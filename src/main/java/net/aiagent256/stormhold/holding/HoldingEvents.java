@@ -7,6 +7,7 @@ import net.aiagent256.stormhold.entity.GarrisonEntity;
 import net.aiagent256.stormhold.entity.Role;
 import net.aiagent256.stormhold.house.House;
 import net.aiagent256.stormhold.house.NameGen;
+import net.aiagent256.stormhold.house.Standing;
 import net.aiagent256.stormhold.item.WarBannerItem;
 import net.aiagent256.stormhold.registry.ModBlocks;
 import net.aiagent256.stormhold.registry.ModItems;
@@ -93,6 +94,10 @@ public final class HoldingEvents {
         if (g.holdingId() != null) {
             Holding h = mgr.holdings.get(g.holdingId());
             if (h != null && h.live.remove(g.getUUID()) != null) {
+                if (h.isHouseOwned() && g.getLastAttacker() instanceof Player killer) {
+                    Standing.change(level, mgr, h.houseId, killer.getUUID(),
+                            role == Role.LORD ? Standing.TOOK_CASTLE / 2 : Standing.KILLED_GUARD, "you killed their " + role.name().toLowerCase());
+                }
                 if (role == Role.LORD) {
                     h.lordAlive = false;
                     level.getServer().getPlayerList().broadcastSystemMessage(gold(h.lordName + " has fallen at " + h.name
@@ -154,6 +159,13 @@ public final class HoldingEvents {
             return;
         }
         mgr.playerColors.put(player.getUUID(), WarBannerItem.color(stack));
+        if (h.isHouseOwned() && Standing.friendly(mgr, h.houseId, player.getUUID())) {
+            // the house is friendly and its lord is dead: the garrison bends the knee
+            level.getServer().getPlayerList().broadcastSystemMessage(gold("The garrison of " + h.name
+                    + " bends the knee to " + player.getGameProfile().getName() + "."), false);
+            transfer(level, mgr, h, me, true);
+            return;
+        }
         h.claimant = player.getUUID();
         if (!me.equals(h.contestSide)) {
             h.contestSide = me;
@@ -250,7 +262,14 @@ public final class HoldingEvents {
 
     /** The castle changes hands. */
     public static void transfer(ServerLevel level, HoldingManager mgr, Holding h, String newSide) {
+        transfer(level, mgr, h, newSide, false);
+    }
+
+    public static void transfer(ServerLevel level, HoldingManager mgr, Holding h, String newSide, boolean peaceful) {
         String oldSide = h.owner;
+        if (Sides.isHouse(oldSide) && Sides.isPlayer(newSide) && !peaceful) {
+            Standing.change(level, mgr, h.houseId, Sides.playerId(newSide), Standing.TOOK_CASTLE, "you took " + h.name);
+        }
         Garrisons.discardLive(level, h.live, true);
         h.usedPosts.clear();
         clearContest(h);
@@ -268,7 +287,7 @@ public final class HoldingEvents {
         }
         if (Sides.isPlayer(newSide)) {
             h.lordAlive = false;
-            h.fillGarrison(0.5);
+            h.fillGarrison(peaceful ? 0.8 : 0.5);
             h.mode = Holding.Mode.DEFEND;
             h.nextRaid = now + raidDelay(level);
             h.raidWarned = false;

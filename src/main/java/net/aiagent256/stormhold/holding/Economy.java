@@ -199,6 +199,10 @@ public final class Economy {
                 if (id != null) dest.addStock(id, st.getCount());
                 delivered += st.getCount();
             }
+            if (dest.isHouseOwned() && delivered > 0) {
+                net.aiagent256.stormhold.house.Standing.change(level, mgr, dest.houseId, origin.ownerPlayer(),
+                        net.aiagent256.stormhold.house.Standing.SUPPLIED_CASTLE, "you supplied " + dest.name);
+            }
         } else {
             level.getChunkAt(s.to);
             BlockEntity be = level.getBlockEntity(s.to);

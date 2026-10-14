@@ -24,6 +24,8 @@ public final class StormholdCommand {
                 .then(Commands.literal("list").executes(StormholdCommand::list))
                 .then(Commands.literal("nearest").executes(StormholdCommand::nearest))
                 .then(Commands.literal("info").executes(StormholdCommand::info))
+                .then(Commands.literal("houses").executes(StormholdCommand::houses))
+                .then(Commands.literal("befriend").requires(s -> s.hasPermission(2)).executes(StormholdCommand::befriend))
                 .then(Commands.literal("capture").requires(s -> s.hasPermission(2)).executes(StormholdCommand::capture))
                 .then(Commands.literal("raid").requires(s -> s.hasPermission(2)).executes(StormholdCommand::raid))
                 .then(Commands.literal("killlord").requires(s -> s.hasPermission(2)).executes(StormholdCommand::killLord)));
@@ -71,8 +73,41 @@ public final class StormholdCommand {
                 + "Held by " + HoldingEvents.ownerName(level, mgr, h.owner) + (h.isHouseOwned() ? (h.lordAlive ? ", " + h.lordName + " lives" : ", lord dead") : "") + "\n"
                 + "Captain " + h.count(Role.CAPTAIN) + ", knights " + h.count(Role.KNIGHT) + ", archers " + h.count(Role.ARCHER)
                 + ", crossbows " + h.count(Role.CROSSBOWMAN) + "\nBanner stand at " + h.bannerPos.toShortString()
-                + (h.contestProgress > 0 ? "\nBeing taken: " + h.contestProgress + "s" : "");
+                + (h.contestProgress > 0 ? "\nBeing taken: " + h.contestProgress + "s" : "")
+                + (h.isHouseOwned() && c.getSource().getEntity() instanceof net.minecraft.server.level.ServerPlayer sp
+                ? "\n" + mgr.house(h.houseId).title() + " counts you a " + net.aiagent256.stormhold.house.Standing.word(
+                net.aiagent256.stormhold.house.Standing.get(mgr, h.houseId, sp.getUUID())) + " ("
+                + net.aiagent256.stormhold.house.Standing.get(mgr, h.houseId, sp.getUUID()) + ")" : "");
         c.getSource().sendSuccess(() -> Component.literal(s), false);
+        return 1;
+    }
+
+    /** Every house you've met and how it feels about you. */
+    private static int houses(CommandContext<CommandSourceStack> c) {
+        if (!(c.getSource().getEntity() instanceof net.minecraft.server.level.ServerPlayer sp)) return 0;
+        HoldingManager mgr = HoldingManager.get(c.getSource().getLevel());
+        StringBuilder sb = new StringBuilder();
+        for (var house : mgr.houses.values()) {
+            if (house.id.equals("outlaws")) continue;
+            int castles = 0;
+            for (Holding h : mgr.holdings.values()) if (h.isHouseOwned() && h.houseId.equals(house.id)) castles++;
+            if (castles == 0) continue;
+            int v = net.aiagent256.stormhold.house.Standing.get(mgr, house.id, sp.getUUID());
+            sb.append(house.title()).append(": ").append(net.aiagent256.stormhold.house.Standing.word(v)).append(" (").append(v)
+                    .append("), ").append(castles).append(castles == 1 ? " castle\n" : " castles\n");
+        }
+        String s = sb.length() == 0 ? "You haven't met any houses yet." : sb.toString().trim();
+        c.getSource().sendSuccess(() -> Component.literal(s), false);
+        return 1;
+    }
+
+    /** Testing: make the nearest castle's house friendly to you. */
+    private static int befriend(CommandContext<CommandSourceStack> c) {
+        Holding h = nearestTo(c.getSource());
+        if (h == null || !(c.getSource().getEntity() instanceof net.minecraft.server.level.ServerPlayer sp)) return 0;
+        ServerLevel level = c.getSource().getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        net.aiagent256.stormhold.house.Standing.change(level, mgr, h.houseId, sp.getUUID(), 100, "command");
         return 1;
     }
 

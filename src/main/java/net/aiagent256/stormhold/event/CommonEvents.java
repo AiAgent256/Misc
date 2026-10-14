@@ -61,6 +61,17 @@ public final class CommonEvents {
     @SubscribeEvent
     public static void death(LivingDeathEvent e) {
         if (e.getEntity() instanceof GarrisonEntity g && !g.level().isClientSide) HoldingEvents.onDeath(g);
+        // killing monsters at a house's gates earns a little goodwill
+        if (!(e.getEntity() instanceof GarrisonEntity) && e.getEntity() instanceof net.minecraft.world.entity.monster.Enemy
+                && e.getEntity().level() instanceof ServerLevel level && e.getSource().getEntity() instanceof Player killer) {
+            HoldingManager mgr = HoldingManager.get(level);
+            if (mgr.holdings.isEmpty()) return;
+            Holding h = mgr.at(e.getEntity().blockPosition(), 40);
+            if (h != null && h.isHouseOwned() && h.lordAlive) {
+                net.aiagent256.stormhold.house.Standing.change(level, mgr, h.houseId, killer.getUUID(),
+                        net.aiagent256.stormhold.house.Standing.KILLED_ENEMY_NEAR_CASTLE, "you fought at " + h.name);
+            }
+        }
     }
 
     @SubscribeEvent

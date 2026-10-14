@@ -31,6 +31,11 @@ public final class Campaigns {
             return;
         }
         if (active(mgr, h.id, Campaign.Kind.RAID)) return;
+        if (net.aiagent256.stormhold.house.Standing.friendly(mgr, h.houseId, h.ownerPlayer())) {
+            // a friendly house doesn't march on you; check again tomorrow
+            if (now >= h.nextRaid) h.nextRaid = now + 24000;
+            return;
+        }
         if (!h.raidWarned && now >= h.nextRaid - 24000) {
             h.raidWarned = true;
             HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("Scouts report " + mgr.house(h.houseId).title()
@@ -71,8 +76,28 @@ public final class Campaigns {
         mgr.campaigns.add(c);
         HoldingEvents.tell(level, h.ownerPlayer(), Component.literal(mgr.house(h.houseId).title() + " marches on "
                 + h.name + " with " + c.total() + " men!").withStyle(ChatFormatting.RED));
+        alliedHelp(level, mgr, h);
         mgr.setDirty();
         return c;
+    }
+
+    /** Friendly houses with a castle nearby send a few knights to stand with you. */
+    static void alliedHelp(ServerLevel level, HoldingManager mgr, Holding h) {
+        java.util.UUID owner = h.ownerPlayer();
+        if (owner == null) return;
+        java.util.Set<String> helped = new java.util.HashSet<>();
+        for (Holding other : mgr.holdings.values()) {
+            if (!other.isHouseOwned() || other.houseId.equals(h.houseId) || helped.contains(other.houseId)) continue;
+            if (!net.aiagent256.stormhold.house.Standing.friendly(mgr, other.houseId, owner)) continue;
+            if (other.center().distSqr(h.center()) > 1500.0 * 1500.0) continue;
+            helped.add(other.houseId);
+            int n = 2 + h.tier;
+            BlockPos at = h.rallyPos.equals(BlockPos.ZERO) ? h.center() : h.rallyPos;
+            if (level.isLoaded(at)) Garrisons.reinforce(level, mgr, h, Role.KNIGHT, n, at, null);
+            else h.add(Role.KNIGHT, n);
+            HoldingEvents.tell(level, owner, HoldingEvents.gold(mgr.house(other.houseId).title() + " sends " + n
+                    + " knights from " + other.name + " to hold " + h.name + " with you."));
+        }
     }
 
     @Nullable
@@ -85,6 +110,10 @@ public final class Campaigns {
         c.tier = h.tier;
         Holding enemy = mgr.at(target, 16);
         c.target = enemy != null && !enemy.owner.equals(h.owner) ? enemy.id : null;
+        if (enemy != null && enemy.isHouseOwned() && c.target != null) {
+            net.aiagent256.stormhold.house.Standing.change(level, mgr, enemy.houseId, h.ownerPlayer(),
+                    net.aiagent256.stormhold.house.Standing.RAIDED_THEM, "you marched on " + enemy.name);
+        }
         c.to = enemy != null ? enemy.bannerPos : target;
         c.from = h.gatePos.equals(BlockPos.ZERO) ? h.center() : h.gatePos;
         for (Role r : new Role[]{Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN}) {

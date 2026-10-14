@@ -46,14 +46,41 @@ public class WarBannerItem extends Item {
         var be = ctx.getLevel().getBlockEntity(ctx.getClickedPos());
         boolean inventory = be instanceof net.minecraft.world.Container
                 || (be != null && be.getCapability(net.minecraftforge.common.capabilities.ForgeCapabilities.ITEM_HANDLER, null).isPresent());
-        if (!inventory) return net.minecraft.world.InteractionResult.PASS;
         net.minecraft.core.BlockPos p = ctx.getClickedPos();
+        if (!inventory) {
+            // plain block: mark a corner of a holding you're founding
+            if (ctx.getLevel().getBlockState(p).is(net.aiagent256.stormhold.registry.ModBlocks.BANNER_STAND.get())) {
+                return net.minecraft.world.InteractionResult.PASS;
+            }
+            var tag = ctx.getItemInHand().getOrCreateTag();
+            boolean second = tag.contains("Corner1") && !tag.contains("Corner2");
+            tag.put(second ? "Corner2" : "Corner1", net.minecraft.nbt.NbtUtils.writeBlockPos(p));
+            if (!second) tag.remove("Corner2");
+            if (!ctx.getLevel().isClientSide) {
+                if (second) {
+                    net.minecraft.core.BlockPos a = corner(ctx.getItemInHand(), 1);
+                    int sx = Math.abs(p.getX() - a.getX()) + 1, sz = Math.abs(p.getZ() - a.getZ()) + 1;
+                    player.displayClientMessage(Component.literal("Second corner marked: " + sx + " by " + sz
+                            + " blocks. Place a War Table inside to found your holding."), true);
+                } else {
+                    player.displayClientMessage(Component.literal("First corner marked at " + p.toShortString()
+                            + ". Sneak-use on the opposite corner."), true);
+                }
+            }
+            return net.minecraft.world.InteractionResult.sidedSuccess(ctx.getLevel().isClientSide);
+        }
         ctx.getItemInHand().getOrCreateTag().put("Depot", net.minecraft.nbt.NbtUtils.writeBlockPos(p));
         if (!ctx.getLevel().isClientSide) {
             player.displayClientMessage(Component.literal("Supply depot marked at " + p.toShortString()
                     + ". Open a War Table to route a castle's surplus here."), true);
         }
         return net.minecraft.world.InteractionResult.sidedSuccess(ctx.getLevel().isClientSide);
+    }
+
+    @Nullable
+    public static net.minecraft.core.BlockPos corner(ItemStack stack, int n) {
+        if (!stack.hasTag() || !stack.getTag().contains("Corner" + n)) return null;
+        return net.minecraft.nbt.NbtUtils.readBlockPos(stack.getTag().getCompound("Corner" + n));
     }
 
     @Nullable
@@ -66,6 +93,9 @@ public class WarBannerItem extends Item {
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
         net.minecraft.core.BlockPos d = depot(stack);
         if (d != null) tip.add(Component.literal("Depot: " + d.toShortString()).withStyle(ChatFormatting.GRAY));
+        net.minecraft.core.BlockPos c1 = corner(stack, 1), c2 = corner(stack, 2);
+        if (c1 != null) tip.add(Component.literal("Corner 1: " + c1.toShortString() + (c2 != null ? "  Corner 2: " + c2.toShortString() : "")).withStyle(ChatFormatting.GRAY));
+        tip.add(Component.literal("Sneak + use on a block to mark a corner of your own holding.").withStyle(ChatFormatting.DARK_GRAY));
         tip.add(Component.literal("Colours: " + color(stack).getName().replace('_', ' ')).withStyle(ChatFormatting.GRAY));
         tip.add(Component.literal("Use on a castle's banner stand once its lord is dead.").withStyle(ChatFormatting.DARK_GRAY));
         tip.add(Component.literal("Sneak + use to change colours.").withStyle(ChatFormatting.DARK_GRAY));

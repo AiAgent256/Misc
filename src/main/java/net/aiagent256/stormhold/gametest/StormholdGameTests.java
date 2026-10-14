@@ -216,6 +216,88 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    @GameTest(template = "arena")
+    public static void houseStandingGatesGuards(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        String houseId = "standingtest";
+        mgr.house(houseId).disposition = 0;
+        mgr.standing.remove(houseId);
+        if (net.aiagent256.stormhold.house.Standing.friendly(mgr, houseId, player.getUUID())) throw new IllegalStateException("wary house counted friendly");
+        GarrisonEntity knight = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(4, 2, 4)), Sides.house(houseId), false);
+        if (knight == null) throw new IllegalStateException("no knight");
+        try {
+            if (!knight.isHostileTo(player)) throw new IllegalStateException("wary house's knight ignored a stranger");
+            net.aiagent256.stormhold.house.Standing.change(level, mgr, houseId, player.getUUID(), 40, "test");
+            if (!net.aiagent256.stormhold.house.Standing.friendly(mgr, houseId, player.getUUID())) throw new IllegalStateException("+40 did not make friends");
+            knight = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(6, 2, 4)), Sides.house(houseId), false);
+            if (knight.isHostileTo(player)) throw new IllegalStateException("friendly house's knight attacked a friend");
+            net.aiagent256.stormhold.house.Standing.change(level, mgr, houseId, player.getUUID(), net.aiagent256.stormhold.house.Standing.HIT_GUARD, "test");
+            if (net.aiagent256.stormhold.house.Standing.friendly(mgr, houseId, player.getUUID())) throw new IllegalStateException("hitting a guard kept you friendly");
+            net.aiagent256.stormhold.house.Standing.change(level, mgr, houseId, player.getUUID(), -500, "test");
+            if (net.aiagent256.stormhold.house.Standing.get(mgr, houseId, player.getUUID()) != net.aiagent256.stormhold.house.Standing.MIN) throw new IllegalStateException("standing not clamped");
+            // bend the knee: a friendly house with a dead lord hands over peacefully with a bigger garrison
+            Holding h = sample(g);
+            h.houseId = houseId;
+            h.owner = Sides.house(houseId);
+            h.lordAlive = false;
+            mgr.add(h);
+            try {
+                HoldingEvents.transfer(level, mgr, h, Sides.player(player.getUUID()), true);
+                if (!h.owner.equals(Sides.player(player.getUUID()))) throw new IllegalStateException("peaceful transfer failed");
+                if (h.count(Role.KNIGHT) < (int) Math.ceil(h.capacity(Role.KNIGHT) * 0.8)) throw new IllegalStateException("bent knee gave a small garrison");
+                if (net.aiagent256.stormhold.house.Standing.get(mgr, houseId, player.getUUID()) != net.aiagent256.stormhold.house.Standing.MIN)
+                    throw new IllegalStateException("peaceful transfer changed standing");
+            } finally {
+                Garrisons.discardLive(level, h.live, false);
+                mgr.holdings.remove(h.id);
+                mgr.byKey.remove(h.key);
+            }
+        } finally {
+            for (var e : level.getEntitiesOfClass(GarrisonEntity.class, new net.minecraft.world.phys.AABB(g.absolutePos(BlockPos.ZERO)).inflate(20))) e.discard();
+            mgr.standing.remove(houseId);
+            mgr.houses.remove(houseId);
+        }
+        g.succeed();
+    }
+
+    @GameTest(template = "arena")
+    public static void foundHoldingAndSupplyIt(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        var banner = new net.minecraft.world.item.ItemStack(net.aiagent256.stormhold.registry.ModItems.WAR_BANNER.get());
+        banner.getOrCreateTag().put("Corner1", net.minecraft.nbt.NbtUtils.writeBlockPos(g.absolutePos(new BlockPos(1, 2, 1))));
+        banner.getOrCreateTag().put("Corner2", net.minecraft.nbt.NbtUtils.writeBlockPos(g.absolutePos(new BlockPos(14, 2, 14))));
+        player.getInventory().setItem(0, banner);
+        BlockPos table = g.absolutePos(new BlockPos(7, 2, 7));
+        g.setBlock(new BlockPos(7, 2, 7), net.aiagent256.stormhold.registry.ModBlocks.WAR_TABLE.get());
+        Holding h = net.aiagent256.stormhold.holding.Founding.tryFound(level, player, table);
+        if (h == null) throw new IllegalStateException("founding failed");
+        try {
+            if (!h.owner.equals(Sides.player(player.getUUID())) || h.tier != 1 || !h.scanned || h.posts.isEmpty())
+                throw new IllegalStateException("founded holding is wrong: tier " + h.tier + " scanned " + h.scanned);
+            if (mgr.at(table, 0) != h) throw new IllegalStateException("table is not inside its own holding");
+            if (net.aiagent256.stormhold.item.WarBannerItem.corner(banner, 1) != null) throw new IllegalStateException("corners not cleared");
+            player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BREAD, 20));
+            var state = level.getBlockState(table);
+            state.getBlock().use(state, level, table, player, net.minecraft.world.InteractionHand.MAIN_HAND,
+                    new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(table), net.minecraft.core.Direction.UP, table, false));
+            if (h.stock(new net.minecraft.resources.ResourceLocation("minecraft:bread")) != 20) throw new IllegalStateException("bread not stored: " + h.stock);
+            if (!player.getMainHandItem().isEmpty()) throw new IllegalStateException("bread still in hand");
+            player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIRT, 5));
+            state.getBlock().use(state, level, table, player, net.minecraft.world.InteractionHand.MAIN_HAND,
+                    new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(table), net.minecraft.core.Direction.UP, table, false));
+            if (player.getMainHandItem().getCount() != 5) throw new IllegalStateException("dirt was taken");
+        } finally {
+            Garrisons.discardLive(level, h.live, false);
+            mgr.holdings.remove(h.id);
+            mgr.byKey.remove(h.key);
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

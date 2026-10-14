@@ -27,12 +27,16 @@ Private Forge 1.20.1 mod for the Dungeons and Homestead pack. Castles held by ri
 - *Supply to*: any chest, barrel, or modded inventory (MineColonies huts work), or another castle you hold. Sneak-use your War Banner on a chest to mark it as a depot and the table pre-fills it. Couriers walk the road and can be ambushed by brigands.
 - *Muster to me*: turns five garrison soldiers into Villager Recruits units hired to you.
 
+**Houses and standing.** Every house has an opinion of you, from sworn enemy to sworn friend. About a third start friendly. `/stormhold houses` lists them. A friendly house's guards ignore you, its lord sells bread (an emerald) or iron (sneak + emerald), it never raids you, and it sends knights when someone else does. If its lord is dead you can take the castle by bending the knee: raise your banner and the garrison swears to you at once, no counterattack. You earn standing by killing monsters at their gates and running supply lines to their castles. You lose it by hitting their guards, marching on them, or taking their castles. Standing drifts back toward the house's nature one point a day.
+
+**Your own holding.** Build a castle or town, sneak-use a War Banner on two opposite corners (12 to 192 blocks a side), then place a War Table inside. Stormhold scans your walls for guard posts and the place becomes a holding you own: empty at first, trained up from bread and iron you put on the War Table (use the table while holding supplies), raided by the local house if it dislikes you, and commanded like any captured castle.
+
 **Raids.** Every 3 to 5 days the house you took the castle from marches to retake it. You get a warning a day ahead. If you're away it's fought out by numbers; Defend stance helps.
 
 **Lived-in world.** Villagers work inside the walls, fields and orchards appear outside, and a road is laid from the gate to the nearest village as the chunks load. Castles are sited on high, dry ground and keep clear of villages and towns from any mod (anything in `#minecraft:village`, plus a few extras in `#stormhold:castle_avoid`); a watchtower or holdfast never lands inside a great castle.
 
 ## Commands
-`/stormhold list | nearest | info` for everyone; `capture | raid | killlord` for ops (testing).
+`/stormhold list | nearest | info | houses` for everyone; `capture | raid | killlord | befriend` for ops (testing).
 
 ## Building
 CI builds on every push to `main` and runs headless game tests. The jar lands on the `dist` branch, logs on `ci-logs`. Castle structures come from `tools/castlegen` (`python3 build_all.py`).

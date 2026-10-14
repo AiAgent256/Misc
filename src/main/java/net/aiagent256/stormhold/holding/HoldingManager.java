@@ -34,6 +34,9 @@ public class HoldingManager extends SavedData {
     public final List<Campaign> campaigns = new ArrayList<>();
     public final List<Shipment> shipments = new ArrayList<>();
     public final List<RoadPlan> roads = new ArrayList<>();
+    /** house id -> player -> personal standing delta. */
+    public final Map<String, Map<UUID, Integer>> standing = new HashMap<>();
+    public long lastStandingDrift;
 
     public static HoldingManager get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(HoldingManager::load, HoldingManager::new, NAME);
@@ -48,6 +51,7 @@ public class HoldingManager extends SavedData {
             if (accent == base) accent = base == DyeColor.WHITE ? DyeColor.BLACK : DyeColor.WHITE;
             String name = id.equals("outlaws") ? "of the Brigands" : NameGen.house(r);
             h = new House(id, name, base, accent, r.nextInt(64), r.nextBoolean());
+            h.disposition = id.equals("outlaws") ? -100 : r.nextInt(3) == 0 ? 40 : 0;
             houses.put(id, h);
             setDirty();
         }
@@ -127,6 +131,14 @@ public class HoldingManager extends SavedData {
         ListTag rl = new ListTag();
         for (RoadPlan r : roads) rl.add(r.save());
         tag.put("Roads", rl);
+        CompoundTag st = new CompoundTag();
+        standing.forEach((house, m) -> {
+            CompoundTag pm = new CompoundTag();
+            m.forEach((p, v) -> pm.putInt(p.toString(), v));
+            st.put(house, pm);
+        });
+        tag.put("Standing", st);
+        tag.putLong("StandingDrift", lastStandingDrift);
         return tag;
     }
 
@@ -156,6 +168,19 @@ public class HoldingManager extends SavedData {
         for (int i = 0; i < sl.size(); i++) m.shipments.add(Shipment.load(sl.getCompound(i)));
         ListTag rl = tag.getList("Roads", Tag.TAG_COMPOUND);
         for (int i = 0; i < rl.size(); i++) m.roads.add(RoadPlan.load(rl.getCompound(i)));
+        CompoundTag st = tag.getCompound("Standing");
+        for (String house : st.getAllKeys()) {
+            CompoundTag pm = st.getCompound(house);
+            Map<UUID, Integer> pmap = new HashMap<>();
+            for (String k : pm.getAllKeys()) {
+                try {
+                    pmap.put(UUID.fromString(k), pm.getInt(k));
+                } catch (IllegalArgumentException ignored) {
+                }
+            }
+            m.standing.put(house, pmap);
+        }
+        m.lastStandingDrift = tag.getLong("StandingDrift");
         return m;
     }
 }

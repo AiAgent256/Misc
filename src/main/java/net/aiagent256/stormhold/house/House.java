@@ -25,6 +25,8 @@ public class House {
     public final DyeColor accent;
     public final int emblem;
     public final boolean border;
+    /** Base attitude toward strangers; see {@link Standing}. Friendly houses start at 40, wary ones at 0. */
+    public int disposition;
 
     public House(String id, String name, DyeColor base, DyeColor accent, int emblem, boolean border) {
         this.id = id;
@@ -53,12 +55,15 @@ public class House {
         t.putInt("Accent", accent.getId());
         t.putInt("Emblem", emblem);
         t.putBoolean("Border", border);
+        t.putInt("Disposition", disposition);
         return t;
     }
 
     public static House load(CompoundTag t) {
-        return new House(t.getString("Id"), t.getString("Name"), DyeColor.byId(t.getInt("Base")),
+        House h = new House(t.getString("Id"), t.getString("Name"), DyeColor.byId(t.getInt("Base")),
                 DyeColor.byId(t.getInt("Accent")), t.getInt("Emblem"), t.getBoolean("Border"));
+        h.disposition = t.getInt("Disposition");
+        return h;
     }
 
 }

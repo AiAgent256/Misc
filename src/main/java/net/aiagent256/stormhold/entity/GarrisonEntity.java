@@ -160,13 +160,33 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         }
         if (e instanceof Player p) {
             if (p.isCreative() || p.isSpectator()) return false;
-            return isHouse() && !side.equals(Sides.player(p.getUUID()));
+            if (!isHouse() || side.equals(Sides.player(p.getUUID()))) return false;
+            // a friendly house leaves you alone unless you've just drawn blood here
+            return alarmTicks > 0 || !isFriendlyTo(p);
         }
         String rs = RecruitsCompat.sideOf(e);
         if (rs != null) return !rs.equals(side) && (isHouse() || Sides.isPlayer(rs));
         if (!isHouse() && e instanceof Enemy && !(e instanceof Creeper)) return true;
         return false;
     }
+
+    /** The house this soldier serves counts the player a friend. Checked at most every half second. */
+    public boolean isFriendlyTo(Player p) {
+        if (!isHouse() || !(this.level() instanceof net.minecraft.server.level.ServerLevel sl)) return false;
+        String hid = Sides.houseId(side);
+        if (hid == null) return false;
+        long now = sl.getGameTime();
+        if (friendCache != null && friendCache.equals(p.getUUID()) && now - friendCacheTime < 10) return friendCached;
+        friendCache = p.getUUID();
+        friendCacheTime = now;
+        friendCached = net.aiagent256.stormhold.house.Standing.friendly(
+                net.aiagent256.stormhold.holding.HoldingManager.get(sl), hid, p.getUUID());
+        return friendCached;
+    }
+
+    @Nullable private UUID friendCache;
+    private long friendCacheTime;
+    private boolean friendCached;
 
     @Override
     public boolean isAlliedTo(Entity other) {
@@ -203,6 +223,16 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         boolean result = super.hurt(src, amount);
         if (result && !this.level().isClientSide && attacker instanceof LivingEntity le) {
             HoldingEvents.onGarrisonHurt(this, le);
+            if (isHouse() && le instanceof Player p && this.level() instanceof net.minecraft.server.level.ServerLevel sl) {
+                String hid = Sides.houseId(side);
+                if (hid != null) {
+                    var mgr = net.aiagent256.stormhold.holding.HoldingManager.get(sl);
+                    int delta = net.aiagent256.stormhold.house.Standing.friendly(mgr, hid, p.getUUID())
+                            ? net.aiagent256.stormhold.house.Standing.HIT_GUARD : -3;
+                    net.aiagent256.stormhold.house.Standing.change(sl, mgr, hid, p.getUUID(), delta, "you attacked their soldier");
+                    alarmTicks = 600;
+                }
+            }
         }
         return result;
     }
@@ -223,6 +253,31 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
             le.knockback(0.9, Math.sin(this.getYRot() * ((float) Math.PI / 180F)), -Math.cos(this.getYRot() * ((float) Math.PI / 180F)));
         }
         return hit;
+    }
+
+    /** A friendly lord sells supplies: an emerald buys 8 bread, or 4 iron ingots when sneaking. */
+    @Override
+    protected net.minecraft.world.InteractionResult mobInteract(Player player, net.minecraft.world.InteractionHand hand) {
+        if (role() != Role.LORD || !isHouse() || !(this.level() instanceof net.minecraft.server.level.ServerLevel sl)) {
+            return super.mobInteract(player, hand);
+        }
+        ItemStack held = player.getItemInHand(hand);
+        if (!isFriendlyTo(player)) {
+            if (!held.is(Items.EMERALD)) return super.mobInteract(player, hand);
+            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                    this.getDisplayName().getString() + " will not trade with you."), true);
+            return net.minecraft.world.InteractionResult.sidedSuccess(sl.isClientSide);
+        }
+        if (!held.is(Items.EMERALD)) {
+            player.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                    this.getDisplayName().getString() + ": \"An emerald buys bread. Sneak for iron.\""), true);
+            return net.minecraft.world.InteractionResult.sidedSuccess(sl.isClientSide);
+        }
+        held.shrink(1);
+        ItemStack goods = player.isShiftKeyDown() ? new ItemStack(Items.IRON_INGOT, 4) : new ItemStack(Items.BREAD, 8);
+        if (!player.getInventory().add(goods)) player.drop(goods, false);
+        this.playSound(SoundEvents.VILLAGER_YES, 1.0F, 1.0F);
+        return net.minecraft.world.InteractionResult.sidedSuccess(sl.isClientSide);
     }
 
     @Override

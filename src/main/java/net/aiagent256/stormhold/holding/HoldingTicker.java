@@ -15,6 +15,10 @@ public final class HoldingTicker {
         Roads.tick(level, mgr);
         if (t % 20 != 0) return;
         for (Holding h : mgr.holdings.values()) tickHolding(level, mgr, h, t);
+        if (t - mgr.lastStandingDrift >= 24000) {
+            mgr.lastStandingDrift = t;
+            net.aiagent256.stormhold.house.Standing.drift(mgr);
+        }
         Campaigns.tick(level, mgr, t);
         Economy.tickShipments(level, mgr);
     }
