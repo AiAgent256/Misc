@@ -168,7 +168,7 @@ public class WarTableScreen extends Screen {
             g.drawWordWrap(this.font, Component.literal("You hold no castles. Kill a castle's lord, then raise a War Banner on "
                     + "its banner stand and hold it until the garrison yields."), rx, y0 + 26, W - 136, 0xE0D0B0);
         } else {
-            String tier = h.tier() == 3 ? "Great castle" : h.tier() == 2 ? "Holdfast" : "Watchtower";
+            String tier = net.aiagent256.stormhold.holding.Holding.tierName(h.tier());
             g.drawString(this.font, h.name(), rx, y0 + 7, 0xFFE8B0, false);
             g.drawString(this.font, tier + " at " + h.pos().getX() + ", " + h.pos().getZ(), rx, y0 + 22, 0xC8B898, false);
             int[] c = h.counts(), cap = h.capacity();

@@ -288,7 +288,7 @@ def pointed_arch(g, x0, x1, y0, height, z0, z1, axis="z", block="minecraft:air")
 
 
 def building(g, x0, z0, x1, z1, GL, wall_h, axis, door_cells=(), upper_floor=None,
-             wall_block=STONE, chimney=None, timber=False):
+             wall_block=STONE, chimney=None, timber=False, roof=None):
     """Rectangular building with gable roof. Returns interior bounds."""
     g.fill(x0, 0, z0, x1, GL - 2, z1, FOUND)
     g.fill(x0, GL - 1, z0, x1, GL - 1, z1, PLANK if timber else FLOOR_STONE)
@@ -323,7 +323,7 @@ def building(g, x0, z0, x1, z1, GL, wall_h, axis, door_cells=(), upper_floor=Non
         g.fill(x, GL, z, x, GL + 2, z, "minecraft:air")
     if upper_floor:
         g.fill(x0 + 1, upper_floor, z0 + 1, x1 - 1, upper_floor, z1 - 1, PLANK)
-    top = gable_roof(g, x0, z0, x1, z1, GL + wall_h, axis, ROOF_STAIR, wall_block)
+    top = gable_roof(g, x0, z0, x1, z1, GL + wall_h, axis, roof or ROOF_STAIR, wall_block)
     if chimney:
         cx, cz = chimney
         g.fill(cx, GL, cz, cx, top + 1, cz, "minecraft:bricks")

@@ -27,6 +27,8 @@ public class House {
     public final boolean border;
     /** Base attitude toward strangers; see {@link Standing}. Friendly houses start at 40, wary ones at 0. */
     public int disposition;
+    /** The holding that is this house's seat (its Great City), if one has been found. */
+    @org.jetbrains.annotations.Nullable public java.util.UUID capital;
 
     public House(String id, String name, DyeColor base, DyeColor accent, int emblem, boolean border) {
         this.id = id;
@@ -56,6 +58,7 @@ public class House {
         t.putInt("Emblem", emblem);
         t.putBoolean("Border", border);
         t.putInt("Disposition", disposition);
+        if (capital != null) t.putUUID("Capital", capital);
         return t;
     }
 
@@ -63,6 +66,7 @@ public class House {
         House h = new House(t.getString("Id"), t.getString("Name"), DyeColor.byId(t.getInt("Base")),
                 DyeColor.byId(t.getInt("Accent")), t.getInt("Emblem"), t.getBoolean("Border"));
         h.disposition = t.getInt("Disposition");
+        if (t.hasUUID("Capital")) h.capital = t.getUUID("Capital");
         return h;
     }
 

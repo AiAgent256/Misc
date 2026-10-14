@@ -163,13 +163,13 @@ public final class Garrisons {
     }
 
     public static double health(Role r, int tier) {
-        int t = Math.max(1, Math.min(3, tier));
+        int t = Math.max(1, Math.min(Holding.MAX_TIER, tier));
         return switch (r) {
-            case LORD -> new double[]{120, 170, 230}[t - 1];
-            case CAPTAIN -> new double[]{44, 60, 80}[t - 1];
-            case KNIGHT -> new double[]{28, 32, 38}[t - 1];
-            case ARCHER -> new double[]{20, 24, 26}[t - 1];
-            case CROSSBOWMAN -> new double[]{22, 26, 30}[t - 1];
+            case LORD -> new double[]{120, 170, 230, 320}[t - 1];
+            case CAPTAIN -> new double[]{44, 60, 80, 96}[t - 1];
+            case KNIGHT -> new double[]{28, 32, 38, 42}[t - 1];
+            case ARCHER -> new double[]{20, 24, 26, 28}[t - 1];
+            case CROSSBOWMAN -> new double[]{22, 26, 30, 32}[t - 1];
             case COURIER -> 24;
         };
     }

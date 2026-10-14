@@ -1,0 +1,30 @@
+{
+ "structures": [
+  {
+   "structure": "stormhold:great_city_north",
+   "weight": 3
+  },
+  {
+   "structure": "stormhold:great_city_riverlands",
+   "weight": 3
+  },
+  {
+   "structure": "stormhold:great_city_reach",
+   "weight": 2
+  },
+  {
+   "structure": "stormhold:great_city_dorne",
+   "weight": 2
+  },
+  {
+   "structure": "stormhold:great_city_stormlands",
+   "weight": 2
+  }
+ ],
+ "placement": {
+  "type": "minecraft:random_spread",
+  "spacing": 96,
+  "separation": 48,
+  "salt": 402911733
+ }
+}

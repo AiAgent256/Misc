@@ -103,7 +103,7 @@ public final class Founding {
         h.bannersDirty = true;
         Garrisons.recolorBanners(level, mgr, h);
         level.playSound(null, table, SoundEvents.RAID_HORN.value(), SoundSource.PLAYERS, 6.0F, 1.1F);
-        String tier = h.tier == 3 ? "great castle" : h.tier == 2 ? "holdfast" : "watchtower";
+        String tier = Holding.tierName(h.tier).toLowerCase();
         int posts = h.posts.values().stream().mapToInt(java.util.List::size).sum();
         player.sendSystemMessage(Component.literal("You found " + h.name + ", a " + tier + " of " + sx + " by " + sz
                 + " blocks. " + posts + " guard posts found. Put bread and iron on the War Table to train soldiers; "

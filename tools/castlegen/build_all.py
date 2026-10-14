@@ -10,6 +10,7 @@ import time
 sys.path.insert(0, os.path.dirname(__file__))
 import castle
 import castle2
+import city
 import export
 import render
 import themes
@@ -21,7 +22,7 @@ LAYOUT_DIR = os.path.join(ROOT, "src/main/resources/data/stormhold/castle_layout
 
 
 LAYOUTS = (castle.great_castle_a, castle2.great_castle_b, castle2.great_castle_c,
-           castle.holdfast_a, castle2.holdfast_b, castle.watchtower_a, castle2.watchtower_b)
+           castle.holdfast_a, castle2.holdfast_b, castle.watchtower_a, castle2.watchtower_b, city.great_city)
 
 
 def main():

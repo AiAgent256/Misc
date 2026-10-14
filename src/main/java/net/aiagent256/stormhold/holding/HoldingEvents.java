@@ -301,7 +301,7 @@ public final class HoldingEvents {
             }
         } else {
             h.lordAlive = true;
-            h.lordName = (h.tier == 1 ? "Castellan " : h.tier == 2 ? "Ser " : "Lord ") + NameGen.first(level.random)
+            h.lordName = Holding.lordTitle(h.tier) + NameGen.first(level.random)
                     + " " + ownerName(level, mgr, newSide).replace("House ", "");
             h.fillGarrison(0.6);
         }
@@ -314,6 +314,19 @@ public final class HoldingEvents {
         if (p != null) {
             tell(level, p, Component.literal("The garrison swears to you. Use the War Table in the hall to give orders.")
                     .withStyle(ChatFormatting.GREEN));
+            House house = mgr.houseOf(oldSide);
+            if (house != null && h.id.equals(house.capital)) {
+                // the crown has fallen: every leaderless castle of the house bends the knee
+                int bent = 0;
+                for (Holding other : new java.util.ArrayList<>(mgr.holdings.values())) {
+                    if (other != h && other.isHouseOwned() && other.houseId.equals(house.id) && !other.lordAlive) {
+                        transfer(level, mgr, other, newSide, true);
+                        bent++;
+                    }
+                }
+                level.getServer().getPlayerList().broadcastSystemMessage(gold(house.title() + " has lost its seat. "
+                        + (bent > 0 ? bent + " of its castles bend the knee." : "Its remaining lords hold out.")), false);
+            }
         }
         mgr.setDirty();
     }

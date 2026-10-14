@@ -9,6 +9,8 @@ TIERS = {
                      "spacing": 46, "separation": 20, "salt": 718213044},
     "holdfast": {"layouts": ["holdfast_a", "holdfast_b"], "spacing": 30, "separation": 12, "salt": 515870611},
     "watchtower": {"layouts": ["watchtower_a", "watchtower_b"], "spacing": 18, "separation": 7, "salt": 93011254},
+    # one capital per house region (1536 blocks); it levels a lot of ground, so it tolerates rough terrain
+    "great_city": {"layouts": ["great_city"], "spacing": 96, "separation": 48, "salt": 402911733, "max_slope": 36},
 }
 # Castles keep clear of these (and smaller castles keep clear of bigger ones). Siting shifts a castle
 # away from a possible village rather than dropping it. Modded entries are optional.
@@ -53,6 +55,8 @@ def write(root, layout_meta):
                 "theme": theme,
                 "layouts": layouts,
             }
+            if "max_slope" in cfg:
+                st["max_slope"] = cfg["max_slope"]
             with open(os.path.join(sdir, f"{sid}.json"), "w") as f:
                 json.dump(st, f, indent=1)
             entries.append({"structure": f"stormhold:{sid}", "weight": THEME_WEIGHT[theme]})
@@ -63,7 +67,7 @@ def write(root, layout_meta):
                 "spacing": cfg["spacing"], "separation": cfg["separation"], "salt": cfg["salt"],
             },
         }
-        with open(os.path.join(setdir, f"{tier}s.json"), "w") as f:
+        with open(os.path.join(setdir, f"{tier}s.json" if tier != "great_city" else "great_cities.json"), "w") as f:
             json.dump(sset, f, indent=1)
     avoid_dir = os.path.join(base, "tags/worldgen/structure")
     os.makedirs(avoid_dir, exist_ok=True)

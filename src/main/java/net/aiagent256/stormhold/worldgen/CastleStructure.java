@@ -85,9 +85,11 @@ public class CastleStructure extends Structure {
         List<Avoidance.Threat> threats = ignoreTerrain ? List.of()
                 : Avoidance.near(ctx, cp.getMiddleBlockX(), cp.getMiddleBlockZ(), 46 + own + 110, maxHalfSize());
         Site best = null;
+        // chunks only reference structure starts within 8 chunks, so a 256-block layout can shift at most one chunk
+        int shift = Math.max(chosen.sizeX(), chosen.sizeZ()) > 200 ? 16 : 32;
         for (int i = -1; i <= 1; i++) {
             for (int j = -1; j <= 1; j++) {
-                int sx = cp.getMiddleBlockX() + i * 32, sz = cp.getMiddleBlockZ() + j * 32;
+                int sx = cp.getMiddleBlockX() + i * shift, sz = cp.getMiddleBlockZ() + j * shift;
                 Avoidance.Threat t = Avoidance.crowds(threats, sx, sz, own);
                 if (t != null) {
                     lastRejection = "too close to " + t.name() + " at " + t.x() + ", " + t.z();

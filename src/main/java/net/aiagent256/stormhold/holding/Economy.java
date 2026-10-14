@@ -37,12 +37,14 @@ public final class Economy {
             {"bread:16", "iron_ingot:8", "gold_ingot:3", "arrow:32", "coal:8", "leather:4", "wheat:12"},
             {"bread:32", "iron_ingot:16", "gold_ingot:8", "arrow:64", "emerald:4", "diamond:1", "coal:16",
                     "leather:8", "wheat:16"},
+            {"bread:64", "iron_ingot:32", "gold_ingot:16", "arrow:128", "emerald:12", "diamond:3", "coal:32",
+                    "leather:16", "wheat:32"},
     };
 
     public static void tickHolding(ServerLevel level, HoldingManager mgr, Holding h, long now) {
         if (!h.isPlayerOwned()) return;
         if (h.mode == Holding.Mode.PRODUCE && now >= h.nextProduce) {
-            for (String g : GOODS[Math.max(1, Math.min(3, h.tier)) - 1]) {
+            for (String g : GOODS[Math.max(1, Math.min(Holding.MAX_TIER, h.tier)) - 1]) {
                 String[] kv = g.split(":");
                 h.addStock(new ResourceLocation("minecraft", kv[0]), Integer.parseInt(kv[1]));
             }

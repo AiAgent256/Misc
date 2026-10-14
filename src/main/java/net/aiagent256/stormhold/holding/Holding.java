@@ -31,7 +31,27 @@ public class Holding {
             {1, 6, 4, 1},
             {1, 12, 8, 3},
             {2, 22, 14, 8},
+            {3, 36, 26, 14},
     };
+    public static final int MAX_TIER = 4;
+
+    public static String tierName(int tier) {
+        return switch (tier) {
+            case 1 -> "Watchtower";
+            case 2 -> "Holdfast";
+            case 3 -> "Great castle";
+            default -> "City";
+        };
+    }
+
+    public static String lordTitle(int tier) {
+        return switch (tier) {
+            case 1 -> "Castellan ";
+            case 2 -> "Ser ";
+            case 3 -> "Lord ";
+            default -> "King ";
+        };
+    }
 
     public UUID id = UUID.randomUUID();
     public String key = "";
@@ -72,7 +92,7 @@ public class Holding {
     public int idleSeconds;
 
     public static int capacity(int tier, Role role) {
-        int t = Math.max(1, Math.min(3, tier)) - 1;
+        int t = Math.max(1, Math.min(MAX_TIER, tier)) - 1;
         int base = switch (role) {
             case CAPTAIN -> CAPACITY[t][0];
             case KNIGHT -> CAPACITY[t][1];

@@ -128,6 +128,11 @@
   "stormhold:watchtower_riverlands",
   "stormhold:watchtower_reach",
   "stormhold:watchtower_dorne",
-  "stormhold:watchtower_stormlands"
+  "stormhold:watchtower_stormlands",
+  "stormhold:great_city_north",
+  "stormhold:great_city_riverlands",
+  "stormhold:great_city_reach",
+  "stormhold:great_city_dorne",
+  "stormhold:great_city_stormlands"
  ]
 }

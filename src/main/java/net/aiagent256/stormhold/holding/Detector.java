@@ -132,12 +132,12 @@ public final class Detector {
         h.houseId = house.id;
         h.owner = Sides.house(house.id);
         h.name = NameGen.place(rnd, h.tier);
-        String title = switch (h.tier) {
-            case 1 -> "Castellan ";
-            case 2 -> "Ser ";
-            default -> "Lord ";
-        };
-        h.lordName = title + NameGen.first(rnd) + " " + house.name;
+        h.lordName = Holding.lordTitle(h.tier) + NameGen.first(rnd) + " " + house.name;
+        if (h.tier >= 4) {
+            // the capital: the house's seat, and friendly to strangers unless the house is already an enemy
+            house.capital = h.id;
+            if (house.disposition < 40) house.disposition = 40;
+        }
         h.fillGarrison(1.0);
         h.lordAlive = true;
         mgr.add(h);
