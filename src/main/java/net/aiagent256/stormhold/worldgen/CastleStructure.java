@@ -83,7 +83,7 @@ public class CastleStructure extends Structure {
         ChunkPos cp = ctx.chunkPos();
         int own = Math.max(chosen.sizeX(), chosen.sizeZ()) / 2;
         List<Avoidance.Threat> threats = ignoreTerrain ? List.of()
-                : Avoidance.near(ctx, cp.getMiddleBlockX(), cp.getMiddleBlockZ(), 46 + own + 110, own);
+                : Avoidance.near(ctx, cp.getMiddleBlockX(), cp.getMiddleBlockZ(), 46 + own + 110, maxHalfSize());
         Site best = null;
         for (int i = -1; i <= 1; i++) {
             for (int j = -1; j <= 1; j++) {

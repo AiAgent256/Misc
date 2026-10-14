@@ -176,16 +176,19 @@ public class StormholdGameTests {
     @GameTest(template = "arena")
     public static void spawnsAvoidWalls(GameTestHelper g) {
         ServerLevel level = g.getLevel();
-        BlockPos post = g.absolutePos(new BlockPos(5, 2, 5));
-        if (!post.equals(Garrisons.standable(level, post))) throw new IllegalStateException("open floor post was moved");
-        g.setBlock(new BlockPos(5, 2, 5), net.minecraft.world.level.block.Blocks.STONE);
-        g.setBlock(new BlockPos(5, 3, 5), net.minecraft.world.level.block.Blocks.STONE);
+        int fy = 1;
+        while (!level.getBlockState(g.absolutePos(new BlockPos(5, fy, 5))).isAir() && fy < 6) fy++;
+        BlockPos post = g.absolutePos(new BlockPos(5, fy, 5));
+        if (!post.equals(Garrisons.standable(level, post)))
+            throw new IllegalStateException("open floor post was moved: " + post + " -> " + Garrisons.standable(level, post));
+        g.setBlock(new BlockPos(5, fy, 5), net.minecraft.world.level.block.Blocks.STONE);
+        g.setBlock(new BlockPos(5, fy + 1, 5), net.minecraft.world.level.block.Blocks.STONE);
         BlockPos moved = Garrisons.standable(level, post);
         if (moved == null || !level.getBlockState(moved).isAir() || !level.getBlockState(moved.above()).isAir())
             throw new IllegalStateException("buried post gave " + moved);
-        for (int x = 8; x <= 12; x++) for (int y = 2; y <= 7; y++) for (int z = 8; z <= 12; z++)
+        for (int x = 8; x <= 12; x++) for (int y = fy; y <= fy + 5; y++) for (int z = 8; z <= 12; z++)
             g.setBlock(new BlockPos(x, y, z), net.minecraft.world.level.block.Blocks.STONE);
-        BlockPos sealed = Garrisons.standable(level, g.absolutePos(new BlockPos(10, 2, 10)));
+        BlockPos sealed = Garrisons.standable(level, g.absolutePos(new BlockPos(10, fy, 10)));
         if (sealed != null) throw new IllegalStateException("found room inside solid stone at " + sealed);
         g.succeed();
     }

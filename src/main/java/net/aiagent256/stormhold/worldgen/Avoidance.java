@@ -72,15 +72,16 @@ public final class Avoidance {
     }
 
     /**
-     * Everything that could start within {@code radius} blocks of (x, z) and that a castle of half-size
-     * {@code ownSize} should keep clear of. The chunk the castle itself starts in is skipped.
+     * Everything that could start within {@code radius} blocks of (x, z) that a castle should keep clear of.
+     * Castle sets no bigger than {@code yieldBelow} (the asking castle's own biggest layout) are ignored, so
+     * small castles make way for big ones and never the other way round. The asker's own chunk is skipped.
      */
-    public static List<Threat> near(Structure.GenerationContext ctx, int x, int z, int radius, int ownSize) {
+    public static List<Threat> near(Structure.GenerationContext ctx, int x, int z, int radius, int yieldBelow) {
         List<Threat> out = new ArrayList<>();
         long seed = ctx.seed();
         ChunkPos self = ctx.chunkPos();
         for (Watch w : watches(ctx.registryAccess())) {
-            if (w.castleSize() > 0 && w.castleSize() <= ownSize) continue;
+            if (w.castleSize() > 0 && w.castleSize() <= yieldBelow) continue;
             RandomSpreadStructurePlacement rs = w.placement();
             int spacing = Math.max(1, rs.spacing());
             int c0x = SectionPos.blockToSectionCoord(x - radius), c1x = SectionPos.blockToSectionCoord(x + radius);
