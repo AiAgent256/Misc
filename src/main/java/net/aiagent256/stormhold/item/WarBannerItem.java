@@ -38,8 +38,34 @@ public class WarBannerItem extends Item {
         return InteractionResultHolder.pass(stack);
     }
 
+    /** Sneak-use on a chest or any inventory block to mark it as a supply depot for the War Table. */
+    @Override
+    public net.minecraft.world.InteractionResult useOn(net.minecraft.world.item.context.UseOnContext ctx) {
+        Player player = ctx.getPlayer();
+        if (player == null || !player.isShiftKeyDown()) return net.minecraft.world.InteractionResult.PASS;
+        var be = ctx.getLevel().getBlockEntity(ctx.getClickedPos());
+        boolean inventory = be instanceof net.minecraft.world.Container
+                || (be != null && be.getCapability(net.minecraftforge.common.capabilities.ForgeCapabilities.ITEM_HANDLER, null).isPresent());
+        if (!inventory) return net.minecraft.world.InteractionResult.PASS;
+        net.minecraft.core.BlockPos p = ctx.getClickedPos();
+        ctx.getItemInHand().getOrCreateTag().put("Depot", net.minecraft.nbt.NbtUtils.writeBlockPos(p));
+        if (!ctx.getLevel().isClientSide) {
+            player.displayClientMessage(Component.literal("Supply depot marked at " + p.toShortString()
+                    + ". Open a War Table to route a castle's surplus here."), true);
+        }
+        return net.minecraft.world.InteractionResult.sidedSuccess(ctx.getLevel().isClientSide);
+    }
+
+    @Nullable
+    public static net.minecraft.core.BlockPos depot(ItemStack stack) {
+        if (!stack.hasTag() || !stack.getTag().contains("Depot")) return null;
+        return net.minecraft.nbt.NbtUtils.readBlockPos(stack.getTag().getCompound("Depot"));
+    }
+
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tip, TooltipFlag flag) {
+        net.minecraft.core.BlockPos d = depot(stack);
+        if (d != null) tip.add(Component.literal("Depot: " + d.toShortString()).withStyle(ChatFormatting.GRAY));
         tip.add(Component.literal("Colours: " + color(stack).getName().replace('_', ' ')).withStyle(ChatFormatting.GRAY));
         tip.add(Component.literal("Use on a castle's banner stand once its lord is dead.").withStyle(ChatFormatting.DARK_GRAY));
         tip.add(Component.literal("Sneak + use to change colours.").withStyle(ChatFormatting.DARK_GRAY));

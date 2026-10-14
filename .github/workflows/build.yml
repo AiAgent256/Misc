@@ -24,7 +24,9 @@ jobs:
           gradle-version: 8.1.1
 
       - name: Build
-        run: gradle build --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          gradle build --no-daemon --stacktrace 2>&1 | tee build.log
 
       - name: Game tests (headless server)
         run: |
@@ -32,35 +34,39 @@ jobs:
           timeout 900 gradle runGameTestServer --no-daemon > gametest.log 2>&1
           code=$?
           set -e
-          grep -E "GAME TESTS COMPLETE|required tests (passed|failed)|::|failed!|Exception|Error" gametest.log | grep -v "DEBUG" | tail -80
-          if grep -q "All [0-9]* required tests passed" gametest.log; then echo "game tests passed"; else echo "game tests FAILED (exit $code)"; tail -120 gametest.log; exit 1; fi
+          grep -E "GAME TESTS COMPLETE|required tests (passed|failed)|failed!|Exception" gametest.log | tail -60
+          if grep -q "All [0-9]* required tests passed" gametest.log; then echo "game tests passed"; else echo "game tests FAILED (exit $code)"; tail -150 gametest.log; exit 1; fi
 
-      - uses: actions/upload-artifact@v4
+      - name: Publish logs to ci-logs branch
         if: always()
-        with:
-          name: gametest-log
-          path: gametest.log
-          if-no-files-found: ignore
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: stormhold-jar
-          path: build/libs/*.jar
-          if-no-files-found: error
+        run: |
+          SHA=$(git rev-parse --short HEAD)
+          mkdir -p /tmp/logs
+          cp build.log gametest.log /tmp/logs/ 2>/dev/null || true
+          echo "$SHA ${{ job.status }} $(date -u +%FT%TZ)" > /tmp/logs/STATUS.txt
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git stash -u -q || true
+          git checkout -q --orphan ci-logs
+          git rm -rf -q . || true
+          cp /tmp/logs/* .
+          git add -A
+          git commit -q -m "logs $SHA"
+          git push -q --force origin ci-logs
+          git checkout -q -f ${{ github.sha }}
 
       - name: Publish jar to dist branch
         run: |
           set -e
+          gradle jar --no-daemon -q
           JAR=$(ls build/libs/*.jar | grep -v -- '-sources' | head -1)
           SHA=$(git rev-parse --short HEAD)
           mkdir -p /tmp/dist && cp "$JAR" /tmp/dist/
           cp "$JAR" /tmp/dist/stormhold-latest.jar
           echo "$SHA $(basename $JAR) $(date -u +%FT%TZ)" > /tmp/dist/BUILD.txt
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git checkout --orphan dist
-          git rm -rf --quiet . || true
+          git checkout -q --orphan dist
+          git rm -rf -q . || true
           cp /tmp/dist/* .
           git add -A
-          git commit -m "build $SHA"
-          git push --force origin dist
+          git commit -q -m "build $SHA"
+          git push -q --force origin dist

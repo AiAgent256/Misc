@@ -98,9 +98,11 @@ public class WarTableScreen extends Screen {
         this.addRenderableWidget(Button.builder(Component.literal("March now"), b -> Net.sendAction(h.id(), Net.MARCH_NOW, BlockPos.ZERO, 0))
                 .bounds(rx + 228, y, 70, 18).build());
         y += 30;
-        sx = box(rx + 64, y, h.supply() != null ? h.supply().getX() : me.getX());
-        sy = box(rx + 112, y, h.supply() != null ? h.supply().getY() : me.getY() - 1);
-        sz = box(rx + 160, y, h.supply() != null ? h.supply().getZ() : me.getZ());
+        BlockPos depot = markedDepot();
+        BlockPos sup = h.supply() != null ? h.supply() : depot != null ? depot : me.below();
+        sx = box(rx + 64, y, sup.getX());
+        sy = box(rx + 112, y, sup.getY());
+        sz = box(rx + 160, y, sup.getZ());
         this.addRenderableWidget(Button.builder(Component.literal("Set"), b -> {
             BlockPos p = parse(sx, sy, sz);
             if (p != null) Net.sendAction(h.id(), Net.SET_SUPPLY, p, 0);
@@ -114,6 +116,20 @@ public class WarTableScreen extends Screen {
         }
         this.addRenderableWidget(Button.builder(Component.literal("Refresh"), b -> Net.sendAction(h.id(), Net.REFRESH, BlockPos.ZERO, 0))
                 .bounds(rx + 166, y, 60, 20).build());
+    }
+
+    /** Depot marked with a War Banner somewhere in the player's inventory. */
+    @Nullable
+    private static BlockPos markedDepot() {
+        var player = Minecraft.getInstance().player;
+        if (player == null) return null;
+        for (var stack : player.getInventory().items) {
+            if (stack.getItem() instanceof net.aiagent256.stormhold.item.WarBannerItem) {
+                BlockPos d = net.aiagent256.stormhold.item.WarBannerItem.depot(stack);
+                if (d != null) return d;
+            }
+        }
+        return null;
     }
 
     private EditBox box(int x, int y, int value) {
