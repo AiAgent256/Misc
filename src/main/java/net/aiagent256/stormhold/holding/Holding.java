@@ -70,6 +70,13 @@ public class Holding {
             gatePos = BlockPos.ZERO, rallyPos = BlockPos.ZERO;
     public final EnumMap<Role, List<BlockPos>> posts = new EnumMap<>(Role.class);
     public final List<BlockPos> banners = new ArrayList<>();
+    /** City features by name: barracks, notice_board, house (door positions), inn, smithy. */
+    public final Map<String, List<BlockPos>> extras = new HashMap<>();
+    /** House doors bought by players. */
+    public final Map<BlockPos, UUID> ownedHouses = new HashMap<>();
+    public final List<Posting> postings = new ArrayList<>();
+    public long nextPosting;
+    public boolean cityBlocksPlaced;
     public final EnumMap<Role, Integer> garrison = new EnumMap<>(Role.class);
     public Mode mode = Mode.DEFEND;
     @Nullable public BlockPos attackTarget;
@@ -134,6 +141,21 @@ public class Holding {
         return s;
     }
 
+    /** A bought house: the door and a modest box behind it that the buyer may use freely. */
+    @Nullable
+    public UUID houseOwnerAt(BlockPos p) {
+        for (var e : ownedHouses.entrySet()) {
+            BlockPos d = e.getKey();
+            if (Math.abs(p.getX() - d.getX()) <= 7 && Math.abs(p.getZ() - d.getZ()) <= 7 && p.getY() >= d.getY() - 1 && p.getY() <= d.getY() + 12)
+                return e.getValue();
+        }
+        return null;
+    }
+
+    public boolean isCity() {
+        return tier >= 4;
+    }
+
     public boolean isHouseOwned() {
         return Sides.isHouse(owner);
     }
@@ -187,6 +209,21 @@ public class Holding {
         posts.forEach((role, list) -> p.put(role.name(), posList(list)));
         t.put("Posts", p);
         t.put("Banners", posList(banners));
+        CompoundTag ex = new CompoundTag();
+        extras.forEach((k, v) -> ex.put(k, posList(v)));
+        t.put("Extras", ex);
+        ListTag oh = new ListTag();
+        ownedHouses.forEach((p2, u) -> {
+            CompoundTag e = NbtUtils.writeBlockPos(p2);
+            e.putUUID("Owner", u);
+            oh.add(e);
+        });
+        t.put("OwnedHouses", oh);
+        ListTag pl = new ListTag();
+        for (Posting p2 : postings) pl.add(p2.save());
+        t.put("Postings", pl);
+        t.putLong("NextPosting", nextPosting);
+        t.putBoolean("CityBlocks", cityBlocksPlaced);
         CompoundTag g = new CompoundTag();
         garrison.forEach((role, n) -> g.putInt(role.name(), n));
         t.put("Garrison", g);
@@ -236,6 +273,17 @@ public class Holding {
             }
         }
         h.banners.addAll(readPosList(t.getList("Banners", Tag.TAG_COMPOUND)));
+        CompoundTag ex = t.getCompound("Extras");
+        for (String k : ex.getAllKeys()) h.extras.put(k, readPosList(ex.getList(k, Tag.TAG_COMPOUND)));
+        ListTag oh = t.getList("OwnedHouses", Tag.TAG_COMPOUND);
+        for (int i = 0; i < oh.size(); i++) {
+            CompoundTag e = oh.getCompound(i);
+            if (e.hasUUID("Owner")) h.ownedHouses.put(NbtUtils.readBlockPos(e), e.getUUID("Owner"));
+        }
+        ListTag pl = t.getList("Postings", Tag.TAG_COMPOUND);
+        for (int i = 0; i < pl.size(); i++) h.postings.add(Posting.load(pl.getCompound(i)));
+        h.nextPosting = t.getLong("NextPosting");
+        h.cityBlocksPlaced = t.getBoolean("CityBlocks");
         CompoundTag g = t.getCompound("Garrison");
         for (String k : g.getAllKeys()) {
             try {

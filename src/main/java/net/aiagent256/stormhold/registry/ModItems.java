@@ -28,6 +28,10 @@ public final class ModItems {
             () -> new BlockItem(ModBlocks.BANNER_STAND.get(), new Item.Properties()));
     public static final RegistryObject<Item> WAR_TABLE = ITEMS.register("war_table",
             () -> new BlockItem(ModBlocks.WAR_TABLE.get(), new Item.Properties()));
+    public static final RegistryObject<Item> MUSTER_POST = ITEMS.register("muster_post",
+            () -> new BlockItem(ModBlocks.MUSTER_POST.get(), new Item.Properties()));
+    public static final RegistryObject<Item> NOTICE_BOARD = ITEMS.register("notice_board",
+            () -> new BlockItem(ModBlocks.NOTICE_BOARD.get(), new Item.Properties()));
 
     public static final List<RegistryObject<Item>> EGGS = new ArrayList<>();
 

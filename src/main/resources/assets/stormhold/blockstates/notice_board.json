@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "stormhold:block/notice_board"
+    }
+  }
+}

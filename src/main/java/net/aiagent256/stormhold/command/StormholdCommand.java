@@ -25,6 +25,8 @@ public final class StormholdCommand {
                 .then(Commands.literal("nearest").executes(StormholdCommand::nearest))
                 .then(Commands.literal("info").executes(StormholdCommand::info))
                 .then(Commands.literal("houses").executes(StormholdCommand::houses))
+                .then(Commands.literal("accept").then(Commands.argument("holding", com.mojang.brigadier.arguments.StringArgumentType.word())
+                        .then(Commands.argument("posting", com.mojang.brigadier.arguments.StringArgumentType.word()).executes(StormholdCommand::accept))))
                 .then(Commands.literal("befriend").requires(s -> s.hasPermission(2)).executes(StormholdCommand::befriend))
                 .then(Commands.literal("capture").requires(s -> s.hasPermission(2)).executes(StormholdCommand::capture))
                 .then(Commands.literal("raid").requires(s -> s.hasPermission(2)).executes(StormholdCommand::raid))
@@ -80,6 +82,17 @@ public final class StormholdCommand {
                 + net.aiagent256.stormhold.house.Standing.get(mgr, h.houseId, sp.getUUID()) + ")" : "");
         c.getSource().sendSuccess(() -> Component.literal(s), false);
         return 1;
+    }
+
+    private static int accept(CommandContext<CommandSourceStack> c) {
+        if (!(c.getSource().getEntity() instanceof net.minecraft.server.level.ServerPlayer sp)) return 0;
+        try {
+            java.util.UUID h = java.util.UUID.fromString(com.mojang.brigadier.arguments.StringArgumentType.getString(c, "holding"));
+            java.util.UUID p = java.util.UUID.fromString(com.mojang.brigadier.arguments.StringArgumentType.getString(c, "posting"));
+            return net.aiagent256.stormhold.holding.City.accept(c.getSource().getLevel(), sp, h, p) ? 1 : 0;
+        } catch (IllegalArgumentException e) {
+            return 0;
+        }
     }
 
     /** Every house you've met and how it feels about you. */

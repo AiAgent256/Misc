@@ -19,6 +19,8 @@ public class Layout {
     public final BlockPos lord, bannerStand, warTable, gate, rally;
     public final EnumMap<Role, List<BlockPos>> posts = new EnumMap<>(Role.class);
     public final List<BlockPos> banners = new ArrayList<>();
+    /** Non-garrison markers: barracks, notice_board, house, inn, smithy. */
+    public final java.util.Map<String, List<BlockPos>> extras = new java.util.HashMap<>();
 
     private Layout(JsonObject o) {
         name = o.get("name").getAsString();
@@ -39,6 +41,9 @@ public class Layout {
             try {
                 role = Role.valueOf(k.toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException e) {
+                List<BlockPos> list = new ArrayList<>();
+                for (JsonElement el : p.getAsJsonArray(k)) list.add(pos(el));
+                extras.put(k, list);
                 continue;
             }
             List<BlockPos> list = new ArrayList<>();

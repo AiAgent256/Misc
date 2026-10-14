@@ -96,9 +96,16 @@ public final class CommonEvents {
     // ------------------------------------------------------------ siege rules
 
     private static Holding houseHoldingAt(ServerLevel level, BlockPos pos) {
+        return houseHoldingAt(level, pos, null);
+    }
+
+    private static Holding houseHoldingAt(ServerLevel level, BlockPos pos, @org.jetbrains.annotations.Nullable Player p) {
         if (!Config.PROTECT_HOUSE_CASTLES.get()) return null;
-        Holding h = HoldingManager.get(level).at(pos, 1);
-        return h != null && h.isHouseOwned() ? h : null;
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = mgr.at(pos, 1);
+        if (h == null || !h.isHouseOwned()) return null;
+        if (p != null && net.aiagent256.stormhold.holding.City.inOwnHouse(mgr, h, p, pos)) return null;
+        return h;
     }
 
     private static void warn(Player p, String msg) {
@@ -113,7 +120,7 @@ public final class CommonEvents {
     @SubscribeEvent
     public static void breakBlock(BlockEvent.BreakEvent e) {
         if (!(e.getLevel() instanceof ServerLevel level) || e.getPlayer().isCreative()) return;
-        Holding h = houseHoldingAt(level, e.getPos());
+        Holding h = houseHoldingAt(level, e.getPos(), e.getPlayer());
         if (h == null || e.getState().is(SIEGE_BREAKABLE)) return;
         e.setCanceled(true);
         warn(e.getPlayer(), "The walls of " + h.name + " hold. Break the gate, climb, or blast the portcullis.");
@@ -122,7 +129,7 @@ public final class CommonEvents {
     @SubscribeEvent
     public static void placeBlock(BlockEvent.EntityPlaceEvent e) {
         if (!(e.getLevel() instanceof ServerLevel level) || !(e.getEntity() instanceof Player p) || p.isCreative()) return;
-        Holding h = houseHoldingAt(level, e.getPos());
+        Holding h = houseHoldingAt(level, e.getPos(), p);
         if (h == null || e.getPlacedBlock().is(SIEGE_PLACEABLE)) return;
         e.setCanceled(true);
         warn(p, "Only ladders, scaffolding, torches and TNT can be placed while " + h.name + " holds out.");
@@ -143,13 +150,22 @@ public final class CommonEvents {
 
     @SubscribeEvent
     public static void interact(PlayerInteractEvent.RightClickBlock e) {
-        if (!(e.getLevel() instanceof ServerLevel level) || !Config.SEAL_TREASURY.get() || e.getEntity().isCreative()) return;
+        if (!(e.getLevel() instanceof ServerLevel level) || e.getEntity().isCreative()) return;
+        if (e.getHand() == net.minecraft.world.InteractionHand.MAIN_HAND && e.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp
+                && level.getBlockState(e.getPos()).getBlock() instanceof net.minecraft.world.level.block.DoorBlock
+                && net.aiagent256.stormhold.holding.City.useDoor(level, sp, e.getPos())) {
+            e.setCanceled(true);
+            e.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        if (!Config.SEAL_TREASURY.get()) return;
         BlockEntity be = level.getBlockEntity(e.getPos());
         if (be == null) return;
         boolean container = be instanceof Container || be.getCapability(ForgeCapabilities.ITEM_HANDLER, null).isPresent();
         if (!container) return;
         Holding h = HoldingManager.get(level).at(e.getPos(), 0);
         if (h == null) return;
+        if (net.aiagent256.stormhold.holding.City.inOwnHouse(HoldingManager.get(level), h, e.getEntity(), e.getPos())) return;
         if (h.isHouseOwned() && h.lordAlive) {
             e.setCanceled(true);
             e.setCancellationResult(InteractionResult.FAIL);

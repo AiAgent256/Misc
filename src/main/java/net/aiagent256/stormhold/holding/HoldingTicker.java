@@ -36,6 +36,7 @@ public final class HoldingTicker {
     private static void tickHolding(ServerLevel level, HoldingManager mgr, Holding h, long now) {
         Economy.tickHolding(level, mgr, h, now);
         Campaigns.scheduleRaids(level, mgr, h, now);
+        City.tickPostings(level, mgr, h, now);
         if (h.isPlayerOwned() && h.mode == Holding.Mode.ATTACK && h.attackTarget != null && now >= h.nextCampaign) {
             h.nextCampaign = now + 6000;
             Campaigns.launchParty(level, mgr, h, h.attackTarget);
@@ -53,6 +54,7 @@ public final class HoldingTicker {
         }
         if (h.bannersDirty) Garrisons.recolorBanners(level, mgr, h);
         else if (now % 200 == 0) Garrisons.placeStand(level, mgr, h);
+        if (!h.cityBlocksPlaced) City.placeBlocks(level, h);
         // The village search behind road planning is a /locate; only run it once the server has caught up.
         if (!h.surroundingsDone && PostScanner.allLoaded(level, h) && level.getServer().getAverageTickTime() < 45f)
             Roads.plan(level, mgr, h);

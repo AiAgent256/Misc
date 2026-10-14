@@ -3,6 +3,7 @@ package net.aiagent256.stormhold.entity;
 import net.aiagent256.stormhold.Sides;
 import net.aiagent256.stormhold.compat.RecruitsCompat;
 import net.aiagent256.stormhold.entity.ai.BackOffGoal;
+import net.aiagent256.stormhold.entity.ai.ClimbGoal;
 import net.aiagent256.stormhold.entity.ai.GarrisonRangedGoal;
 import net.aiagent256.stormhold.entity.ai.KnightMeleeGoal;
 import net.aiagent256.stormhold.entity.ai.GuardStrollGoal;
@@ -70,6 +71,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     private int alarmTicks;
     /** Ticks spent next to a target we can't reach; past a limit the knight backs off. */
     private int unreachableTicks;
+    public boolean climbing;
     public int backOffTicks;
     @Nullable public Vec3 backOffFrom;
     @Nullable private UUID ignoring;
@@ -116,6 +118,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
             this.goalSelector.addGoal(2, new GarrisonRangedGoal(this));
         } else {
             this.goalSelector.addGoal(1, new BackOffGoal(this));
+            this.goalSelector.addGoal(1, new ClimbGoal(this));
             this.goalSelector.addGoal(2, new KnightMeleeGoal(this, 1.2));
         }
         this.goalSelector.addGoal(3, new OpenDoorGoal(this, true));
@@ -330,7 +333,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         if (backOffTicks > 0) backOffTicks--;
         if (!role().ranged && role() != Role.COURIER) {
             LivingEntity t = this.getTarget();
-            if (t != null && targetOutOfReach(t)) {
+            if (t != null && targetOutOfReach(t) && !climbing) {
                 if (++unreachableTicks > 70) {
                     unreachableTicks = 0;
                     backOffTicks = 160;

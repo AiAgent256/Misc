@@ -25,6 +25,12 @@ public final class ModBlocks {
     public static final RegistryObject<Block> WAR_TABLE = BLOCKS.register("war_table", () -> new WarTableBlock(
             BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).strength(2.5F).sound(SoundType.WOOD)));
 
+    public static final RegistryObject<Block> MUSTER_POST = BLOCKS.register("muster_post", () -> new net.aiagent256.stormhold.block.MusterPostBlock(
+            BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).strength(-1.0F, 3600000.0F).sound(SoundType.WOOD).noLootTable()));
+
+    public static final RegistryObject<Block> NOTICE_BOARD = BLOCKS.register("notice_board", () -> new net.aiagent256.stormhold.block.NoticeBoardBlock(
+            BlockBehaviour.Properties.of().mapColor(MapColor.WOOD).strength(-1.0F, 3600000.0F).sound(SoundType.WOOD).noLootTable().noOcclusion()));
+
     private ModBlocks() {
     }
 }

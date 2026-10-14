@@ -162,6 +162,7 @@ public final class Campaigns {
             if (c.stage == Campaign.Stage.DONE) continue;
             Garrisons.pruneLive(level, c.live);
             if (c.kind == Campaign.Kind.RAID) tickRaid(level, mgr, c);
+            else if (c.kind == Campaign.Kind.CAMP) tickCamp(level, mgr, c);
             else tickParty(level, mgr, c, now);
         }
         if (mgr.campaigns.removeIf(c -> c.stage == Campaign.Stage.DONE)) mgr.setDirty();
@@ -270,6 +271,53 @@ public final class Campaigns {
         }
         c.stage = Campaign.Stage.DONE;
         mgr.setDirty();
+    }
+
+    /** A band of brigands sitting on a spot until someone kills them. */
+    private static void tickCamp(ServerLevel level, HoldingManager mgr, Campaign c) {
+        if (c.total() <= 0) {
+            City.campCleared(level, mgr, c);
+            c.stage = Campaign.Stage.DONE;
+            return;
+        }
+        if (playerNear(level, c.to, 110)) {
+            if (c.live.size() < c.total()) {
+                boolean first = c.live.isEmpty();
+                materialize(level, mgr, c, null);
+                for (UUID id : c.live.keySet()) {
+                    if (level.getEntity(id) instanceof GarrisonEntity g && g.post() == null) g.setPost(c.to);
+                }
+                if (first && !c.live.isEmpty() && level.isLoaded(c.to)) campSite(level, c.to);
+            }
+        }
+    }
+
+    /** Tents, a fire and a loot chest where the brigands sit. */
+    private static void campSite(ServerLevel level, BlockPos at) {
+        int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, at.getX(), at.getZ());
+        BlockPos c = new BlockPos(at.getX(), y, at.getZ());
+        if (!level.getBlockState(c).isAir()) return;
+        level.setBlock(c, net.minecraft.world.level.block.Blocks.CAMPFIRE.defaultBlockState(), 3);
+        for (int k = 0; k < 3; k++) {
+            double a = k * Math.PI * 2 / 3;
+            int tx = c.getX() + (int) Math.round(Math.cos(a) * 5), tz = c.getZ() + (int) Math.round(Math.sin(a) * 5);
+            int ty = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, tx, tz);
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    BlockPos p = new BlockPos(tx + dx, ty + (Math.abs(dx) + Math.abs(dz) == 0 ? 2 : 1), tz + dz);
+                    if (level.getBlockState(p).isAir())
+                        level.setBlock(p, net.minecraft.world.level.block.Blocks.BROWN_WOOL.defaultBlockState(), 3);
+                }
+            }
+            BlockPos pole = new BlockPos(tx, ty, tz);
+            if (level.getBlockState(pole).isAir()) level.setBlock(pole, net.minecraft.world.level.block.Blocks.OAK_FENCE.defaultBlockState(), 3);
+        }
+        BlockPos chest = c.east(2);
+        if (level.getBlockState(chest).isAir()) {
+            level.setBlock(chest, net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState(), 3);
+            if (level.getBlockEntity(chest) instanceof net.minecraft.world.level.block.entity.ChestBlockEntity cbe)
+                cbe.setLootTable(new net.minecraft.resources.ResourceLocation("stormhold", "chests/castle_barracks"), level.random.nextLong());
+        }
     }
 
     private static void tickParty(ServerLevel level, HoldingManager mgr, Campaign c, long now) {

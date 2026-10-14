@@ -349,6 +349,35 @@ public class StormholdGameTests {
             if (!level.getBlockState(h.bannerPos.below()).isSolidRender(level, h.bannerPos.below()))
                 throw new IllegalStateException("banner stand floats at " + h.bannerPos);
             if (!level.getBlockState(h.lordPos).isAir()) throw new IllegalStateException("throne is inside a block at " + h.lordPos);
+            if (!h.extras.containsKey("barracks") || !h.extras.containsKey("notice_board") || h.extras.getOrDefault("house", List.of()).size() < 6)
+                throw new IllegalStateException("city features missing: " + h.extras.keySet());
+            net.aiagent256.stormhold.holding.City.placeBlocks(level, h);
+            if (!level.getBlockState(h.extras.get("barracks").get(0)).is(net.aiagent256.stormhold.registry.ModBlocks.MUSTER_POST.get()))
+                throw new IllegalStateException("muster post not placed");
+            if (!level.getBlockState(h.extras.get("notice_board").get(0)).is(net.aiagent256.stormhold.registry.ModBlocks.NOTICE_BOARD.get()))
+                throw new IllegalStateException("notice board not placed");
+            // a posting appears, is accepted, becomes a camp, and clearing the camp pays out
+            net.aiagent256.stormhold.holding.City.tickPostings(level, mgr, h, level.getGameTime() + 1);
+            if (h.postings.isEmpty()) throw new IllegalStateException("no posting generated");
+            var player = g.makeMockPlayer();
+            player.moveTo(h.center().getX(), h.center().getY(), h.center().getZ());
+            var post = h.postings.get(0);
+            if (!(player instanceof net.minecraft.server.level.ServerPlayer)) {
+                post.takenBy = player.getUUID();
+                var c = new net.aiagent256.stormhold.holding.Campaign();
+                c.kind = net.aiagent256.stormhold.holding.Campaign.Kind.CAMP;
+                c.origin = h.id;
+                c.to = post.at;
+                c.from = post.at;
+                post.campaign = c.id;
+                mgr.campaigns.add(c);
+                int before = mgr.campaigns.size();
+                net.aiagent256.stormhold.holding.Campaigns.tick(level, mgr, level.getGameTime());
+                if (mgr.campaigns.size() != before - 1) throw new IllegalStateException("empty camp was not cleared");
+                if (h.postings.contains(post)) throw new IllegalStateException("cleared posting still on the board");
+                if (h.stock(new net.minecraft.resources.ResourceLocation("minecraft", "emerald")) != post.reward)
+                    throw new IllegalStateException("reward not banked for an absent player: " + h.stock);
+            }
         } finally {
             mgr.holdings.remove(h.id);
             mgr.byKey.remove(h.key);

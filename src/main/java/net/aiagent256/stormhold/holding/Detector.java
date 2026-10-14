@@ -160,6 +160,12 @@ public final class Detector {
         }
         h.banners.clear();
         for (BlockPos b : l.banners) h.banners.add(o.offset(b));
+        h.extras.clear();
+        for (var e : l.extras.entrySet()) {
+            List<BlockPos> list = new ArrayList<>();
+            for (BlockPos p : e.getValue()) list.add(o.offset(p));
+            h.extras.put(e.getKey(), list);
+        }
         h.scanned = true;
     }
 
