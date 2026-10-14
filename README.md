@@ -31,6 +31,10 @@ Private Forge 1.20.1 mod for the Dungeons and Homestead pack. Castles held by ri
 
 **Your own holding.** Build a castle or town, sneak-use a War Banner on two opposite corners (12 to 192 blocks a side), then place a War Table inside. Stormhold scans your walls for guard posts and the place becomes a holding you own: empty at first, trained up from bread and iron you put on the War Table (use the table while holding supplies), raided by the local house if it dislikes you, and commanded like any captured castle.
 
+**The Great City.** Once per house region (about every 1500 blocks) a capital generates: 256 blocks across, three terraces climbing to the keep, harbour, sept, market with a notice board, barracks, Dragonpit. It is the seat of the house that rules the region and starts friendly: walk in, trade with its king (an emerald buys bread, sneak for iron), use it as a base. Its garrison is 80 strong but only the district you're in is populated at any time. Take it (kill the king, raise your banner, hold the donjon) and every leaderless castle of that house bends the knee to you.
+
+**Fighting the garrison.** Knights reach as far as you do, three blocks in any direction, so standing on a ledge two blocks up doesn't make you safe. A knight who takes hits from someone he can't reach for a few seconds backs off out of reach and leaves you to the archers.
+
 **Raids.** Every 3 to 5 days the house you took the castle from marches to retake it. You get a warning a day ahead. If you're away it's fought out by numbers; Defend stance helps.
 
 **Lived-in world.** Villagers work inside the walls, fields and orchards appear outside, and a road is laid from the gate to the nearest village as the chunks load. Castles are sited on high, dry ground and keep clear of villages and towns from any mod (anything in `#minecraft:village`, plus a few extras in `#stormhold:castle_avoid`); a watchtower or holdfast never lands inside a great castle.
