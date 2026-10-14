@@ -653,7 +653,7 @@ def holdfast_a(seed=11):
     g.stair(32, GL + 1, kz0 + 3, "minecraft:dark_oak_stairs", "south")
     g.wall_banner(31, GL + 5, kz0 + 2, "south"); g.wall_banner(32, GL + 5, kz0 + 2, "south")
     g.fill(30, GL, kz0 + 6, 33, GL, kz1 - 2, "minecraft:red_carpet")
-    g.mark("lord", 31, GL + 1, kz0 + 5)
+    g.mark("lord", 31, GL, kz0 + 5)
     g.mark("war_table", 28, GL, kz0 + 4)
     for (x, z) in ((25, 18), (38, 18), (25, 25), (38, 25)):
         g.mark("knight", x, GL, z)
@@ -709,23 +709,33 @@ def watchtower_a(seed=5):
         g.fill(x, GL, c + 14, x, GL + 6, c + 15, STONE)
     g.mark("gate", c, GL, W - 1)
     top = GL + 30
-    round_tower(g, c, c - 2, 7, top, GL, floors=(GL + 8, GL + 16, GL + 23), spiral=True,
+    # a proper tower: 19 wide, so the floors are rooms around the stair and not a ledge beside it
+    round_tower(g, c, c - 2, 9, top, GL, floors=(GL + 8, GL + 16, GL + 23), spiral=True,
                 doors=((0, 1, GL),), banner_dirs=((0, 1), (1, 0), (-1, 0)))
+    for fy in (GL + 8, GL + 16, GL + 23):
+        for ang in (0.0, np.pi):
+            g.fill(int(round(c + 8 * np.cos(ang))), fy + 2, int(round(c - 2 + 8 * np.sin(ang))),
+                   int(round(c + 8 * np.cos(ang))), fy + 3, int(round(c - 2 + 8 * np.sin(ang))), GLASS)
     # timber hoarding around the top
-    hz = ring(g, c, c - 2, 10, 8)
+    hz = ring(g, c, c - 2, 12, 10)
     g.fill_mask(hz, top - 2, top - 2, "minecraft:spruce_planks")
-    g.fill_mask(ring(g, c, c - 2, 10, 9), top - 1, top + 1, "minecraft:spruce_fence")
+    g.fill_mask(ring(g, c, c - 2, 12, 11), top - 1, top + 1, "minecraft:spruce_fence")
     g.fill_mask(hz, top + 2, top + 2, "minecraft:dark_oak_slab[type=bottom]")
     for k in range(8):
         ang = k * np.pi / 4
-        x = int(round(c + 9 * np.cos(ang))); z = int(round(c - 2 + 9 * np.sin(ang)))
+        x = int(round(c + 11 * np.cos(ang))); z = int(round(c - 2 + 11 * np.sin(ang)))
         g.fill(x, top - 5, z, x, top - 3, z, "minecraft:dark_oak_log[axis=y]")
-        g.mark("archer", int(round(c + 5 * np.cos(ang))), top, int(round(c - 2 + 5 * np.sin(ang))))
-    g.mark("banner_stand", c + 3, top, c - 2)
-    g.mark("lord", c + 2, GL + 16, c - 2)
-    g.mark("war_table", c - 3, GL + 16, c - 2)
-    g.chest(c + 4, GL + 16, c - 4, "west", LOOT + "watchtower_treasury")
-    g.chest(c + 4, GL + 16, c, "west", LOOT + "watchtower_treasury")
+        g.mark("archer", int(round(c + 7 * np.cos(ang))), top, int(round(c - 2 + 7 * np.sin(ang))))
+    g.mark("banner_stand", c + 5, top, c - 2)
+    # the castellan's floor: his chair, the war table and the strongbox, all clear of the stair core
+    g.mark("lord", c + 4, GL + 17, c - 2)
+    g.stair(c + 5, GL + 17, c - 2, "minecraft:dark_oak_stairs", "west")
+    g.mark("war_table", c - 4, GL + 17, c - 2)
+    g.chest(c + 5, GL + 17, c - 5, "west", LOOT + "watchtower_treasury")
+    g.chest(c + 5, GL + 17, c + 1, "west", LOOT + "watchtower_treasury")
+    g.bed(c - 4, GL + 24, c - 5, "east", "red")
+    g.mark("captain", c, GL, c + 10)
+    g.lantern(c + 4, GL + 15, c + 2); g.lantern(c - 4, GL + 15, c - 6); g.lantern(c + 4, GL + 22, c + 2)
     # a hut in the yard
     building(g, c - 13, c + 4, c - 6, c + 11, GL, 5, "x", door_cells=((c - 6, c + 7),), chimney=(c - 11, c + 6))
     g.bed(c - 12, GL, c + 5, "north", "brown"); g.bed(c - 12, GL, c + 9, "south", "brown")

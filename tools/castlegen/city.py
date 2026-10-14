@@ -413,7 +413,7 @@ def keep(g, GL3):
         for x in (tx0, tx1):
             for z in (tz0 + 6, tz0 + 10, tz0 + 14):
                 g.fill(x, fy + 2, z, x, fy + 5, z, GLASS)
-    g.mark("banner_stand", 161, dtop, 37)
+    g.mark("banner_stand", 164, dtop, 40)
     for (x, z) in ((149, 25), (163, 25), (149, 39)):
         g.mark("crossbowman", x, dtop, z)
     for z in range(27, 40, 3):

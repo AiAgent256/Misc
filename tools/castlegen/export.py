@@ -98,6 +98,11 @@ def clean_posts(g):
 def write_layout(g, meta, tiles, path):
     X, Z, Y = g.a.shape
     posts = clean_posts(g)
+    for role in ("lord", "war_table", "banner_stand"):
+        x, y, z = g.markers[role][0]
+        here, above = g.get(x, y, z), g.get(x, y + 1, z)
+        if here not in ("minecraft:air", "<void>") or above not in ("minecraft:air", "<void>") or not g.is_solid(x, y - 1, z):
+            raise SystemExit(f"{meta['name']}: {role} at {(x, y, z)} is not a clear spot on a floor (here={here}, below={g.get(x, y - 1, z)})")
     layout = {
         "name": meta["name"], "tier": meta["tier"], "size": [X, Y, Z], "ground": meta["GL"],
         "tiles": tiles,

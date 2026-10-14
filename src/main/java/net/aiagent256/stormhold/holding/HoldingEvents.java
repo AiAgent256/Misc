@@ -308,10 +308,7 @@ public final class HoldingEvents {
             h.nextReplenish = now + 1200;
             h.addStock(new ResourceLocation("minecraft", "bread"), 32);
             h.addStock(new ResourceLocation("minecraft", "iron_ingot"), 16);
-            if (!h.warTablePos.equals(BlockPos.ZERO) && level.isLoaded(h.warTablePos)
-                    && level.getBlockState(h.warTablePos).canBeReplaced()) {
-                level.setBlock(h.warTablePos, ModBlocks.WAR_TABLE.get().defaultBlockState(), 3);
-            }
+            placeWarTable(level, h, Sides.playerId(newSide));
         } else {
             h.lordAlive = true;
             h.lordName = Holding.lordTitle(h.tier) + NameGen.first(level.random)
@@ -342,6 +339,30 @@ public final class HoldingEvents {
             }
         }
         mgr.setDirty();
+    }
+
+    /** The War Table goes on its marked spot, or the nearest clear floor, or into the new lord's hands. */
+    static void placeWarTable(ServerLevel level, Holding h, @Nullable UUID player) {
+        BlockPos want = h.warTablePos.equals(BlockPos.ZERO) ? h.lordPos : h.warTablePos;
+        if (want.equals(BlockPos.ZERO) || !level.isLoaded(want)) return;
+        for (BlockPos p : new BlockPos[]{want, want.above(), want.below()}) {
+            if (level.getBlockState(p).is(ModBlocks.WAR_TABLE.get())) return;
+        }
+        BlockPos spot = level.getBlockState(want).canBeReplaced() && !level.getBlockState(want.below()).canBeReplaced() ? want
+                : Garrisons.standable(level, want);
+        if (spot == null) spot = Garrisons.standable(level, h.lordPos);
+        if (spot != null && level.getBlockState(spot).canBeReplaced()) {
+            level.setBlock(spot, ModBlocks.WAR_TABLE.get().defaultBlockState(), 3);
+            h.warTablePos = spot;
+            return;
+        }
+        ServerPlayer p = player != null ? level.getServer().getPlayerList().getPlayer(player) : null;
+        if (p != null) {
+            ItemStack table = new ItemStack(ModBlocks.WAR_TABLE.get());
+            if (!p.getInventory().add(table)) p.drop(table, false);
+            p.sendSystemMessage(Component.literal("No room in the keep for a War Table, so the steward hands you one. Place it anywhere inside the walls.")
+                    .withStyle(ChatFormatting.GREEN));
+        }
     }
 
     public static long raidDelay(ServerLevel level) {

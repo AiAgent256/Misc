@@ -121,7 +121,7 @@ public class StormholdGameTests {
         var gen = level.getChunkSource().getGenerator();
         HoldingManager mgr = HoldingManager.get(level);
         int i = 0;
-        for (String id : new String[]{"watchtower_riverlands", "holdfast_dorne", "great_castle_reach"}) {
+        for (String id : new String[]{"watchtower_riverlands", "watchtower_north", "holdfast_dorne", "holdfast_north", "great_castle_reach"}) {
             var structure = reg.get(Stormhold.id(id));
             if (structure == null) throw new IllegalStateException("structure not registered: " + id);
             BlockPos at = g.absolutePos(BlockPos.ZERO).offset(3000 + i * 400, 0, 3000);
@@ -166,6 +166,11 @@ public class StormholdGameTests {
             if (h == null || h.posts.isEmpty() || h.bannerPos.equals(BlockPos.ZERO)) throw new IllegalStateException(id + " did not attach");
             if (!level.getBlockState(h.bannerPos.below()).isSolidRender(level, h.bannerPos.below()))
                 throw new IllegalStateException(id + " banner stand floats at " + h.bannerPos);
+            if (!level.getBlockState(h.bannerPos).canBeReplaced()) throw new IllegalStateException(id + " banner stand is inside a block at " + h.bannerPos);
+            if (!level.getBlockState(h.warTablePos).canBeReplaced() || level.getBlockState(h.warTablePos.below()).canBeReplaced())
+                throw new IllegalStateException(id + " war table spot is blocked or floating at " + h.warTablePos);
+            if (!level.getBlockState(h.lordPos).canBeReplaced() || level.getBlockState(h.lordPos.below()).canBeReplaced())
+                throw new IllegalStateException(id + " lord's spot is blocked or floating at " + h.lordPos);
             mgr.holdings.remove(h.id);
             mgr.byKey.remove(h.key);
             i++;
@@ -349,6 +354,8 @@ public class StormholdGameTests {
             if (!level.getBlockState(h.bannerPos.below()).isSolidRender(level, h.bannerPos.below()))
                 throw new IllegalStateException("banner stand floats at " + h.bannerPos);
             if (!level.getBlockState(h.lordPos).isAir()) throw new IllegalStateException("throne is inside a block at " + h.lordPos);
+            if (!level.getBlockState(h.bannerPos).canBeReplaced()) throw new IllegalStateException("city banner stand is inside a block at " + h.bannerPos);
+            if (!level.getBlockState(h.warTablePos).canBeReplaced()) throw new IllegalStateException("city war table spot is blocked at " + h.warTablePos);
             if (!h.extras.containsKey("barracks") || !h.extras.containsKey("notice_board") || h.extras.getOrDefault("house", List.of()).size() < 6)
                 throw new IllegalStateException("city features missing: " + h.extras.keySet());
             net.aiagent256.stormhold.holding.City.placeBlocks(level, h);
