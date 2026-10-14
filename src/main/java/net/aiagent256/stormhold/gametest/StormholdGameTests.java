@@ -220,7 +220,12 @@ public class StormholdGameTests {
     public static void houseStandingGatesGuards(GameTestHelper g) {
         ServerLevel level = g.getLevel();
         HoldingManager mgr = HoldingManager.get(level);
-        var player = g.makeMockPlayer();
+        // the framework's mock player is creative, which guards always ignore; use a survival one
+        var player = new net.minecraft.world.entity.player.Player(level, BlockPos.ZERO, 0.0F,
+                new com.mojang.authlib.GameProfile(UUID.randomUUID(), "stormhold-test")) {
+            @Override public boolean isSpectator() { return false; }
+            @Override public boolean isCreative() { return false; }
+        };
         String houseId = "standingtest";
         mgr.house(houseId).disposition = 0;
         mgr.standing.remove(houseId);
