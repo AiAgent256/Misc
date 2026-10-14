@@ -64,6 +64,7 @@ public final class Campaigns {
         c.side = Sides.house(h.houseId);
         c.target = h.id;
         c.tier = h.tier;
+        c.renown = h.renown;
         c.to = h.bannerPos;
         double ang = level.random.nextDouble() * Math.PI * 2;
         BlockPos center = h.center();
@@ -195,6 +196,10 @@ public final class Campaigns {
                 BlockPos p = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
                 GarrisonEntity g = Garrisons.spawn(level, mgr, null, r, p, c.side, false);
                 if (g == null) break;
+                if (c.renown != 2) {
+                    g.setup(c.side, null, c.tier, c.renown, g.color(), null, false);
+                    net.aiagent256.stormhold.entity.Loadouts.equip(g, r, c.tier, c.renown, g.color(), mgr.houseOf(c.side));
+                }
                 g.setCampaignId(c.id);
                 g.setMarchTarget(marchTo);
                 g.setPost(null);

@@ -173,11 +173,12 @@ public final class Garrisons {
         House house = mgr.houseOf(side);
         DyeColor color = mgr.colorOf(side);
         int tier = h != null ? h.tier : 2;
-        e.setup(side, h != null ? h.id : null, tier, color, p, hold);
+        int renown = h != null ? h.renown : 2;
+        e.setup(side, h != null ? h.id : null, tier, renown, color, p, hold);
         e.moveTo(p.getX() + 0.5, p.getY(), p.getZ() + 0.5, level.random.nextFloat() * 360F, 0);
         e.finalizeSpawn(level, level.getCurrentDifficultyAt(p), MobSpawnType.EVENT, null, null);
-        Loadouts.equip(e, r, tier, color, house);
-        double hp = health(r, tier);
+        Loadouts.equip(e, r, tier, renown, color, house);
+        double hp = health(r, tier) * (1.0 + 0.12 * (renown - 1));
         AttributeInstance mh = e.getAttribute(Attributes.MAX_HEALTH);
         if (mh != null) mh.setBaseValue(hp);
         e.setHealth((float) hp);

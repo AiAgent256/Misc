@@ -386,6 +386,40 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    @GameTest(template = "arena")
+    public static void renownScalesGearAndTreasure(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding poor = sample(g);
+        poor.renown = 1;
+        Holding famed = sample(g);
+        famed.renown = 5;
+        GarrisonEntity a = Garrisons.spawn(level, mgr, poor, Role.KNIGHT, g.absolutePos(new BlockPos(3, 2, 3)), Sides.house("x"), false);
+        GarrisonEntity b = Garrisons.spawn(level, mgr, famed, Role.KNIGHT, g.absolutePos(new BlockPos(7, 2, 3)), Sides.house("x"), false);
+        try {
+            var aChest = a.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST);
+            var bChest = b.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST);
+            if (bChest.getItem() == aChest.getItem()) throw new IllegalStateException("renown 1 and 5 knights wear the same armour: " + aChest);
+            int prot = net.minecraft.world.item.enchantment.EnchantmentHelper.getItemEnchantmentLevel(
+                    net.minecraft.world.item.enchantment.Enchantments.ALL_DAMAGE_PROTECTION, bChest);
+            if (prot != 4) throw new IllegalStateException("famed knight has Protection " + prot);
+            if (net.minecraft.world.item.enchantment.EnchantmentHelper.getItemEnchantmentLevel(
+                    net.minecraft.world.item.enchantment.Enchantments.ALL_DAMAGE_PROTECTION, aChest) != 0)
+                throw new IllegalStateException("poor knight has enchanted armour");
+            if (b.getMaxHealth() <= a.getMaxHealth()) throw new IllegalStateException("renown did not raise health");
+            var loot = net.aiagent256.stormhold.holding.Treasure.roll(level.random, 5);
+            boolean netherite = loot.stream().anyMatch(s -> s.is(net.minecraft.world.item.Items.NETHERITE_INGOT));
+            boolean prot4 = loot.stream().anyMatch(s -> net.minecraft.world.item.enchantment.EnchantmentHelper.getItemEnchantmentLevel(
+                    net.minecraft.world.item.enchantment.Enchantments.ALL_DAMAGE_PROTECTION, s) == 4);
+            if (!netherite || !prot4) throw new IllegalStateException("famed treasure is thin: " + loot);
+            if (net.aiagent256.stormhold.holding.Treasure.roll(level.random, 1).size() != 0) throw new IllegalStateException("poor castle paid a bonus");
+        } finally {
+            a.discard();
+            b.discard();
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

@@ -128,6 +128,8 @@ public final class Detector {
             h.box = start.getBoundingBox();
             h.scanned = false;
         }
+        h.renown = rollRenown(level, h, rnd);
+        h.bonusLeft = Math.max(0, h.renown - 1);
         House house = mgr.houseForRegion(level, h.center());
         h.houseId = house.id;
         h.owner = Sides.house(house.id);
@@ -142,6 +144,24 @@ public final class Detector {
         h.lordAlive = true;
         mgr.add(h);
         return h;
+    }
+
+    /**
+     * How rich a castle is: bigger castles and castles far from spawn tend to be richer, with some
+     * luck either way. A watchtower never gets past 3, a holdfast past 4; cities are always 5.
+     */
+    static int rollRenown(ServerLevel level, Holding h, RandomSource rnd) {
+        if (h.tier >= 4) return 5;
+        int base = h.tier;                                   // 1, 2, 3
+        BlockPos spawn = level.getSharedSpawnPos();
+        double dist = Math.sqrt(h.center().distSqr(new BlockPos(spawn.getX(), h.center().getY(), spawn.getZ())));
+        if (dist > 1500) base++;
+        if (dist > 4000) base++;
+        float roll = rnd.nextFloat();
+        if (roll < 0.2F) base++;
+        else if (roll > 0.85F) base--;
+        int cap = h.tier == 1 ? 3 : h.tier == 2 ? 4 : 5;
+        return Math.max(1, Math.min(cap, base));
     }
 
     public static void applyLayout(Holding h, Layout l, BlockPos o) {

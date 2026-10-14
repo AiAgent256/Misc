@@ -66,6 +66,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     @Nullable private BlockPos marchTarget;
     private boolean holdPosition;
     private int tier = 1;
+    private int renown = 2;
     private DyeColor color = DyeColor.RED;
     private boolean reinforced;
     private int alarmTicks;
@@ -136,9 +137,14 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     // ---------------------------------------------------------------- allegiance
 
     public void setup(String side, @Nullable UUID holdingId, int tier, DyeColor color, @Nullable BlockPos post, boolean hold) {
+        setup(side, holdingId, tier, this.renown, color, post, hold);
+    }
+
+    public void setup(String side, @Nullable UUID holdingId, int tier, int renown, DyeColor color, @Nullable BlockPos post, boolean hold) {
         this.side = side;
         this.holdingId = holdingId;
         this.tier = tier;
+        this.renown = Math.max(1, Math.min(5, renown));
         this.color = color;
         this.post = post;
         this.holdPosition = hold;
@@ -156,6 +162,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     public void setMarchTarget(@Nullable BlockPos p) { this.marchTarget = p; }
     public boolean holdsPosition() { return holdPosition && marchTarget == null; }
     public int tier() { return tier; }
+    public int renown() { return renown; }
     public DyeColor color() { return color; }
 
     public boolean isAlly(Entity e) {
@@ -396,7 +403,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
                 if (p != null) side = Sides.player(p.getUUID());
             }
             if (post == null) post = this.blockPosition();
-            Loadouts.equip(this, role(), tier, color, null);
+            Loadouts.equip(this, role(), tier, renown, color, null);
         }
         return d;
     }
@@ -421,6 +428,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         if (holdingId != null) tag.putUUID("Holding", holdingId);
         if (post != null) tag.put("Post", NbtUtils.writeBlockPos(post));
         tag.putInt("Tier", tier);
+        tag.putInt("Renown", renown);
         tag.putInt("Color", color.getId());
     }
 
@@ -431,6 +439,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         if (tag.hasUUID("Holding")) holdingId = tag.getUUID("Holding");
         if (tag.contains("Post")) post = NbtUtils.readBlockPos(tag.getCompound("Post"));
         tier = Math.max(1, tag.getInt("Tier"));
+        if (tag.contains("Renown")) renown = Math.max(1, Math.min(5, tag.getInt("Renown")));
         color = DyeColor.byId(tag.getInt("Color"));
     }
 }

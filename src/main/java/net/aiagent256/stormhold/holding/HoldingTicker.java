@@ -59,8 +59,24 @@ public final class HoldingTicker {
         if (!h.surroundingsDone && PostScanner.allLoaded(level, h) && level.getServer().getAverageTickTime() < 45f)
             Roads.plan(level, mgr, h);
         Garrisons.materialize(level, mgr, h);
+        greet(level, mgr, h);
         if (!h.villagersSpawned) Garrisons.spawnVillagers(level, h);
         HoldingEvents.contest(level, mgr, h);
+    }
+
+    /** Word of a castle's wealth, once, as you come within sight of it. */
+    private static void greet(ServerLevel level, HoldingManager mgr, Holding h) {
+        if (h.name.isEmpty()) return;
+        for (ServerPlayer p : level.players()) {
+            if (p.isSpectator() || h.greeted.contains(p.getUUID())) continue;
+            if (p.blockPosition().distSqr(h.center()) > 140.0 * 140.0) continue;
+            h.greeted.add(p.getUUID());
+            String owner = HoldingEvents.ownerName(level, mgr, h.owner);
+            String wealth = h.renown >= 5 ? "Its treasury is the stuff of songs." : h.renown == 4 ? "Its armoury is famed."
+                    : h.renown == 3 ? "It does well for itself." : h.renown == 2 ? "A modest place." : "A poor, hard place.";
+            p.sendSystemMessage(net.minecraft.network.chat.Component.literal(h.name + ", " + Holding.renownName(h.renown) + " "
+                    + Holding.tierName(h.tier).toLowerCase() + " of " + owner + ". " + wealth).withStyle(net.minecraft.ChatFormatting.GRAY, net.minecraft.ChatFormatting.ITALIC));
+        }
     }
 
     private HoldingTicker() {

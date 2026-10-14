@@ -170,6 +170,9 @@ public final class CommonEvents {
             e.setCanceled(true);
             e.setCancellationResult(InteractionResult.FAIL);
             warn(e.getEntity(), "The stores of " + h.name + " are sealed while " + h.lordName + " lives.");
+        } else if (h.bonusLeft > 0 && be instanceof net.minecraft.world.level.block.entity.ChestBlockEntity chest
+                && e.getPos().distSqr(h.lordPos) < 28 * 28 && e.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp) {
+            net.aiagent256.stormhold.holding.Treasure.fill(level, HoldingManager.get(level), h, chest, sp);
         } else if (h.isPlayerOwned() && !Sides.player(e.getEntity().getUUID()).equals(h.owner)) {
             e.setCanceled(true);
             e.setCancellationResult(InteractionResult.FAIL);

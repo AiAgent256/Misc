@@ -28,6 +28,7 @@ public class Campaign {
     public double progress;
     public long siegeUntil;
     public int tier = 2;
+    public int renown = 2;
     public int color;
     public final EnumMap<Role, Integer> counts = new EnumMap<>(Role.class);
     public final Map<UUID, Role> live = new HashMap<>();
@@ -72,6 +73,7 @@ public class Campaign {
         t.putDouble("Progress", progress);
         t.putLong("SiegeUntil", siegeUntil);
         t.putInt("Tier", tier);
+        t.putInt("Renown", renown);
         t.putInt("Color", color);
         CompoundTag c = new CompoundTag();
         counts.forEach((r, n) -> c.putInt(r.name(), n));
@@ -92,6 +94,7 @@ public class Campaign {
         c.progress = t.getDouble("Progress");
         c.siegeUntil = t.getLong("SiegeUntil");
         c.tier = t.getInt("Tier");
+        if (t.contains("Renown")) c.renown = t.getInt("Renown");
         c.color = t.getInt("Color");
         CompoundTag cc = t.getCompound("Counts");
         for (String k : cc.getAllKeys()) {

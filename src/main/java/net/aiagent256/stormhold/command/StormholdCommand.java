@@ -72,6 +72,7 @@ public final class StormholdCommand {
         ServerLevel level = c.getSource().getLevel();
         HoldingManager mgr = HoldingManager.get(level);
         String s = h.name + " [" + h.structure + (h.layout != null ? " / " + h.layout + " / " + h.theme : "") + "]\n"
+                + Holding.renownName(h.renown).substring(0, 1).toUpperCase() + Holding.renownName(h.renown).substring(1) + " " + Holding.tierName(h.tier).toLowerCase() + " (renown " + h.renown + "/5)\n"
                 + "Held by " + HoldingEvents.ownerName(level, mgr, h.owner) + (h.isHouseOwned() ? (h.lordAlive ? ", " + h.lordName + " lives" : ", lord dead") : "") + "\n"
                 + "Captain " + h.count(Role.CAPTAIN) + ", knights " + h.count(Role.KNIGHT) + ", archers " + h.count(Role.ARCHER)
                 + ", crossbows " + h.count(Role.CROSSBOWMAN) + "\nBanner stand at " + h.bannerPos.toShortString()

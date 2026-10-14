@@ -44,6 +44,16 @@ public class Holding {
         };
     }
 
+    public static String renownName(int renown) {
+        return switch (Math.max(1, Math.min(5, renown))) {
+            case 1 -> "a poor";
+            case 2 -> "a modest";
+            case 3 -> "a prosperous";
+            case 4 -> "a rich";
+            default -> "a famed";
+        };
+    }
+
     public static String lordTitle(int tier) {
         return switch (tier) {
             case 1 -> "Castellan ";
@@ -60,6 +70,10 @@ public class Holding {
     @Nullable public String layout;
     public String theme = "north";
     public int tier = 1;
+    /** 1 (a backwater) to 5 (famed): gear, health and treasure scale with it. */
+    public int renown = 2;
+    /** Treasury chests still carrying a renown bonus (the first few opened in the keep after the lord falls). */
+    public int bonusLeft;
     public BoundingBox box = new BoundingBox(0, 0, 0, 0, 0, 0);
     public String houseId = "outlaws";
     public String owner = Sides.OUTLAWS;
@@ -77,6 +91,7 @@ public class Holding {
     public final List<Posting> postings = new ArrayList<>();
     public long nextPosting;
     public boolean cityBlocksPlaced;
+    public final Set<UUID> greeted = new HashSet<>();
     public final EnumMap<Role, Integer> garrison = new EnumMap<>(Role.class);
     public Mode mode = Mode.DEFEND;
     @Nullable public BlockPos attackTarget;
@@ -136,7 +151,7 @@ public class Holding {
 
     public double strength() {
         double s = 0;
-        for (Role r : Role.TROOPS) s += count(r) * r.strength();
+        for (Role r : Role.TROOPS) s += count(r) * r.strength() * (1.0 + 0.15 * (renown - 1));
         if (lordAlive && isHouseOwned()) s += Role.LORD.strength();
         return s;
     }
@@ -194,6 +209,8 @@ public class Holding {
         if (layout != null) t.putString("Layout", layout);
         t.putString("Theme", theme);
         t.putInt("Tier", tier);
+        t.putInt("Renown", renown);
+        t.putInt("BonusLeft", bonusLeft);
         t.putIntArray("Box", new int[]{box.minX(), box.minY(), box.minZ(), box.maxX(), box.maxY(), box.maxZ()});
         t.putString("House", houseId);
         t.putString("Owner", owner);
@@ -253,6 +270,8 @@ public class Holding {
         h.layout = t.contains("Layout") ? t.getString("Layout") : null;
         h.theme = t.getString("Theme");
         h.tier = t.getInt("Tier");
+        h.renown = t.contains("Renown") ? Math.max(1, Math.min(5, t.getInt("Renown"))) : Math.min(5, h.tier + 1);
+        h.bonusLeft = t.getInt("BonusLeft");
         int[] b = t.getIntArray("Box");
         if (b.length == 6) h.box = new BoundingBox(b[0], b[1], b[2], b[3], b[4], b[5]);
         h.houseId = t.getString("House");
