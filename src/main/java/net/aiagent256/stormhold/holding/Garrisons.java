@@ -15,6 +15,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
@@ -57,9 +58,32 @@ public final class Garrisons {
     }
 
     /** Spawn missing soldiers at loaded posts, a few per call. */
+    /** Holdings this wide only keep soldiers near players; the rest of the garrison exists as counts. */
+    public static final int DISTRICT_SIZE = 150;
+    public static final double DISTRICT_RADIUS = 96;
+
+    static boolean nearPlayer(ServerLevel level, BlockPos p, double r) {
+        for (ServerPlayer sp : level.players()) {
+            if (!sp.isSpectator() && sp.blockPosition().distSqr(p) < r * r) return true;
+        }
+        return false;
+    }
+
     public static void materialize(ServerLevel level, HoldingManager mgr, Holding h) {
         pruneLive(level, h.live);
         if (h.live.isEmpty()) h.usedPosts.clear();
+        boolean city = h.box.getXSpan() > DISTRICT_SIZE || h.box.getZSpan() > DISTRICT_SIZE;
+        if (city) {
+            // soldiers that wandered out of every player's district fade back into the count
+            for (UUID id : new java.util.ArrayList<>(h.live.keySet())) {
+                Entity e = level.getEntity(id);
+                if (e instanceof GarrisonEntity ge && ge.getTarget() == null && !nearPlayer(level, e.blockPosition(), DISTRICT_RADIUS + 40)) {
+                    if (ge.post() != null) h.usedPosts.remove(ge.post());
+                    h.live.remove(id);
+                    e.discard();
+                }
+            }
+        }
         int budget = 6;
         if (h.isHouseOwned() && h.lordAlive && liveCount(h.live, Role.LORD) == 0 && level.isLoaded(h.lordPos)) {
             spawn(level, mgr, h, Role.LORD, h.lordPos, h.owner, true);
@@ -90,14 +114,17 @@ public final class Garrisons {
             if (fallback == null) return h.rallyPos.equals(BlockPos.ZERO) ? null : h.rallyPos;
             return pickPost(level, h, fallback);
         }
-        for (int i = 0; i < 16; i++) {
+        boolean city = h.box.getXSpan() > DISTRICT_SIZE || h.box.getZSpan() > DISTRICT_SIZE;
+        for (int i = 0; i < (city ? 40 : 16); i++) {
             BlockPos p = list.get(level.random.nextInt(list.size()));
+            if (city && !nearPlayer(level, p, DISTRICT_RADIUS)) continue;
             if (!h.usedPosts.contains(p) && level.isLoaded(p)) {
                 h.usedPosts.add(p);
                 BlockPos free = standable(level, p);
                 if (free != null) return free;
             }
         }
+        if (city) return null;
         BlockPos p = list.get(level.random.nextInt(list.size()));
         return level.isLoaded(p) ? standable(level, p) : null;
     }

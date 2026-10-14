@@ -303,6 +303,57 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** The capital: 256 blocks across, tier 4, a King on the throne, and friendly by default. */
+    @GameTest(template = "arena", timeoutTicks = 2400)
+    public static void cityGeneratesAndAttaches(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        var reg = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.STRUCTURE);
+        var gen = level.getChunkSource().getGenerator();
+        HoldingManager mgr = HoldingManager.get(level);
+        var structure = reg.get(Stormhold.id("great_city_north"));
+        if (structure == null) throw new IllegalStateException("city structure not registered");
+        BlockPos at = g.absolutePos(BlockPos.ZERO).offset(6000, 0, 6000);
+        net.minecraft.world.level.ChunkPos cp = new net.minecraft.world.level.ChunkPos(at);
+        net.aiagent256.stormhold.worldgen.CastleStructure.ignoreTerrain = true;
+        var start = structure.generate(level.registryAccess(), gen, gen.getBiomeSource(), level.getChunkSource().randomState(),
+                level.getStructureManager(), level.getSeed(), cp, 0, level, b -> true);
+        net.aiagent256.stormhold.worldgen.CastleStructure.ignoreTerrain = false;
+        if (!start.isValid()) throw new IllegalStateException("city generated nothing");
+        BoundingBox bb = start.getBoundingBox();
+        if (bb.getXSpan() < 250 || bb.getZSpan() < 250) throw new IllegalStateException("city box too small: " + bb);
+        // every chunk of the city must be within 8 chunks of the start chunk, or vanilla never places it
+        for (int cx = bb.minX() >> 4; cx <= bb.maxX() >> 4; cx++)
+            for (int cz = bb.minZ() >> 4; cz <= bb.maxZ() >> 4; cz++)
+                if (Math.abs(cx - cp.x) > 8 || Math.abs(cz - cp.z) > 8)
+                    throw new IllegalStateException("city chunk " + cx + "," + cz + " is out of reference range of " + cp);
+        long t0 = System.currentTimeMillis();
+        net.minecraft.world.level.ChunkPos.rangeClosed(new net.minecraft.world.level.ChunkPos(bb.minX() >> 4, bb.minZ() >> 4),
+                new net.minecraft.world.level.ChunkPos(bb.maxX() >> 4, bb.maxZ() >> 4)).forEach(c ->
+                start.placeInChunk(level, level.structureManager(), gen, level.getRandom(),
+                        new BoundingBox(c.getMinBlockX(), level.getMinBuildHeight(), c.getMinBlockZ(), c.getMaxBlockX(),
+                                level.getMaxBuildHeight(), c.getMaxBlockZ()), c));
+        Stormhold.LOGGER.info("City placed in {} ms", System.currentTimeMillis() - t0);
+        Holding h = net.aiagent256.stormhold.holding.Detector.createForTest(level, mgr, "test:city@" + cp.toLong(),
+                Stormhold.id("great_city_north"), start);
+        if (h == null) throw new IllegalStateException("city did not attach");
+        try {
+            if (h.tier != 4) throw new IllegalStateException("city tier " + h.tier);
+            if (!h.lordName.startsWith("King ")) throw new IllegalStateException("city lord is " + h.lordName);
+            if (h.capacity(Role.KNIGHT) < 30) throw new IllegalStateException("city garrison too small");
+            var house = mgr.house(h.houseId);
+            if (!h.id.equals(house.capital)) throw new IllegalStateException("city is not its house's capital");
+            if (house.disposition < 40) throw new IllegalStateException("capital house not friendly: " + house.disposition);
+            if (!level.getBlockState(h.bannerPos.below()).isSolidRender(level, h.bannerPos.below()))
+                throw new IllegalStateException("banner stand floats at " + h.bannerPos);
+            if (!level.getBlockState(h.lordPos).isAir()) throw new IllegalStateException("throne is inside a block at " + h.lordPos);
+        } finally {
+            mgr.holdings.remove(h.id);
+            mgr.byKey.remove(h.key);
+            mgr.houses.remove(h.houseId);
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();
