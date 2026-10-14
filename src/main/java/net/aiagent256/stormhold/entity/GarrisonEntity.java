@@ -2,7 +2,9 @@ package net.aiagent256.stormhold.entity;
 
 import net.aiagent256.stormhold.Sides;
 import net.aiagent256.stormhold.compat.RecruitsCompat;
+import net.aiagent256.stormhold.entity.ai.BackOffGoal;
 import net.aiagent256.stormhold.entity.ai.GarrisonRangedGoal;
+import net.aiagent256.stormhold.entity.ai.KnightMeleeGoal;
 import net.aiagent256.stormhold.entity.ai.GuardStrollGoal;
 import net.aiagent256.stormhold.entity.ai.MarchGoal;
 import net.aiagent256.stormhold.entity.ai.ReturnToPostGoal;
@@ -66,6 +68,12 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     private DyeColor color = DyeColor.RED;
     private boolean reinforced;
     private int alarmTicks;
+    /** Ticks spent next to a target we can't reach; past a limit the knight backs off. */
+    private int unreachableTicks;
+    public int backOffTicks;
+    @Nullable public Vec3 backOffFrom;
+    @Nullable private UUID ignoring;
+    private long ignoreUntil;
     @Nullable private final ServerBossEvent bossEvent;
 
     protected GarrisonEntity(EntityType<? extends GarrisonEntity> type, Level level) {
@@ -107,7 +115,8 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         } else if (r.ranged) {
             this.goalSelector.addGoal(2, new GarrisonRangedGoal(this));
         } else {
-            this.goalSelector.addGoal(2, new MeleeAttackGoal(this, 1.2, true));
+            this.goalSelector.addGoal(1, new BackOffGoal(this));
+            this.goalSelector.addGoal(2, new KnightMeleeGoal(this, 1.2));
         }
         this.goalSelector.addGoal(3, new OpenDoorGoal(this, true));
         this.goalSelector.addGoal(4, new MarchGoal(this));
@@ -299,9 +308,41 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     }
 
     @Override
+    public boolean canAttack(LivingEntity target) {
+        if (ignoring != null && ignoring.equals(target.getUUID()) && this.level().getGameTime() < ignoreUntil
+                && target.getY() - this.getY() > 1.5) return false;
+        return super.canAttack(target);
+    }
+
+    /** Can't reach the target: it is above sword reach and we're already as close as we can get. */
+    private boolean targetOutOfReach(LivingEntity t) {
+        double dy = t.getY() - this.getY();
+        double dx = t.getX() - this.getX(), dz = t.getZ() - this.getZ();
+        double horiz = Math.sqrt(dx * dx + dz * dz);
+        if (dy > KnightMeleeGoal.REACH - 0.5 && horiz < 4.5) return true;
+        return dy > 1.5 && horiz < 6 && this.getNavigation().isDone();
+    }
+
+    @Override
     protected void customServerAiStep() {
         super.customServerAiStep();
         if (alarmTicks > 0) alarmTicks--;
+        if (backOffTicks > 0) backOffTicks--;
+        if (!role().ranged && role() != Role.COURIER) {
+            LivingEntity t = this.getTarget();
+            if (t != null && targetOutOfReach(t)) {
+                if (++unreachableTicks > 70) {
+                    unreachableTicks = 0;
+                    backOffTicks = 160;
+                    backOffFrom = t.position();
+                    ignoring = t.getUUID();
+                    ignoreUntil = this.level().getGameTime() + 400;
+                    this.setTarget(null);
+                }
+            } else if (unreachableTicks > 0) {
+                unreachableTicks--;
+            }
+        }
         if (bossEvent != null) {
             if (this.tickCount % 20 == 0) updateBossViewers();
             bossEvent.setProgress(this.getHealth() / this.getMaxHealth());

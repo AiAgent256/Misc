@@ -322,10 +322,13 @@ public class StormholdGameTests {
         BoundingBox bb = start.getBoundingBox();
         if (bb.getXSpan() < 250 || bb.getZSpan() < 250) throw new IllegalStateException("city box too small: " + bb);
         // every chunk of the city must be within 8 chunks of the start chunk, or vanilla never places it
-        for (int cx = bb.minX() >> 4; cx <= bb.maxX() >> 4; cx++)
-            for (int cz = bb.minZ() >> 4; cz <= bb.maxZ() >> 4; cz++)
-                if (Math.abs(cx - cp.x) > 8 || Math.abs(cz - cp.z) > 8)
-                    throw new IllegalStateException("city chunk " + cx + "," + cz + " is out of reference range of " + cp);
+        for (var piece : start.getPieces()) {
+            BoundingBox pb = piece.getBoundingBox();
+            for (int cx = pb.minX() >> 4; cx <= pb.maxX() >> 4; cx++)
+                for (int cz = pb.minZ() >> 4; cz <= pb.maxZ() >> 4; cz++)
+                    if (Math.abs(cx - cp.x) > 8 || Math.abs(cz - cp.z) > 8)
+                        throw new IllegalStateException("city tile chunk " + cx + "," + cz + " is out of reference range of " + cp);
+        }
         long t0 = System.currentTimeMillis();
         net.minecraft.world.level.ChunkPos.rangeClosed(new net.minecraft.world.level.ChunkPos(bb.minX() >> 4, bb.minZ() >> 4),
                 new net.minecraft.world.level.ChunkPos(bb.maxX() >> 4, bb.maxZ() >> 4)).forEach(c ->
