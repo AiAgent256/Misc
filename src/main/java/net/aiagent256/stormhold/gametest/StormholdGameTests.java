@@ -173,6 +173,46 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    @GameTest(template = "arena")
+    public static void spawnsAvoidWalls(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        BlockPos post = g.absolutePos(new BlockPos(5, 2, 5));
+        if (!post.equals(Garrisons.standable(level, post))) throw new IllegalStateException("open floor post was moved");
+        g.setBlock(new BlockPos(5, 2, 5), net.minecraft.world.level.block.Blocks.STONE);
+        g.setBlock(new BlockPos(5, 3, 5), net.minecraft.world.level.block.Blocks.STONE);
+        BlockPos moved = Garrisons.standable(level, post);
+        if (moved == null || !level.getBlockState(moved).isAir() || !level.getBlockState(moved.above()).isAir())
+            throw new IllegalStateException("buried post gave " + moved);
+        for (int x = 8; x <= 12; x++) for (int y = 2; y <= 7; y++) for (int z = 8; z <= 12; z++)
+            g.setBlock(new BlockPos(x, y, z), net.minecraft.world.level.block.Blocks.STONE);
+        BlockPos sealed = Garrisons.standable(level, g.absolutePos(new BlockPos(10, 2, 10)));
+        if (sealed != null) throw new IllegalStateException("found room inside solid stone at " + sealed);
+        g.succeed();
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void castlesKeepClearOfVillages(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        var watches = net.aiagent256.stormhold.worldgen.Avoidance.watches(level.registryAccess());
+        if (watches.stream().noneMatch(w -> w.name().equals("minecraft:villages")))
+            throw new IllegalStateException("villages not watched; sets: " + watches.stream().map(w -> w.name()).toList());
+        if (watches.stream().noneMatch(w -> w.name().equals("stormhold:great_castles") && w.castleSize() > 0))
+            throw new IllegalStateException("great castles not watched");
+        var t = List.of(new net.aiagent256.stormhold.worldgen.Avoidance.Threat("v", 100, 100, 72, 0));
+        if (net.aiagent256.stormhold.worldgen.Avoidance.crowds(t, 100, 160, 32) == null)
+            throw new IllegalStateException("holdfast 60 blocks from a village start was allowed");
+        if (net.aiagent256.stormhold.worldgen.Avoidance.crowds(t, 100, 320, 32) != null)
+            throw new IllegalStateException("holdfast 220 blocks from a village start was refused");
+        var gen = level.getChunkSource().getGenerator();
+        var ctx = new net.minecraft.world.level.levelgen.structure.Structure.GenerationContext(level.registryAccess(), gen,
+                gen.getBiomeSource(), level.getChunkSource().randomState(), level.getStructureManager(), level.getSeed(),
+                new net.minecraft.world.level.ChunkPos(0, 0), level, b -> true);
+        var near = net.aiagent256.stormhold.worldgen.Avoidance.near(ctx, 0, 0, 3000, 18);
+        Stormhold.LOGGER.info("Avoidance: {} watched sets, {} possible starts within 3000 blocks", watches.size(), near.size());
+        if (near.isEmpty()) throw new IllegalStateException("no possible villages or castles within 3000 blocks");
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

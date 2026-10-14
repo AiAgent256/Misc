@@ -1,0 +1,57 @@
+{
+ "replace": false,
+ "values": [
+  "#minecraft:village",
+  {
+   "id": "nova_structures:village_jungle",
+   "required": false
+  },
+  {
+   "id": "nova_structures:village_swamp",
+   "required": false
+  },
+  {
+   "id": "nova_structures:ruin_town",
+   "required": false
+  },
+  {
+   "id": "dungeons_arise:bandit_village",
+   "required": false
+  },
+  {
+   "id": "dungeons_arise:mushroom_village",
+   "required": false
+  },
+  {
+   "id": "dungeons_arise:keep_kayra",
+   "required": false
+  },
+  {
+   "id": "dungeons_arise:illager_fort",
+   "required": false
+  },
+  {
+   "id": "dungeons_arise:coliseum",
+   "required": false
+  },
+  {
+   "id": "dungeons_arise:monastery",
+   "required": false
+  },
+  "stormhold:great_castle_north",
+  "stormhold:great_castle_riverlands",
+  "stormhold:great_castle_reach",
+  "stormhold:great_castle_dorne",
+  "stormhold:great_castle_stormlands",
+  "stormhold:holdfast_north",
+  "stormhold:holdfast_riverlands",
+  "stormhold:holdfast_reach",
+  "stormhold:holdfast_dorne",
+  "stormhold:holdfast_stormlands",
+  "stormhold:watchtower_north",
+  "stormhold:watchtower_riverlands",
+  "stormhold:watchtower_reach",
+  "stormhold:watchtower_dorne",
+  "stormhold:watchtower_stormlands"
+ ]
+}

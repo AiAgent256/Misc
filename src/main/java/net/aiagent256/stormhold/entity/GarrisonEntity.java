@@ -248,6 +248,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         super.customServerAiStep();
         if (alarmTicks > 0) alarmTicks--;
         if (bossEvent != null) {
+            if (this.tickCount % 20 == 0) updateBossViewers();
             bossEvent.setProgress(this.getHealth() / this.getMaxHealth());
             if (!reinforced && this.getHealth() < this.getMaxHealth() * 0.5F) {
                 reinforced = true;
@@ -262,10 +263,16 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         if (bossEvent != null) bossEvent.setName(this.getDisplayName());
     }
 
-    @Override
-    public void startSeenByPlayer(ServerPlayer player) {
-        super.startSeenByPlayer(player);
-        if (bossEvent != null) bossEvent.addPlayer(player);
+    /** The lord's bar shows once you're close enough to see him, or while he's fighting you. */
+    private void updateBossViewers() {
+        if (!(this.level() instanceof net.minecraft.server.level.ServerLevel sl) || bossEvent == null) return;
+        for (ServerPlayer p : sl.players()) {
+            double d = p.distanceToSqr(this);
+            boolean shown = bossEvent.getPlayers().contains(p);
+            boolean near = !p.isSpectator() && (d < 40 * 40 || (this.getTarget() == p && d < 96 * 96));
+            if (near && !shown) bossEvent.addPlayer(p);
+            else if (!near && shown && d > 48 * 48) bossEvent.removePlayer(p);
+        }
     }
 
     @Override

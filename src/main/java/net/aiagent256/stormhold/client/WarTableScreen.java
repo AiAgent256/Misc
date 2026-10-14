@@ -15,7 +15,7 @@ import java.util.List;
 
 /** Command every castle you hold: stance, march orders, supply lines, mustering. */
 public class WarTableScreen extends Screen {
-    private static final int W = 380, H = 236;
+    private static final int W = 430, H = 236;
     private Net.WarTableData data;
     private int selected;
     private int page;
@@ -81,34 +81,34 @@ public class WarTableScreen extends Screen {
             final int act = i;
             boolean on = modes[i].equals(h.mode());
             this.addRenderableWidget(Button.builder(Component.literal((on ? "[" : "") + labels[i] + (on ? "]" : "")),
-                    b -> Net.sendAction(h.id(), act, BlockPos.ZERO, 0)).bounds(rx + i * 82, y, 78, 20).build());
+                    b -> Net.sendAction(h.id(), act, BlockPos.ZERO, 0)).bounds(rx + i * 98, y, 94, 20).build());
         }
         BlockPos me = Minecraft.getInstance().player != null ? Minecraft.getInstance().player.blockPosition() : BlockPos.ZERO;
         y += 34;
-        ax = box(rx + 64, y, h.attack() != null ? h.attack().getX() : me.getX());
-        az = box(rx + 112, y, h.attack() != null ? h.attack().getZ() : me.getZ());
+        ax = box(rx + 66, y, h.attack() != null ? h.attack().getX() : me.getX());
+        az = box(rx + 122, y, h.attack() != null ? h.attack().getZ() : me.getZ());
         this.addRenderableWidget(Button.builder(Component.literal("Here"), b -> {
             ax.setValue(String.valueOf(me.getX()));
             az.setValue(String.valueOf(me.getZ()));
-        }).bounds(rx + 160, y, 34, 18).build());
+        }).bounds(rx + 170, y, 32, 18).build());
         this.addRenderableWidget(Button.builder(Component.literal("Set"), b -> {
             BlockPos p = parse(ax, null, az);
             if (p != null) Net.sendAction(h.id(), Net.SET_ATTACK, p, 0);
-        }).bounds(rx + 196, y, 30, 18).build());
+        }).bounds(rx + 204, y, 28, 18).build());
         this.addRenderableWidget(Button.builder(Component.literal("March now"), b -> Net.sendAction(h.id(), Net.MARCH_NOW, BlockPos.ZERO, 0))
-                .bounds(rx + 228, y, 70, 18).build());
+                .bounds(rx + 234, y, 56, 18).build());
         y += 30;
         BlockPos depot = markedDepot();
         BlockPos sup = h.supply() != null ? h.supply() : depot != null ? depot : me.below();
-        sx = box(rx + 64, y, sup.getX());
-        sy = box(rx + 112, y, sup.getY());
-        sz = box(rx + 160, y, sup.getZ());
+        sx = box(rx + 66, y, sup.getX());
+        sy = box(rx + 122, y, sup.getY());
+        sz = box(rx + 178, y, sup.getZ());
         this.addRenderableWidget(Button.builder(Component.literal("Set"), b -> {
             BlockPos p = parse(sx, sy, sz);
             if (p != null) Net.sendAction(h.id(), Net.SET_SUPPLY, p, 0);
-        }).bounds(rx + 208, y, 30, 18).build());
+        }).bounds(rx + 226, y, 28, 18).build());
         this.addRenderableWidget(Button.builder(Component.literal("Clear"), b -> Net.sendAction(h.id(), Net.CLEAR_SUPPLY, BlockPos.ZERO, 0))
-                .bounds(rx + 240, y, 40, 18).build());
+                .bounds(rx + 256, y, 34, 18).build());
         y += 30;
         if (data.recruits()) {
             this.addRenderableWidget(Button.builder(Component.literal("Muster 5 to me (Recruits)"),
@@ -133,7 +133,7 @@ public class WarTableScreen extends Screen {
     }
 
     private EditBox box(int x, int y, int value) {
-        EditBox b = new EditBox(this.font, x, y, 44, 18, Component.empty());
+        EditBox b = new EditBox(this.font, x, y, 46, 18, Component.empty());
         b.setValue(String.valueOf(value));
         b.setFilter(s -> s.isEmpty() || s.equals("-") || s.matches("-?\\d{0,8}"));
         this.addRenderableWidget(b);
@@ -172,18 +172,19 @@ public class WarTableScreen extends Screen {
             g.drawString(this.font, h.name(), rx, y0 + 7, 0xFFE8B0, false);
             g.drawString(this.font, tier + " at " + h.pos().getX() + ", " + h.pos().getZ(), rx, y0 + 22, 0xC8B898, false);
             int[] c = h.counts(), cap = h.capacity();
-            g.drawString(this.font, "Knights " + c[1] + "/" + cap[1] + "   Archers " + c[2] + "/" + cap[2]
-                    + "   Crossbows " + c[3] + "/" + cap[3] + "   Captains " + c[0], rx, y0 + 36, 0xE0D0B0, false);
-            g.drawString(this.font, "Stores: " + trim(h.stock(), 52), rx, y0 + 50, 0xC8B898, false);
+            g.drawString(this.font, "Knights " + c[1] + "/" + cap[1] + "  Archers " + c[2] + "/" + cap[2]
+                    + "  Crossbows " + c[3] + "/" + cap[3] + "  Captains " + c[0], rx, y0 + 36, 0xE0D0B0, false);
+            g.drawString(this.font, "Stores: " + trim(h.stock(), 56), rx, y0 + 50, 0xC8B898, false);
             g.drawWordWrap(this.font, Component.literal(h.status().isEmpty() ? "Quiet." : h.status()), rx, y0 + 64, W - 136, 0xD8A070);
             g.drawString(this.font, "Stance", rx, y0 + 82, 0xF0D8A0, false);
-            g.drawString(this.font, "March on   x", rx, y0 + 131, 0xE0D0B0, false);
-            g.drawString(this.font, "z", rx + 104, y0 + 131, 0xE0D0B0, false);
-            g.drawString(this.font, "Supply to  x", rx, y0 + 161, 0xE0D0B0, false);
-            g.drawString(this.font, "y", rx + 104, y0 + 161, 0xE0D0B0, false);
-            g.drawString(this.font, "z", rx + 152, y0 + 161, 0xE0D0B0, false);
-            g.drawString(this.font, h.supply() == null ? "No supply line." : "Couriers carry surplus to " + h.supply().toShortString()
-                    + " each day in Produce.", rx, y0 + 214, 0x9C8C6C, false);
+            g.drawString(this.font, "March on", rx, y0 + 131, 0xE0D0B0, false);
+            g.drawString(this.font, "x", rx + 58, y0 + 131, 0xE0D0B0, false);
+            g.drawString(this.font, "z", rx + 114, y0 + 131, 0xE0D0B0, false);
+            g.drawString(this.font, "Supply to", rx, y0 + 161, 0xE0D0B0, false);
+            g.drawString(this.font, "x", rx + 58, y0 + 161, 0xE0D0B0, false);
+            g.drawString(this.font, "y", rx + 114, y0 + 161, 0xE0D0B0, false);
+            g.drawString(this.font, "z", rx + 170, y0 + 161, 0xE0D0B0, false);
+            g.drawString(this.font, h.supply() == null ? "No supply line." : "Couriers take surplus to " + h.supply().toShortString() + " daily.", rx, y0 + 214, 0x9C8C6C, false);
         }
         super.render(g, mouseX, mouseY, partial);
     }

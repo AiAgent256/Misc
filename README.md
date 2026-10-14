@@ -29,7 +29,7 @@ Private Forge 1.20.1 mod for the Dungeons and Homestead pack. Castles held by ri
 
 **Raids.** Every 3 to 5 days the house you took the castle from marches to retake it. You get a warning a day ahead. If you're away it's fought out by numbers; Defend stance helps.
 
-**Lived-in world.** Villagers work inside the walls, fields and orchards appear outside, and a road is laid from the gate to the nearest village as the chunks load.
+**Lived-in world.** Villagers work inside the walls, fields and orchards appear outside, and a road is laid from the gate to the nearest village as the chunks load. Castles are sited on high, dry ground and keep clear of villages and towns from any mod (anything in `#minecraft:village`, plus a few extras in `#stormhold:castle_avoid`); a watchtower or holdfast never lands inside a great castle.
 
 ## Commands
 `/stormhold list | nearest | info` for everyone; `capture | raid | killlord` for ops (testing).

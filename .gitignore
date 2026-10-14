@@ -10,3 +10,5 @@ bin/
 build/
 eclipse/
 run/
+__pycache__/
+*.pyc

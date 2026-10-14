@@ -74,8 +74,14 @@ public final class RecruitsCompat {
         if (type == null) return false;
         Entity e = type.create(level);
         if (!(e instanceof Mob mob)) return false;
-        BlockPos p = player.blockPosition().offset(level.random.nextInt(5) - 2, 0, level.random.nextInt(5) - 2);
-        mob.moveTo(p.getX() + 0.5, player.getY(), p.getZ() + 0.5, player.getYRot(), 0);
+        BlockPos p = null;
+        for (int i = 0; i < 8 && p == null; i++) {
+            BlockPos q = player.blockPosition().offset(level.random.nextInt(5) - 2, 0, level.random.nextInt(5) - 2);
+            BlockPos free = net.aiagent256.stormhold.holding.Garrisons.standable(level, q);
+            if (free != null && free.distSqr(player.blockPosition()) <= 16) p = free;
+        }
+        if (p == null) p = player.blockPosition();
+        mob.moveTo(p.getX() + 0.5, p.getY(), p.getZ() + 0.5, player.getYRot(), 0);
         mob.finalizeSpawn(level, level.getCurrentDifficultyAt(p), MobSpawnType.MOB_SUMMONED, null, null);
         level.addFreshEntity(mob);
         try {

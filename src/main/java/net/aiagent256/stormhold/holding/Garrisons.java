@@ -94,11 +94,45 @@ public final class Garrisons {
             BlockPos p = list.get(level.random.nextInt(list.size()));
             if (!h.usedPosts.contains(p) && level.isLoaded(p)) {
                 h.usedPosts.add(p);
-                return p;
+                BlockPos free = standable(level, p);
+                if (free != null) return free;
             }
         }
         BlockPos p = list.get(level.random.nextInt(list.size()));
-        return level.isLoaded(p) ? p : null;
+        return level.isLoaded(p) ? standable(level, p) : null;
+    }
+
+    /**
+     * The nearest spot to {@code p} (within two blocks across, three up, one down) where a mob can
+     * stand without being inside a wall. Null if there's none, e.g. something else was built over the post.
+     */
+    @Nullable
+    public static BlockPos standable(ServerLevel level, BlockPos p) {
+        int[] ys = {0, 1, -1, 2, 3};
+        for (int r = 0; r <= 2; r++) {
+            for (int dy : ys) {
+                for (int dx = -r; dx <= r; dx++) {
+                    for (int dz = -r; dz <= r; dz++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
+                        BlockPos q = p.offset(dx, dy, dz);
+                        if (fits(level, q)) return q;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean fits(ServerLevel level, BlockPos q) {
+        if (!level.isLoaded(q) || !level.isLoaded(q.above())) return false;
+        BlockState feet = level.getBlockState(q), head = level.getBlockState(q.above());
+        var fs = feet.getCollisionShape(level, q);
+        if (!fs.isEmpty() && fs.max(net.minecraft.core.Direction.Axis.Y) > 0.5) return false;
+        if (!head.getCollisionShape(level, q.above()).isEmpty()) return false;
+        if (!feet.getFluidState().isEmpty() || !head.getFluidState().isEmpty()) return false;
+        if (!fs.isEmpty()) return true;
+        BlockPos below = q.below();
+        return !level.getBlockState(below).getCollisionShape(level, below).isEmpty();
     }
 
     @Nullable
@@ -107,6 +141,8 @@ public final class Garrisons {
         EntityType<? extends GarrisonEntity> type = ModEntities.typeFor(r, Sides.isHouse(side));
         GarrisonEntity e = type.create(level);
         if (e == null) return null;
+        BlockPos free = standable(level, p);
+        if (free != null) p = free;
         House house = mgr.houseOf(side);
         DyeColor color = mgr.colorOf(side);
         int tier = h != null ? h.tier : 2;
@@ -255,7 +291,8 @@ public final class Garrisons {
         if (ground.size() < 3) return;
         int n = h.tier * 3;
         for (int i = 0; i < n; i++) {
-            BlockPos p = ground.get(level.random.nextInt(ground.size()));
+            BlockPos p = standable(level, ground.get(level.random.nextInt(ground.size())));
+            if (p == null) continue;
             Villager v = EntityType.VILLAGER.create(level);
             if (v == null) continue;
             v.moveTo(p.getX() + 0.5, p.getY(), p.getZ() + 0.5, level.random.nextFloat() * 360F, 0);

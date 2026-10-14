@@ -56,6 +56,13 @@ public class CastleStructure extends Structure {
         return theme;
     }
 
+    /** Half the longest side of the biggest layout this structure can pick. */
+    public int maxHalfSize() {
+        int m = 0;
+        for (Variant v : variants) m = Math.max(m, Math.max(v.sizeX(), v.sizeZ()) / 2);
+        return m;
+    }
+
     private record Site(int cx, int cz, int y, double score) {
     }
 
@@ -74,10 +81,19 @@ public class CastleStructure extends Structure {
             }
         }
         ChunkPos cp = ctx.chunkPos();
+        int own = Math.max(chosen.sizeX(), chosen.sizeZ()) / 2;
+        List<Avoidance.Threat> threats = ignoreTerrain ? List.of()
+                : Avoidance.near(ctx, cp.getMiddleBlockX(), cp.getMiddleBlockZ(), 46 + own + 110, own);
         Site best = null;
         for (int i = -1; i <= 1; i++) {
             for (int j = -1; j <= 1; j++) {
-                Site s = evaluate(ctx, cp.getMiddleBlockX() + i * 32, cp.getMiddleBlockZ() + j * 32, chosen);
+                int sx = cp.getMiddleBlockX() + i * 32, sz = cp.getMiddleBlockZ() + j * 32;
+                Avoidance.Threat t = Avoidance.crowds(threats, sx, sz, own);
+                if (t != null) {
+                    lastRejection = "too close to " + t.name() + " at " + t.x() + ", " + t.z();
+                    continue;
+                }
+                Site s = evaluate(ctx, sx, sz, chosen);
                 if (s != null && (best == null || s.score > best.score)) best = s;
             }
         }
