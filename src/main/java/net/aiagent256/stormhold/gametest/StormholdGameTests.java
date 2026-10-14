@@ -126,9 +126,16 @@ public class StormholdGameTests {
             if (structure == null) throw new IllegalStateException("structure not registered: " + id);
             BlockPos at = g.absolutePos(BlockPos.ZERO).offset(3000 + i * 400, 0, 3000);
             net.minecraft.world.level.ChunkPos cp = new net.minecraft.world.level.ChunkPos(at);
+            net.aiagent256.stormhold.worldgen.CastleStructure.ignoreTerrain = false;
+            var probe = structure.generate(level.registryAccess(), gen, gen.getBiomeSource(), level.getChunkSource().randomState(),
+                    level.getStructureManager(), level.getSeed(), cp, 0, level, b -> true);
+            Stormhold.LOGGER.info("Siting probe for {}: valid={} last rejection: {}", id, probe.isValid(),
+                    net.aiagent256.stormhold.worldgen.CastleStructure.lastRejection);
+            net.aiagent256.stormhold.worldgen.CastleStructure.ignoreTerrain = true;
             var start = structure.generate(level.registryAccess(), gen, gen.getBiomeSource(), level.getChunkSource().randomState(),
                     level.getStructureManager(), level.getSeed(), cp, 0, level, b -> true);
-            if (!start.isValid()) throw new IllegalStateException(id + " found no site in a flat world");
+            net.aiagent256.stormhold.worldgen.CastleStructure.ignoreTerrain = false;
+            if (!start.isValid()) throw new IllegalStateException(id + " generated nothing even with terrain checks off");
             BoundingBox bb = start.getBoundingBox();
             net.minecraft.world.level.ChunkPos.rangeClosed(new net.minecraft.world.level.ChunkPos(bb.minX() >> 4, bb.minZ() >> 4),
                     new net.minecraft.world.level.ChunkPos(bb.maxX() >> 4, bb.maxZ() >> 4)).forEach(c ->

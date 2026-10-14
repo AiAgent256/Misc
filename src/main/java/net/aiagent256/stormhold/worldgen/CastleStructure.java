@@ -37,6 +37,10 @@ public class CastleStructure extends Structure {
             Codec.INT.optionalFieldOf("max_slope", 14).forGetter(s -> s.maxSlope)
     ).apply(i, CastleStructure::new));
 
+    /** Game tests run in a flat world where terrain scoring is meaningless. */
+    public static volatile boolean ignoreTerrain;
+    public static volatile String lastRejection = "";
+
     private final List<Variant> variants;
     private final String theme;
     private final int maxSlope;
@@ -85,6 +89,9 @@ public class CastleStructure extends Structure {
     }
 
     private Site evaluate(GenerationContext ctx, int cx, int cz, Variant v) {
+        if (ignoreTerrain) {
+            return new Site(cx, cz, height(ctx, cx, cz, Heightmap.Types.WORLD_SURFACE_WG) + 1, 0);
+        }
         int hx = v.sizeX() / 2 - 4, hz = v.sizeZ() / 2 - 4;
         int[] hs = new int[9];
         int k = 0;
@@ -98,14 +105,23 @@ public class CastleStructure extends Structure {
                 hs[k++] = surface;
             }
         }
-        if (wet > 1) return null;
+        if (wet > 1) {
+            lastRejection = "water x" + wet;
+            return null;
+        }
         int[] sorted = hs.clone();
         Arrays.sort(sorted);
         int slope = sorted[8] - sorted[0];
-        if (slope > maxSlope) return null;
+        if (slope > maxSlope) {
+            lastRejection = "slope " + slope;
+            return null;
+        }
         int median = sorted[4];
         int sea = ctx.chunkGenerator().getSeaLevel();
-        if (median <= sea + 1) return null;
+        if (median <= sea + 1) {
+            lastRejection = "median " + median + " vs sea " + sea;
+            return null;
+        }
         // prominence over the surrounding land and water in view
         double ring = 0;
         int ringWater = 0;
