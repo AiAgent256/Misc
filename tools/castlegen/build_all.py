@@ -1,0 +1,50 @@
+"""Generate all Stormhold castles: NBT tiles, layout JSON, preview renders.
+
+usage: python3 build_all.py [--render-only NAME] [--out RENDER_DIR]
+"""
+import argparse
+import os
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(__file__))
+import castle
+import export
+import render
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+STRUCT_DIR = os.path.join(ROOT, "src/main/resources/data/stormhold/structures")
+LAYOUT_DIR = os.path.join(ROOT, "src/main/resources/data/stormhold/castle_layouts")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--only", default=None)
+    ap.add_argument("--renders", default=os.path.join(ROOT, "build/renders"))
+    ap.add_argument("--no-export", action="store_true")
+    ap.add_argument("--no-render", action="store_true")
+    args = ap.parse_args()
+    os.makedirs(args.renders, exist_ok=True)
+    for fn in (castle.great_castle, castle.holdfast, castle.watchtower):
+        if args.only and fn.__name__ != args.only:
+            continue
+        t = time.time()
+        g, meta = fn()
+        name = meta["name"]
+        print(f"{name}: built in {time.time() - t:.1f}s, palette {len(g.palette)}")
+        if not args.no_export:
+            tiles = export.write_tiles(g, os.path.join(STRUCT_DIR, name), name)
+            layout = export.write_layout(g, meta, tiles, os.path.join(LAYOUT_DIR, f"{name}.json"))
+            print(f"  tiles {len(tiles)}, blocks {sum(t['blocks'] for t in tiles)}, posts " +
+                  ", ".join(f"{k}={len(v)}" for k, v in layout["posts"].items()) +
+                  f", banners {len(layout['banners'])}")
+        if not args.no_render:
+            s = 4 if g.X > 64 else 7
+            for rot in range(4):
+                render.render_iso(g, os.path.join(args.renders, f"{name}_iso{rot}.png"), s=s, rot=rot)
+            render.render_plan(g, os.path.join(args.renders, f"{name}_plan.png"))
+            print(f"  renders done in {time.time() - t:.1f}s")
+
+
+if __name__ == "__main__":
+    main()
