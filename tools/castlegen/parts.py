@@ -28,12 +28,14 @@ PORTCULLIS = "stormhold:portcullis"
 GLASS = "minecraft:gray_stained_glass_pane"
 
 
-def side_grids(g, a, b):
-    """For a square wall from a..b: distance from outer face d, along-wall coord, outward facing."""
+def side_grids(g, a, b, az=None, bz=None):
+    """For a rectangular wall (x a..b, z az..bz): distance from outer face d, along coord, outward facing."""
+    if az is None:
+        az, bz = a, b
     xs, zs = g.xz()
     xs = xs + 0 * zs
     zs = zs + 0 * xs
-    dn, ds, dw, de = zs - a, b - zs, xs - a, b - xs
+    dn, ds, dw, de = zs - az, bz - zs, xs - a, b - xs
     stack = np.stack([dn, ds, dw, de])
     side = np.argmin(stack, axis=0)  # 0 N,1 S,2 W,3 E
     d = np.min(stack, axis=0)
@@ -50,9 +52,20 @@ def stairs_by_facing(g, mask, y, block, facing_grid, half="bottom", invert=False
         g.fill_mask(m, y, y, f"{block}[facing={ff},half={half}]")
 
 
-def curtain(g, a, b, thick, walk_y, GL, gallery=True, banners_every=16):
-    """Square curtain wall. Outer face at a/b. Walkway standing level walk_y."""
-    d, along, out = side_grids(g, a, b)
+def ring_grids(g, cx, cz, r_out):
+    """Round curtain: integer distance inward from the outer face, along coord, outward facing."""
+    xs, zs = g.xz()
+    rr = np.sqrt((xs - cx) ** 2 + (zs - cz) ** 2)
+    d = np.floor(r_out - rr + 0.5).astype(int)
+    along = angle_index(g, cx, cz, r_out)
+    inward = facing_to_center_grid(g, cx, cz)
+    out = np.vectorize(lambda f: OPPOSITE[f])(inward)
+    return d, along, out
+
+
+def curtain(g, a, b, thick, walk_y, GL, gallery=True, banners_every=16, grids=None, az=None, bz=None):
+    """Curtain wall. Square/rect by default (outer faces a/b), or pass grids=(d, along, out)."""
+    d, along, out = grids if grids is not None else side_grids(g, a, b, az, bz)
     body = (d >= 0) & (d < thick)
     g.fill_mask(body, 0, walk_y - 1, STONE)
     # string courses

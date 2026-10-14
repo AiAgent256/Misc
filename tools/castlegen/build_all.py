@@ -9,12 +9,18 @@ import time
 
 sys.path.insert(0, os.path.dirname(__file__))
 import castle
+import castle2
 import export
 import render
+import themes
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 STRUCT_DIR = os.path.join(ROOT, "src/main/resources/data/stormhold/structures")
 LAYOUT_DIR = os.path.join(ROOT, "src/main/resources/data/stormhold/castle_layouts")
+
+
+LAYOUTS = (castle.great_castle_a, castle2.great_castle_b, castle2.great_castle_c,
+           castle.holdfast_a, castle2.holdfast_b, castle.watchtower_a, castle2.watchtower_b)
 
 
 def main():
@@ -25,7 +31,8 @@ def main():
     ap.add_argument("--no-render", action="store_true")
     args = ap.parse_args()
     os.makedirs(args.renders, exist_ok=True)
-    for fn in (castle.great_castle, castle.holdfast, castle.watchtower):
+    themes.write_json(os.path.join(ROOT, "src/main/resources/data/stormhold/castle_themes"))
+    for fn in LAYOUTS:
         if args.only and fn.__name__ != args.only:
             continue
         t = time.time()

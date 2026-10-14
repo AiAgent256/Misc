@@ -47,7 +47,7 @@ def bartizan(g, cx, cz, y, r=2):
     cone_roof(g, cx, cz, r, y + 4, ROOF, height_factor=2.0)
 
 
-def great_castle(seed=7):
+def great_castle_a(seed=7):
     W, H, GL = 128, 74, 6
     g = Grid(W, H, W, seed)
     a, b = 10, W - 11          # curtain outer faces (10 .. 117)
@@ -539,10 +539,10 @@ def great_castle(seed=7):
         for z in (67, 110):
             g.mark("knight", x, GL, z)
 
-    return g, {"name": "great_castle", "tier": 3, "GL": GL}
+    return g, {"name": "great_castle_a", "tier": 3, "GL": GL}
 
 
-def holdfast(seed=11):
+def holdfast_a(seed=11):
     """Tier 2: square curtain, four towers, gatehouse, tall keep."""
     W, H, GL = 64, 48, 5
     g = Grid(W, H, W, seed)
@@ -683,10 +683,10 @@ def holdfast(seed=11):
         g.mark("knight", x, GL, z)
     for z in range(36, 52, 7):
         lamp_post(g, 27, z, GL); lamp_post(g, 36, z, GL)
-    return g, {"name": "holdfast", "tier": 2, "GL": GL}
+    return g, {"name": "holdfast_a", "tier": 2, "GL": GL}
 
 
-def watchtower(seed=5):
+def watchtower_a(seed=5):
     """Tier 1: tall round tower with a timber hoarding inside a low stone enclosure."""
     W, H, GL = 36, 46, 4
     g = Grid(W, H, W, seed)
@@ -735,4 +735,4 @@ def watchtower(seed=5):
     g.mark("captain", c, GL, c + 8)
     g.mark("rally", c, GL, c + 10)
     lamp_post(g, c - 3, c + 11, GL); lamp_post(g, c + 3, c + 11, GL)
-    return g, {"name": "watchtower", "tier": 1, "GL": GL}
+    return g, {"name": "watchtower_a", "tier": 1, "GL": GL}
