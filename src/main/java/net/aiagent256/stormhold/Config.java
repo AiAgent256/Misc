@@ -40,7 +40,14 @@ public final class Config {
                         "nova_structures:donjon=2",
                         "nova_structures:stray_fort=2",
                         "dungeons_arise:bandit_towers=1",
-                        "idas:ruined_fort=1"), o -> o instanceof String s && s.contains("="));
+                        "idas:ruined_fort=1",
+                        "valarian_conquest:barathian_castle=2",
+                        "valarian_conquest:valarian_castle=2",
+                        "valarian_conquest:orleanian_castle=2",
+                        "valarian_conquest:templar_castle=2",
+                        "valarian_conquest:hospitaller_castle=2",
+                        "valarian_conquest:visgothian_castle=2",
+                        "valarian_conquest:burgundian_castle=2"), o -> o instanceof String s && s.contains("="));
         GARRISON_SCALE = b.comment("Multiplier on garrison sizes. Lower this if sieges lag.")
                 .defineInRange("garrisonScale", 1.0, 0.1, 4.0);
         PROTECT_HOUSE_CASTLES = b.comment("Walls of castles held by a house cannot be broken or built on (ladders, scaffolding, torches and TNT allowed; portcullises, doors and glass can be broken).")

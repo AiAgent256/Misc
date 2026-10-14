@@ -15,6 +15,10 @@ TIERS = {
 AVOID_EXTRA = ["nova_structures:village_jungle", "nova_structures:village_swamp", "nova_structures:ruin_town",
                "dungeons_arise:bandit_village", "dungeons_arise:mushroom_village", "dungeons_arise:keep_kayra",
                "dungeons_arise:illager_fort", "dungeons_arise:coliseum", "dungeons_arise:monastery"]
+AVOID_EXTRA += [f"valarian_conquest:{f}_{k}" for f in ("barathian", "valarian", "orleanian", "templar", "hospitaller",
+                                                         "visgothian", "burgundian", "bohemian", "neutral") for k in ("castle", "outpost")
+                if not (f == "bohemian" and k == "castle") and not (f == "neutral" and k == "castle")]
+AVOID_EXTRA += ["valarian_conquest:bandit_camp", "valarian_conquest:neutral_tent_camp", "valarian_conquest:neutral_tent_camp_2"]
 THEME_WEIGHT = {"north": 3, "riverlands": 3, "reach": 2, "dorne": 2, "stormlands": 2}
 
 

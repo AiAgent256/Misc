@@ -38,6 +38,82 @@
    "id": "dungeons_arise:monastery",
    "required": false
   },
+  {
+   "id": "valarian_conquest:barathian_castle",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:barathian_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:valarian_castle",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:valarian_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:orleanian_castle",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:orleanian_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:templar_castle",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:templar_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:hospitaller_castle",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:hospitaller_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:visgothian_castle",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:visgothian_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:burgundian_castle",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:burgundian_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:bohemian_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:neutral_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:bandit_camp",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:neutral_tent_camp",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:neutral_tent_camp_2",
+   "required": false
+  },
   "stormhold:great_castle_north",
   "stormhold:great_castle_riverlands",
   "stormhold:great_castle_reach",
