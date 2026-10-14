@@ -1,0 +1,24 @@
+{
+ "type": "stormhold:castle",
+ "biomes": "#stormhold:has_castle/reach",
+ "step": "surface_structures",
+ "terrain_adaptation": "beard_box",
+ "spawn_overrides": {},
+ "theme": "reach",
+ "layouts": [
+  {
+   "name": "holdfast_a",
+   "size_x": 64,
+   "size_z": 64,
+   "ground": 5,
+   "weight": 1
+  },
+  {
+   "name": "holdfast_b",
+   "size_x": 56,
+   "size_z": 56,
+   "ground": 5,
+   "weight": 1
+  }
+ ]
+}

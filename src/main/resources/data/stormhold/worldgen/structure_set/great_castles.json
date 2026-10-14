@@ -1,0 +1,34 @@
+{
+ "structures": [
+  {
+   "structure": "stormhold:great_castle_north",
+   "weight": 3
+  },
+  {
+   "structure": "stormhold:great_castle_riverlands",
+   "weight": 3
+  },
+  {
+   "structure": "stormhold:great_castle_reach",
+   "weight": 2
+  },
+  {
+   "structure": "stormhold:great_castle_dorne",
+   "weight": 2
+  },
+  {
+   "structure": "stormhold:great_castle_stormlands",
+   "weight": 2
+  }
+ ],
+ "placement": {
+  "type": "minecraft:random_spread",
+  "spacing": 52,
+  "separation": 22,
+  "salt": 718213044,
+  "exclusion_zone": {
+   "other_set": "minecraft:villages",
+   "chunk_count": 4
+  }
+ }
+}

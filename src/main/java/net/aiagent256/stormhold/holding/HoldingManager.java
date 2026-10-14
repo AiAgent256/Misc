@@ -1,0 +1,161 @@
+package net.aiagent256.stormhold.holding;
+
+import net.aiagent256.stormhold.Sides;
+import net.aiagent256.stormhold.house.House;
+import net.aiagent256.stormhold.house.NameGen;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.saveddata.SavedData;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+/** Per-dimension registry of holdings, houses, campaigns, shipments and roads. */
+public class HoldingManager extends SavedData {
+    private static final String NAME = "stormhold_holdings";
+
+    public final Map<UUID, Holding> holdings = new LinkedHashMap<>();
+    public final Map<String, UUID> byKey = new HashMap<>();
+    public final Set<String> rejected = new HashSet<>();
+    public final Map<String, House> houses = new HashMap<>();
+    public final Map<UUID, DyeColor> playerColors = new HashMap<>();
+    public final List<Campaign> campaigns = new ArrayList<>();
+    public final List<Shipment> shipments = new ArrayList<>();
+    public final List<RoadPlan> roads = new ArrayList<>();
+
+    public static HoldingManager get(ServerLevel level) {
+        return level.getDataStorage().computeIfAbsent(HoldingManager::load, HoldingManager::new, NAME);
+    }
+
+    public House house(String id) {
+        House h = houses.get(id);
+        if (h == null) {
+            RandomSource r = RandomSource.create(id.hashCode() * 31L + 7);
+            DyeColor base = DyeColor.byId(r.nextInt(16));
+            DyeColor accent = DyeColor.byId(r.nextInt(16));
+            if (accent == base) accent = base == DyeColor.WHITE ? DyeColor.BLACK : DyeColor.WHITE;
+            String name = id.equals("outlaws") ? "of the Brigands" : NameGen.house(r);
+            h = new House(id, name, base, accent, r.nextInt(64), r.nextBoolean());
+            houses.put(id, h);
+            setDirty();
+        }
+        return h;
+    }
+
+    /** Houses own regions of roughly 1500 blocks, so neighbouring castles share banners. */
+    public House houseForRegion(ServerLevel level, BlockPos pos) {
+        int rx = Math.floorDiv(pos.getX(), 1536), rz = Math.floorDiv(pos.getZ(), 1536);
+        long mix = level.getSeed() ^ (rx * 341873128712L) ^ (rz * 132897987541L);
+        return house("h" + Long.toHexString(mix & 0xffffffffL));
+    }
+
+    public DyeColor playerColor(UUID player) {
+        return playerColors.getOrDefault(player, DyeColor.BLUE);
+    }
+
+    public DyeColor colorOf(String side) {
+        UUID p = Sides.playerId(side);
+        if (p != null) return playerColor(p);
+        String hid = Sides.houseId(side);
+        return hid != null ? house(hid).base : DyeColor.GRAY;
+    }
+
+    @Nullable
+    public House houseOf(String side) {
+        String hid = Sides.houseId(side);
+        return hid != null ? house(hid) : null;
+    }
+
+    @Nullable
+    public Holding at(BlockPos pos, int margin) {
+        for (Holding h : holdings.values()) {
+            if (h.box.inflatedBy(margin).isInside(pos)) return h;
+        }
+        return null;
+    }
+
+    @Nullable
+    public Holding byName(String name) {
+        for (Holding h : holdings.values()) if (h.name.equalsIgnoreCase(name)) return h;
+        return null;
+    }
+
+    public List<Holding> ownedBy(UUID player) {
+        String side = Sides.player(player);
+        List<Holding> out = new ArrayList<>();
+        for (Holding h : holdings.values()) if (side.equals(h.owner)) out.add(h);
+        return out;
+    }
+
+    public void add(Holding h) {
+        holdings.put(h.id, h);
+        byKey.put(h.key, h.id);
+        setDirty();
+    }
+
+    // ------------------------------------------------------------ persistence
+
+    @Override
+    public CompoundTag save(CompoundTag tag) {
+        ListTag hl = new ListTag();
+        for (Holding h : holdings.values()) hl.add(h.save());
+        tag.put("Holdings", hl);
+        ListTag houseList = new ListTag();
+        for (House h : houses.values()) houseList.add(h.save());
+        tag.put("Houses", houseList);
+        CompoundTag colors = new CompoundTag();
+        playerColors.forEach((k, v) -> colors.putInt(k.toString(), v.getId()));
+        tag.put("PlayerColors", colors);
+        ListTag cl = new ListTag();
+        for (Campaign c : campaigns) cl.add(c.save());
+        tag.put("Campaigns", cl);
+        ListTag sl = new ListTag();
+        for (Shipment s : shipments) sl.add(s.save());
+        tag.put("Shipments", sl);
+        ListTag rl = new ListTag();
+        for (RoadPlan r : roads) rl.add(r.save());
+        tag.put("Roads", rl);
+        return tag;
+    }
+
+    public static HoldingManager load(CompoundTag tag) {
+        HoldingManager m = new HoldingManager();
+        ListTag hl = tag.getList("Holdings", Tag.TAG_COMPOUND);
+        for (int i = 0; i < hl.size(); i++) {
+            Holding h = Holding.load(hl.getCompound(i));
+            m.holdings.put(h.id, h);
+            m.byKey.put(h.key, h.id);
+        }
+        ListTag houseList = tag.getList("Houses", Tag.TAG_COMPOUND);
+        for (int i = 0; i < houseList.size(); i++) {
+            House h = House.load(houseList.getCompound(i));
+            m.houses.put(h.id, h);
+        }
+        CompoundTag colors = tag.getCompound("PlayerColors");
+        for (String k : colors.getAllKeys()) {
+            try {
+                m.playerColors.put(UUID.fromString(k), DyeColor.byId(colors.getInt(k)));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        ListTag cl = tag.getList("Campaigns", Tag.TAG_COMPOUND);
+        for (int i = 0; i < cl.size(); i++) m.campaigns.add(Campaign.load(cl.getCompound(i)));
+        ListTag sl = tag.getList("Shipments", Tag.TAG_COMPOUND);
+        for (int i = 0; i < sl.size(); i++) m.shipments.add(Shipment.load(sl.getCompound(i)));
+        ListTag rl = tag.getList("Roads", Tag.TAG_COMPOUND);
+        for (int i = 0; i < rl.size(); i++) m.roads.add(RoadPlan.load(rl.getCompound(i)));
+        return m;
+    }
+}

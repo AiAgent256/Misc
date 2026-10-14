@@ -35,6 +35,9 @@ minecraft {
             property 'forge.enabledGameTestNamespaces', mod_id
             args '--nogui'
         }
+        gameTestServer {
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
     }
 }
 

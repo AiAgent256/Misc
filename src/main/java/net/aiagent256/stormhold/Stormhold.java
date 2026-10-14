@@ -1,7 +1,16 @@
 package net.aiagent256.stormhold;
 
 import com.mojang.logging.LogUtils;
+import net.aiagent256.stormhold.net.Net;
+import net.aiagent256.stormhold.registry.ModBlocks;
+import net.aiagent256.stormhold.registry.ModEntities;
+import net.aiagent256.stormhold.registry.ModItems;
+import net.aiagent256.stormhold.registry.ModStructures;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
@@ -12,11 +21,24 @@ public class Stormhold {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public Stormhold() {
-        var bus = FMLJavaModLoadingContext.get().getModEventBus();
+        IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
+        ModBlocks.BLOCKS.register(bus);
+        ModItems.ITEMS.register(bus);
+        ModItems.TABS.register(bus);
+        ModEntities.ENTITIES.register(bus);
+        ModStructures.STRUCTURE_TYPES.register(bus);
+        ModStructures.PIECES.register(bus);
+        ModStructures.PROCESSORS.register(bus);
         bus.addListener(this::commonSetup);
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
+        event.enqueueWork(Net::register);
         LOGGER.info("Stormhold loaded. The banners are raised.");
+    }
+
+    public static ResourceLocation id(String path) {
+        return new ResourceLocation(MODID, path);
     }
 }

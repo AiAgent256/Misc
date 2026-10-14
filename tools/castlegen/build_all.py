@@ -13,6 +13,7 @@ import castle2
 import export
 import render
 import themes
+import worldgen
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 STRUCT_DIR = os.path.join(ROOT, "src/main/resources/data/stormhold/structures")
@@ -32,6 +33,7 @@ def main():
     args = ap.parse_args()
     os.makedirs(args.renders, exist_ok=True)
     themes.write_json(os.path.join(ROOT, "src/main/resources/data/stormhold/castle_themes"))
+    metas = {}
     for fn in LAYOUTS:
         if args.only and fn.__name__ != args.only:
             continue
@@ -42,6 +44,7 @@ def main():
         if not args.no_export:
             tiles = export.write_tiles(g, os.path.join(STRUCT_DIR, name), name)
             layout = export.write_layout(g, meta, tiles, os.path.join(LAYOUT_DIR, f"{name}.json"))
+            metas[name] = layout
             print(f"  tiles {len(tiles)}, blocks {sum(t['blocks'] for t in tiles)}, posts " +
                   ", ".join(f"{k}={len(v)}" for k, v in layout["posts"].items()) +
                   f", banners {len(layout['banners'])}")
@@ -51,6 +54,9 @@ def main():
                 render.render_iso(g, os.path.join(args.renders, f"{name}_iso{rot}.png"), s=s, rot=rot)
             render.render_plan(g, os.path.join(args.renders, f"{name}_plan.png"))
             print(f"  renders done in {time.time() - t:.1f}s")
+
+    if not args.only and not args.no_export:
+        worldgen.write(ROOT, metas)
 
 
 if __name__ == "__main__":

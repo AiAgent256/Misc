@@ -1,0 +1,309 @@
+package net.aiagent256.stormhold.holding;
+
+import net.aiagent256.stormhold.Config;
+import net.aiagent256.stormhold.Sides;
+import net.aiagent256.stormhold.compat.RecruitsCompat;
+import net.aiagent256.stormhold.entity.GarrisonEntity;
+import net.aiagent256.stormhold.entity.Role;
+import net.aiagent256.stormhold.house.House;
+import net.aiagent256.stormhold.house.NameGen;
+import net.aiagent256.stormhold.item.WarBannerItem;
+import net.aiagent256.stormhold.registry.ModBlocks;
+import net.aiagent256.stormhold.registry.ModItems;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerBossEvent;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.BossEvent;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.AABB;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+
+/** Fighting, dying, claiming and changing hands. */
+public final class HoldingEvents {
+
+    // ------------------------------------------------------------ messages
+
+    public static void tell(ServerLevel level, @Nullable UUID player, Component msg) {
+        if (player == null) return;
+        ServerPlayer p = level.getServer().getPlayerList().getPlayer(player);
+        if (p != null) p.sendSystemMessage(msg);
+    }
+
+    public static void announceNear(ServerLevel level, BlockPos at, int radius, Component msg) {
+        for (ServerPlayer p : level.players()) {
+            if (p.blockPosition().distSqr(at) < (double) radius * radius) p.sendSystemMessage(msg);
+        }
+    }
+
+    public static Component gold(String s) {
+        return Component.literal(s).withStyle(ChatFormatting.GOLD);
+    }
+
+    public static String ownerName(ServerLevel level, HoldingManager mgr, String side) {
+        UUID p = Sides.playerId(side);
+        if (p != null) {
+            ServerPlayer sp = level.getServer().getPlayerList().getPlayer(p);
+            return sp != null ? sp.getGameProfile().getName() : "a rival lord";
+        }
+        House h = mgr.houseOf(side);
+        return h != null ? h.title() : "brigands";
+    }
+
+    // ------------------------------------------------------------ combat hooks
+
+    public static void onGarrisonHurt(GarrisonEntity g, LivingEntity attacker) {
+        if (!(g.level() instanceof ServerLevel level) || g.holdingId() == null) return;
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = mgr.holdings.get(g.holdingId());
+        if (h == null) return;
+        for (UUID id : h.live.keySet()) {
+            Entity e = level.getEntity(id);
+            if (e instanceof GarrisonEntity other && other != g && other.distanceToSqr(g) < 48 * 48) other.alarm(attacker);
+        }
+    }
+
+    public static void onLordBloodied(GarrisonEntity lord) {
+        if (!(lord.level() instanceof ServerLevel level) || lord.holdingId() == null) return;
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = mgr.holdings.get(lord.holdingId());
+        if (h == null) return;
+        Garrisons.reinforce(level, mgr, h, Role.KNIGHT, 2 + h.tier, lord.blockPosition(), lord.getTarget());
+        announceNear(level, lord.blockPosition(), 64, gold(h.lordName + " calls his household guard!"));
+        level.playSound(null, lord.blockPosition(), SoundEvents.RAID_HORN.value(), SoundSource.HOSTILE, 4.0F, 1.0F);
+    }
+
+    public static void onDeath(GarrisonEntity g) {
+        if (!(g.level() instanceof ServerLevel level)) return;
+        HoldingManager mgr = HoldingManager.get(level);
+        Role role = g.role();
+        if (g.holdingId() != null) {
+            Holding h = mgr.holdings.get(g.holdingId());
+            if (h != null && h.live.remove(g.getUUID()) != null) {
+                if (role == Role.LORD) {
+                    h.lordAlive = false;
+                    level.getServer().getPlayerList().broadcastSystemMessage(gold(h.lordName + " has fallen at " + h.name
+                            + ". Raise a War Banner on the keep's banner stand to claim it."), false);
+                } else {
+                    h.add(role, -1);
+                }
+                mgr.setDirty();
+            }
+        }
+        if (g.campaignId() != null) {
+            for (Campaign c : mgr.campaigns) {
+                if (c.id.equals(g.campaignId()) && c.live.remove(g.getUUID()) != null) {
+                    c.add(role, -1);
+                    mgr.setDirty();
+                }
+            }
+        }
+        if (g.shipmentId() != null) {
+            Shipment s = null;
+            for (Shipment x : mgr.shipments) if (x.id.equals(g.shipmentId())) s = x;
+            if (s != null) {
+                for (ItemStack st : s.cargo) level.addFreshEntity(new ItemEntity(level, g.getX(), g.getY() + 0.5, g.getZ(), st.copy()));
+                mgr.shipments.remove(s);
+                Holding from = mgr.holdings.get(s.origin);
+                if (from != null) tell(level, from.ownerPlayer(), gold("A courier from " + from.name + " was killed on the road. The cargo lies where he fell."));
+                mgr.setDirty();
+            }
+        }
+    }
+
+    // ------------------------------------------------------------ claiming
+
+    @Nullable
+    public static Holding byStand(HoldingManager mgr, BlockPos pos) {
+        for (Holding h : mgr.holdings.values()) if (h.bannerPos.equals(pos)) return h;
+        return null;
+    }
+
+    public static void useBannerStand(ServerLevel level, ServerPlayer player, BlockPos pos, ItemStack stack) {
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = byStand(mgr, pos);
+        if (h == null) {
+            player.sendSystemMessage(Component.literal("This banner stand belongs to no castle."));
+            return;
+        }
+        String me = Sides.player(player.getUUID());
+        if (me.equals(h.owner)) {
+            player.sendSystemMessage(gold(h.name + ": " + h.troops() + " soldiers. Use a War Table to command them."));
+            return;
+        }
+        if (!stack.is(ModItems.WAR_BANNER.get())) {
+            player.sendSystemMessage(Component.literal("Raise a War Banner here to claim " + h.name + "."));
+            return;
+        }
+        if (h.isHouseOwned() && h.lordAlive) {
+            player.sendSystemMessage(Component.literal(h.lordName + " still lives. Defeat him before you claim " + h.name + ".")
+                    .withStyle(ChatFormatting.RED));
+            return;
+        }
+        mgr.playerColors.put(player.getUUID(), WarBannerItem.color(stack));
+        h.claimant = player.getUUID();
+        if (!me.equals(h.contestSide)) {
+            h.contestSide = me;
+            h.contestProgress = 0;
+        }
+        level.playSound(null, pos, SoundEvents.RAID_HORN.value(), SoundSource.PLAYERS, 6.0F, 1.2F);
+        player.sendSystemMessage(gold("You raise your banner over " + h.name + ". Hold the stand for "
+                + Config.CAPTURE_SECONDS.get() + " seconds with no defenders near it."));
+        if (h.isHouseOwned() && !h.counterattackSpawned) {
+            h.counterattackSpawned = true;
+            int n = Math.max(3, (int) Math.ceil(h.capacity(Role.KNIGHT) * 0.35));
+            BlockPos at = h.rallyPos.equals(BlockPos.ZERO) ? h.gatePos : h.rallyPos;
+            Garrisons.reinforce(level, mgr, h, Role.KNIGHT, n, at, player);
+            Garrisons.reinforce(level, mgr, h, Role.CROSSBOWMAN, Math.max(1, n / 3), at, player);
+            announceNear(level, pos, 96, Component.literal("The garrison of " + h.name + " rallies to retake the keep!")
+                    .withStyle(ChatFormatting.RED));
+        }
+        mgr.setDirty();
+    }
+
+    // ------------------------------------------------------------ the contest at the banner stand
+
+    @Nullable
+    private static String sideOf(Entity e, Holding h) {
+        if (e instanceof GarrisonEntity g) return g.role() == Role.COURIER || g.side().isEmpty() ? null : g.side();
+        if (e instanceof Player p) {
+            if (p.isSpectator()) return null;
+            String s = Sides.player(p.getUUID());
+            if (s.equals(h.owner)) return s;
+            return h.claimant != null && h.claimant.equals(p.getUUID()) ? s : null;
+        }
+        return RecruitsCompat.sideOf(e);
+    }
+
+    public static void contest(ServerLevel level, HoldingManager mgr, Holding h) {
+        if (h.bannerPos.equals(BlockPos.ZERO) || !level.isLoaded(h.bannerPos)) return;
+        if (h.isHouseOwned() && h.lordAlive) {
+            clearContest(h);
+            return;
+        }
+        AABB inner = new AABB(h.bannerPos).inflate(7, 5, 7);
+        AABB outer = new AABB(h.bannerPos).inflate(12, 8, 12);
+        Set<String> attackers = new HashSet<>();
+        boolean defended = false;
+        for (Entity e : level.getEntities((Entity) null, outer, x -> x instanceof LivingEntity le && le.isAlive())) {
+            String s = sideOf(e, h);
+            if (s == null) continue;
+            if (s.equals(h.owner)) defended = true;
+            else if (inner.contains(e.position())) attackers.add(s);
+        }
+        if (defended) {
+            h.contestProgress = Math.max(0, h.contestProgress - 2);
+        } else if (attackers.size() == 1) {
+            String s = attackers.iterator().next();
+            if (!s.equals(h.contestSide)) {
+                h.contestSide = s;
+                h.contestProgress = 0;
+            }
+            h.contestProgress++;
+            if (h.contestProgress >= Config.CAPTURE_SECONDS.get()) {
+                transfer(level, mgr, h, s);
+                return;
+            }
+        } else {
+            h.contestProgress = Math.max(0, h.contestProgress - 1);
+        }
+        updateBar(level, mgr, h);
+    }
+
+    private static void clearContest(Holding h) {
+        h.contestProgress = 0;
+        if (h.bar != null) {
+            h.bar.removeAllPlayers();
+            h.bar = null;
+        }
+    }
+
+    private static void updateBar(ServerLevel level, HoldingManager mgr, Holding h) {
+        if (h.contestProgress <= 0 || h.contestSide == null) {
+            clearContest(h);
+            return;
+        }
+        if (h.bar == null) {
+            h.bar = new ServerBossEvent(Component.literal("Taking " + h.name), BossEvent.BossBarColor.YELLOW,
+                    BossEvent.BossBarOverlay.PROGRESS);
+        }
+        h.bar.setName(Component.literal(ownerName(level, mgr, h.contestSide) + " is taking " + h.name));
+        h.bar.setProgress(Math.min(1F, h.contestProgress / (float) Config.CAPTURE_SECONDS.get()));
+        for (ServerPlayer p : level.players()) {
+            if (p.blockPosition().distSqr(h.bannerPos) < 64 * 64) h.bar.addPlayer(p);
+            else h.bar.removePlayer(p);
+        }
+    }
+
+    /** The castle changes hands. */
+    public static void transfer(ServerLevel level, HoldingManager mgr, Holding h, String newSide) {
+        String oldSide = h.owner;
+        Garrisons.discardLive(level, h.live, true);
+        h.usedPosts.clear();
+        clearContest(h);
+        h.owner = newSide;
+        h.contestSide = null;
+        h.claimant = null;
+        h.counterattackSpawned = false;
+        long now = level.getGameTime();
+        // armies fighting over this castle go home
+        for (Campaign c : mgr.campaigns) {
+            if (h.id.equals(c.target) && c.stage != Campaign.Stage.DONE && c.side.equals(newSide)) {
+                Garrisons.discardLive(level, c.live, true);
+                c.stage = Campaign.Stage.DONE;
+            }
+        }
+        if (Sides.isPlayer(newSide)) {
+            h.lordAlive = false;
+            h.fillGarrison(0.5);
+            h.mode = Holding.Mode.DEFEND;
+            h.nextRaid = now + raidDelay(level);
+            h.raidWarned = false;
+            h.nextProduce = now + 24000;
+            h.nextReplenish = now + 1200;
+            h.addStock(new ResourceLocation("minecraft", "bread"), 32);
+            h.addStock(new ResourceLocation("minecraft", "iron_ingot"), 16);
+            if (!h.warTablePos.equals(BlockPos.ZERO) && level.isLoaded(h.warTablePos)
+                    && level.getBlockState(h.warTablePos).canBeReplaced()) {
+                level.setBlock(h.warTablePos, ModBlocks.WAR_TABLE.get().defaultBlockState(), 3);
+            }
+        } else {
+            h.lordAlive = true;
+            h.lordName = (h.tier == 1 ? "Castellan " : h.tier == 2 ? "Ser " : "Lord ") + NameGen.first(level.random)
+                    + " " + ownerName(level, mgr, newSide).replace("House ", "");
+            h.fillGarrison(0.6);
+        }
+        h.bannersDirty = true;
+        Garrisons.recolorBanners(level, mgr, h);
+        level.playSound(null, h.bannerPos, SoundEvents.RAID_HORN.value(), SoundSource.HOSTILE, 8.0F, 0.8F);
+        level.getServer().getPlayerList().broadcastSystemMessage(gold(ownerName(level, mgr, newSide) + " has taken "
+                + h.name + " from " + ownerName(level, mgr, oldSide) + "!"), false);
+        UUID p = Sides.playerId(newSide);
+        if (p != null) {
+            tell(level, p, Component.literal("The garrison swears to you. Use the War Table in the hall to give orders.")
+                    .withStyle(ChatFormatting.GREEN));
+        }
+        mgr.setDirty();
+    }
+
+    public static long raidDelay(ServerLevel level) {
+        int lo = Config.RAID_MIN_DAYS.get(), hi = Math.max(lo, Config.RAID_MAX_DAYS.get());
+        return (lo + level.random.nextInt(hi - lo + 1)) * 24000L;
+    }
+
+    private HoldingEvents() {
+    }
+}
