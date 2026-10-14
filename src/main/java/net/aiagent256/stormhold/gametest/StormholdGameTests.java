@@ -113,6 +113,59 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** Runs the same path as /place structure, then turns the result into a holding. */
+    @GameTest(template = "arena", timeoutTicks = 400)
+    public static void castlesGenerateAndAttach(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        var reg = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.STRUCTURE);
+        var gen = level.getChunkSource().getGenerator();
+        HoldingManager mgr = HoldingManager.get(level);
+        int i = 0;
+        for (String id : new String[]{"watchtower_riverlands", "holdfast_dorne", "great_castle_reach"}) {
+            var structure = reg.get(Stormhold.id(id));
+            if (structure == null) throw new IllegalStateException("structure not registered: " + id);
+            BlockPos at = g.absolutePos(BlockPos.ZERO).offset(3000 + i * 400, 0, 3000);
+            net.minecraft.world.level.ChunkPos cp = new net.minecraft.world.level.ChunkPos(at);
+            var start = structure.generate(level.registryAccess(), gen, gen.getBiomeSource(), level.getChunkSource().randomState(),
+                    level.getStructureManager(), level.getSeed(), cp, 0, level, b -> true);
+            if (!start.isValid()) throw new IllegalStateException(id + " found no site in a flat world");
+            BoundingBox bb = start.getBoundingBox();
+            net.minecraft.world.level.ChunkPos.rangeClosed(new net.minecraft.world.level.ChunkPos(bb.minX() >> 4, bb.minZ() >> 4),
+                    new net.minecraft.world.level.ChunkPos(bb.maxX() >> 4, bb.maxZ() >> 4)).forEach(c ->
+                    start.placeInChunk(level, level.structureManager(), gen, level.getRandom(),
+                            new BoundingBox(c.getMinBlockX(), level.getMinBuildHeight(), c.getMinBlockZ(), c.getMaxBlockX(),
+                                    level.getMaxBuildHeight(), c.getMaxBlockZ()), c));
+            int stone = 0;
+            BlockPos center = bb.getCenter();
+            for (int y = bb.minY(); y <= bb.maxY(); y++) {
+                if (!level.getBlockState(new BlockPos(center.getX(), y, center.getZ())).isAir()) stone++;
+            }
+            for (int x = bb.minX(); x <= bb.maxX(); x += 3) {
+                if (!level.getBlockState(new BlockPos(x, bb.minY() + 2, center.getZ())).isAir()) stone++;
+            }
+            if (stone < 5) throw new IllegalStateException(id + " placed almost nothing");
+            if (id.contains("dorne")) {
+                boolean sand = false;
+                for (int x = bb.minX(); x <= bb.maxX() && !sand; x++) {
+                    for (int y = bb.minY(); y < bb.maxY() && !sand; y += 2) {
+                        var s = level.getBlockState(new BlockPos(x, y, center.getZ()));
+                        if (s.is(net.minecraft.world.level.block.Blocks.CUT_SANDSTONE) || s.is(net.minecraft.world.level.block.Blocks.SMOOTH_SANDSTONE)) sand = true;
+                    }
+                }
+                if (!sand) throw new IllegalStateException("dorne theme did not apply");
+            }
+            Holding h = net.aiagent256.stormhold.holding.Detector.createForTest(level, mgr, "test:" + id + "@" + cp.toLong(),
+                    Stormhold.id(id), start);
+            if (h == null || h.posts.isEmpty() || h.bannerPos.equals(BlockPos.ZERO)) throw new IllegalStateException(id + " did not attach");
+            if (!level.getBlockState(h.bannerPos.below()).isSolidRender(level, h.bannerPos.below()))
+                throw new IllegalStateException(id + " banner stand floats at " + h.bannerPos);
+            mgr.holdings.remove(h.id);
+            mgr.byKey.remove(h.key);
+            i++;
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

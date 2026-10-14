@@ -163,6 +163,11 @@ public final class Detector {
         h.scanned = true;
     }
 
+    @Nullable
+    public static Holding createForTest(ServerLevel level, HoldingManager mgr, String key, ResourceLocation id, StructureStart start) {
+        return create(level, mgr, key, id, true, 0, start);
+    }
+
     @SuppressWarnings("unused")
     private static final Role[] KEEP = Role.values();
 
