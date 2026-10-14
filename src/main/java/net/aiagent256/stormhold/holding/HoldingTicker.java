@@ -49,7 +49,9 @@ public final class HoldingTicker {
         }
         if (h.bannersDirty) Garrisons.recolorBanners(level, mgr, h);
         else if (now % 200 == 0) Garrisons.placeStand(level, mgr, h);
-        if (!h.surroundingsDone && PostScanner.allLoaded(level, h)) Roads.plan(level, mgr, h);
+        // The village search behind road planning is a /locate; only run it once the server has caught up.
+        if (!h.surroundingsDone && PostScanner.allLoaded(level, h) && level.getServer().getAverageTickTime() < 45f)
+            Roads.plan(level, mgr, h);
         Garrisons.materialize(level, mgr, h);
         if (!h.villagersSpawned) Garrisons.spawnVillagers(level, h);
         HoldingEvents.contest(level, mgr, h);
