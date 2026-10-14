@@ -172,8 +172,11 @@ public final class HoldingEvents {
             h.contestProgress = 0;
         }
         level.playSound(null, pos, SoundEvents.RAID_HORN.value(), SoundSource.PLAYERS, 6.0F, 1.2F);
+        int near = 0;
+        for (Entity e : level.getEntities((Entity) null, new AABB(pos).inflate(12, 8, 12), x -> x instanceof GarrisonEntity ge && ge.isAlive() && ge.side().equals(h.owner))) near++;
         player.sendSystemMessage(gold("You raise your banner over " + h.name + ". Hold the stand for "
-                + Config.CAPTURE_SECONDS.get() + " seconds with no defenders near it."));
+                + Config.CAPTURE_SECONDS.get() + " seconds with no defenders within 12 blocks."
+                + (near > 0 ? " " + near + " still stand near it, archers on the roof count." : "")));
         if (h.isHouseOwned() && !h.counterattackSpawned) {
             h.counterattackSpawned = true;
             int n = Math.max(3, (int) Math.ceil(h.capacity(Role.KNIGHT) * 0.35));
@@ -209,14 +212,15 @@ public final class HoldingEvents {
         AABB inner = new AABB(h.bannerPos).inflate(7, 5, 7);
         AABB outer = new AABB(h.bannerPos).inflate(12, 8, 12);
         Set<String> attackers = new HashSet<>();
-        boolean defended = false;
+        int defenders = 0;
         for (Entity e : level.getEntities((Entity) null, outer, x -> x instanceof LivingEntity le && le.isAlive())) {
             String s = sideOf(e, h);
             if (s == null) continue;
-            if (s.equals(h.owner)) defended = true;
+            if (s.equals(h.owner)) defenders++;
             else if (inner.contains(e.position())) attackers.add(s);
         }
-        if (defended) {
+        h.contestDefenders = defenders;
+        if (defenders > 0) {
             h.contestProgress = Math.max(0, h.contestProgress - 2);
         } else if (attackers.size() == 1) {
             String s = attackers.iterator().next();
@@ -244,7 +248,8 @@ public final class HoldingEvents {
     }
 
     private static void updateBar(ServerLevel level, HoldingManager mgr, Holding h) {
-        if (h.contestProgress <= 0 || h.contestSide == null) {
+        boolean claimed = h.claimant != null && level.getServer().getPlayerList().getPlayer(h.claimant) != null;
+        if ((h.contestProgress <= 0 && !claimed) || h.contestSide == null) {
             clearContest(h);
             return;
         }
@@ -252,7 +257,15 @@ public final class HoldingEvents {
             h.bar = new ServerBossEvent(Component.literal("Taking " + h.name), BossEvent.BossBarColor.YELLOW,
                     BossEvent.BossBarOverlay.PROGRESS);
         }
-        h.bar.setName(Component.literal(ownerName(level, mgr, h.contestSide) + " is taking " + h.name));
+        if (h.contestDefenders > 0) {
+            h.bar.setName(Component.literal(h.name + ": " + h.contestDefenders + (h.contestDefenders == 1 ? " defender" : " defenders")
+                    + " within 12 blocks of the stand. Kill them."));
+            h.bar.setColor(BossEvent.BossBarColor.RED);
+        } else {
+            int left = Config.CAPTURE_SECONDS.get() - h.contestProgress;
+            h.bar.setName(Component.literal(ownerName(level, mgr, h.contestSide) + " is taking " + h.name + " (" + left + "s)"));
+            h.bar.setColor(BossEvent.BossBarColor.YELLOW);
+        }
         h.bar.setProgress(Math.min(1F, h.contestProgress / (float) Config.CAPTURE_SECONDS.get()));
         for (ServerPlayer p : level.players()) {
             if (p.blockPosition().distSqr(h.bannerPos) < 64 * 64) h.bar.addPlayer(p);

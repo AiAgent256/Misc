@@ -81,7 +81,7 @@ public final class Avoidance {
         long seed = ctx.seed();
         ChunkPos self = ctx.chunkPos();
         for (Watch w : watches(ctx.registryAccess())) {
-            if (w.castleSize() > 0 && w.castleSize() <= yieldBelow) continue;
+            if (w.castleSize() > 0 && (yieldBelow == Integer.MAX_VALUE || w.castleSize() <= yieldBelow)) continue;
             RandomSpreadStructurePlacement rs = w.placement();
             int spacing = Math.max(1, rs.spacing());
             int c0x = SectionPos.blockToSectionCoord(x - radius), c1x = SectionPos.blockToSectionCoord(x + radius);

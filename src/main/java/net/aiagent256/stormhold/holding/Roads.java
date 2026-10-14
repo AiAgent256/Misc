@@ -6,7 +6,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
-import net.minecraft.tags.StructureTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
@@ -40,7 +39,8 @@ public final class Roads {
         BlockPos start = h.gatePos.equals(BlockPos.ZERO) ? h.center() : h.gatePos;
         BlockPos village;
         try {
-            village = level.findNearestMapStructure(StructureTags.VILLAGE, start, Config.ROAD_MAX_CHUNKS.get() / 2, false);
+            // the same placement maths worldgen uses, so this costs microseconds instead of a /locate
+            village = nearestVillage(level, start, Config.ROAD_MAX_CHUNKS.get() * 8);
         } catch (Exception e) {
             Stormhold.LOGGER.warn("Stormhold: village search failed near {}", start, e);
             return;
@@ -62,6 +62,26 @@ public final class Roads {
             }
         }
         Stormhold.LOGGER.info("Stormhold: road planned from {} to village at {}", h.name, village);
+    }
+
+    /** Where the nearest village could start, from structure-set placement and the biome there. Never loads chunks. */
+    @org.jetbrains.annotations.Nullable
+    public static BlockPos nearestVillage(ServerLevel level, BlockPos from, int radius) {
+        var gen = level.getChunkSource().getGenerator();
+        var ctx = new net.minecraft.world.level.levelgen.structure.Structure.GenerationContext(level.registryAccess(), gen,
+                gen.getBiomeSource(), level.getChunkSource().randomState(), level.getStructureManager(), level.getSeed(),
+                new ChunkPos(from), level, b -> true);
+        BlockPos best = null;
+        double bestD = Double.MAX_VALUE;
+        for (var t : net.aiagent256.stormhold.worldgen.Avoidance.near(ctx, from.getX(), from.getZ(), radius, Integer.MAX_VALUE)) {
+            if (t.castleSize() > 0) continue;
+            double d = (t.x() - from.getX()) * (double) (t.x() - from.getX()) + (t.z() - from.getZ()) * (double) (t.z() - from.getZ());
+            if (d < bestD) {
+                bestD = d;
+                best = new BlockPos(t.x(), 0, t.z());
+            }
+        }
+        return best;
     }
 
     public static void tick(ServerLevel level, HoldingManager mgr) {

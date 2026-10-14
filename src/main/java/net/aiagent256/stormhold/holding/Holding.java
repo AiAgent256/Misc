@@ -104,6 +104,7 @@ public class Holding {
     public boolean surroundingsDone;
     @Nullable public String contestSide;
     public int contestProgress;
+    public int contestDefenders;
     @Nullable public UUID claimant;
     public boolean counterattackSpawned;
 
