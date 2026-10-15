@@ -288,6 +288,7 @@ public final class Builder {
     }
 
     private static boolean natural(BlockState s) {
+        if (s.is(Blocks.SNOW) || s.is(Blocks.GRASS) || s.is(Blocks.TALL_GRASS) || s.is(Blocks.FERN)) return true;
         return s.is(BlockTags.DIRT) || s.is(BlockTags.SAND) || s.is(Blocks.GRAVEL) || s.is(BlockTags.BASE_STONE_OVERWORLD)
                 || s.is(Blocks.CLAY) || s.is(Blocks.SNOW_BLOCK) || s.is(BlockTags.TERRACOTTA) || s.is(Blocks.MOSS_BLOCK) || s.is(Blocks.PODZOL);
     }
@@ -296,13 +297,32 @@ public final class Builder {
     private static void palisade(ServerLevel level, Holding h) {
         int d = 7;
         int x0 = h.box.minX() - d, x1 = h.box.maxX() + d, z0 = h.box.minZ() - d, z1 = h.box.maxZ() + d;
+        int causeway = 0, unloaded = 0, wet = 0, odd = 0, ok = 0;
         for (int x = x0; x <= x1; x++) {
             for (int z = z0; z <= z1; z++) {
                 boolean ring = x == x0 || x == x1 || z == z0 || z == z1;
-                if (!ring || onCauseway(h, x, z, 9) || !level.isLoaded(new BlockPos(x, 64, z))) continue;
+                if (!ring) continue;
+                if (onCauseway(h, x, z, 9)) {
+                    causeway++;
+                    continue;
+                }
+                if (!level.isLoaded(new BlockPos(x, 64, z))) {
+                    unloaded++;
+                    continue;
+                }
                 int y = surface(level, x, z);
                 BlockPos ground = new BlockPos(x, y - 1, z);
-                if (!level.getBlockState(ground).getFluidState().isEmpty() || !natural(level.getBlockState(ground))) continue;
+                BlockState gs = level.getBlockState(ground);
+                if (!gs.getFluidState().isEmpty()) {
+                    wet++;
+                    continue;
+                }
+                if (!natural(gs)) {
+                    odd++;
+                    if (odd <= 3) Stormhold.LOGGER.info("Stormhold: palisade skips {} at {}", gs, ground);
+                    continue;
+                }
+                ok++;
                 // posts every third block, sharpened stakes between them (dripstone needs solid ground under it)
                 boolean post = (x + z) % 3 == 0;
                 if (post) {
@@ -313,6 +333,8 @@ public final class Builder {
                 }
             }
         }
+        Stormhold.LOGGER.info("Stormhold: palisade at {}: {} cells, {} on the causeway, {} unloaded, {} wet, {} not natural ground",
+                h.name, ok, causeway, unloaded, wet, odd);
     }
 
     /** Stage 2: a water-filled ditch two wide outside the palisade. */

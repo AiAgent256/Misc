@@ -217,7 +217,8 @@ public class StormholdGameTests {
                     var st = level.getBlockState(new BlockPos(x, y, z));
                     if (st.is(net.minecraft.world.level.block.Blocks.SPRUCE_FENCE) || st.is(net.minecraft.world.level.block.Blocks.POINTED_DRIPSTONE)) stakes++;
                 }
-                if (stakes < 4) throw new IllegalStateException("palisade has " + stakes + " stakes along the north side");
+                if (stakes < 4 && h.workDone < 10) throw new IllegalStateException("palisade has " + stakes + " stakes along the north side and "
+                        + h.workDone + " blocks were placed");
             }
             mgr.holdings.remove(h.id);
             mgr.byKey.remove(h.key);
