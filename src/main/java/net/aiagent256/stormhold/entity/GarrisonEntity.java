@@ -88,6 +88,8 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     private DyeColor color = DyeColor.RED;
     private boolean reinforced;
     private int alarmTicks;
+    /** Whose side the alarm is against: a player's side string. Null means a monster, which is nobody's fault. */
+    @Nullable private String alarmSide;
     /** Ticks spent next to a target we can't reach; past a limit the knight backs off. */
     private int unreachableTicks;
     public boolean climbing;
@@ -230,7 +232,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
             if (p.isCreative() || p.isSpectator()) return false;
             if (!isHouse() || side.equals(Sides.player(p.getUUID()))) return false;
             // a friendly house leaves you alone unless you've just drawn blood here
-            return alarmTicks > 0 || !isFriendlyTo(p);
+            return alarmedAt(Sides.player(p.getUUID())) || !isFriendlyTo(p);
         }
         String rs = RecruitsCompat.sideOf(e);
         if (rs != null) return !rs.equals(side) && (isHouse() || Sides.isPlayer(rs));
@@ -268,7 +270,8 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         String house = isHouse() ? side : g.isHouse() ? g.side : null;
         String player = !isHouse() ? side : !g.isHouse() ? g.side : null;
         if (house == null || player == null) return false;
-        if (alarmTicks > 0 || g.alarmTicks > 0) return false;
+        GarrisonEntity houseMan = isHouse() ? this : g, playerMan = isHouse() ? g : this;
+        if (houseMan.alarmedAt(player) || playerMan.alarmedAt(house)) return false;
         LivingEntity gt = g.getTarget();
         if (gt != null && (gt == this || isAlly(gt))) return false;
         LivingEntity mt = this.getTarget();
@@ -290,12 +293,31 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         return isAlly(other) || super.isAlliedTo(other);
     }
 
-    /** Hostile everywhere in the holding for a while after being attacked. */
+    /**
+     * The whole garrison turns on whoever struck one of them, for half a minute. A monster hitting a guard
+     * raises the alarm against nobody in particular: the guards fight the monster, and a friendly visitor
+     * standing nearby is left alone.
+     */
     public void alarm(LivingEntity attacker) {
-        if (this.getTarget() == null || !this.getTarget().isAlive()) {
-            if (isHostileTo(attacker) || attacker instanceof Player) this.setTarget(attacker);
-        }
         this.alarmTicks = 600;
+        this.alarmSide = blame(attacker);
+        if (this.getTarget() == null || !this.getTarget().isAlive()) {
+            if (isHostileTo(attacker)) this.setTarget(attacker);
+        }
+    }
+
+    /** Is the alarm up against this side right now? */
+    public boolean alarmedAt(@Nullable String side) {
+        return alarmTicks > 0 && side != null && side.equals(alarmSide);
+    }
+
+    /** The side to hold responsible for a blow: the player, or the player whose man struck it. */
+    @Nullable
+    private static String blame(LivingEntity attacker) {
+        if (attacker instanceof Player p) return Sides.player(p.getUUID());
+        if (attacker instanceof GarrisonEntity g) return g.owner() != null ? Sides.player(g.owner()) : (g.side.isEmpty() ? null : g.side);
+        String rs = RecruitsCompat.sideOf(attacker);
+        return rs;
     }
 
     // ---------------------------------------------------------------- combat
@@ -332,6 +354,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
                             ? net.aiagent256.stormhold.house.Standing.HIT_GUARD : -3;
                     net.aiagent256.stormhold.house.Standing.change(sl, mgr, hid, p.getUUID(), delta, "you attacked their soldier");
                     alarmTicks = 600;
+                    alarmSide = Sides.player(p.getUUID());
                 }
             }
         }

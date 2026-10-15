@@ -13,6 +13,7 @@ public final class Config {
     public static final ForgeConfigSpec.BooleanValue SEAL_TREASURY;
     public static final ForgeConfigSpec.BooleanValue DISABLE_FOREIGN_SPAWNERS;
     public static final ForgeConfigSpec.BooleanValue CLEAR_FOREIGN_MOBS;
+    public static final ForgeConfigSpec.BooleanValue CASTLES_CLAIM_GROUND;
     public static final ForgeConfigSpec.IntValue CAPTURE_SECONDS;
     public static final ForgeConfigSpec.IntValue RAID_MIN_DAYS;
     public static final ForgeConfigSpec.IntValue RAID_MAX_DAYS;
@@ -60,6 +61,8 @@ public final class Config {
                 .define("disableForeignSpawners", true);
         CLEAR_FOREIGN_MOBS = b.comment("Remove hostile mobs inside attached structures when the garrison arrives.")
                 .define("clearForeignMobs", true);
+        CASTLES_CLAIM_GROUND = b.comment("Other mods' surface structures (villages, towers, camps) give way where a castle could stand, so nothing spawns on top of one.")
+                .define("castlesClaimGround", true);
         CAPTURE_SECONDS = b.comment("Seconds you must hold the banner stand to take a castle.")
                 .defineInRange("captureSeconds", 90, 5, 1200);
         DETECT_RADIUS_CHUNKS = b.defineInRange("detectRadiusChunks", 7, 2, 16);

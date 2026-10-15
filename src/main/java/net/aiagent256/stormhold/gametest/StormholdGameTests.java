@@ -286,6 +286,27 @@ public class StormholdGameTests {
         var near = net.aiagent256.stormhold.worldgen.Avoidance.near(ctx, 0, 0, 3000, 18);
         Stormhold.LOGGER.info("Avoidance: {} watched sets, {} possible starts within 3000 blocks", watches.size(), near.size());
         if (near.isEmpty()) throw new IllegalStateException("no possible villages or castles within 3000 blocks");
+        // and the other way round: a village that would start where a castle could stand gives way (mixin)
+        var sets = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.STRUCTURE_SET);
+        var castles = sets.get(Stormhold.id("great_castles"));
+        if (castles == null || !(castles.placement() instanceof net.minecraft.world.level.levelgen.structure.placement.RandomSpreadStructurePlacement rsp))
+            throw new IllegalStateException("great_castles set missing");
+        var village = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.STRUCTURE)
+                .get(new net.minecraft.resources.ResourceLocation("minecraft:village_plains"));
+        if (village == null) throw new IllegalStateException("no plains village structure");
+        net.minecraft.world.level.ChunkPos claimed = null;
+        for (int rx = 0; rx < 40 && claimed == null; rx++) {
+            for (int rz = 0; rz < 40 && claimed == null; rz++) {
+                var c = rsp.getPotentialStructureChunk(level.getSeed(), rx * rsp.spacing(), rz * rsp.spacing());
+                if (net.aiagent256.stormhold.worldgen.Avoidance.onCastleGround(level.registryAccess(), level.getSeed(), gen,
+                        gen.getBiomeSource(), level.getChunkSource().randomState(), level, c, 80)) claimed = c;
+            }
+        }
+        if (claimed == null) throw new IllegalStateException("no castle site found in 40x40 cells");
+        var start = village.generate(level.registryAccess(), gen, gen.getBiomeSource(), level.getChunkSource().randomState(),
+                level.getStructureManager(), level.getSeed(), claimed, 0, level, b -> true);
+        if (start.isValid()) throw new IllegalStateException("a village was allowed to start on castle ground at " + claimed);
+        Stormhold.LOGGER.info("Avoidance: village refused at castle site {}", claimed);
         g.succeed();
     }
 

@@ -112,11 +112,46 @@ public final class Avoidance {
     }
 
     private static boolean biomeAllows(Structure.GenerationContext ctx, Watch w, int bx, int bz) {
-        int y = ctx.chunkGenerator().getFirstOccupiedHeight(bx, bz, Heightmap.Types.WORLD_SURFACE_WG, ctx.heightAccessor(),
-                ctx.randomState());
-        Holder<Biome> b = ctx.biomeSource().getNoiseBiome(QuartPos.fromBlock(bx), QuartPos.fromBlock(y), QuartPos.fromBlock(bz),
-                ctx.randomState().sampler());
+        return biomeAllows(ctx.chunkGenerator(), ctx.biomeSource(), ctx.randomState(), ctx.heightAccessor(), w, bx, bz);
+    }
+
+    private static boolean biomeAllows(net.minecraft.world.level.chunk.ChunkGenerator gen, net.minecraft.world.level.biome.BiomeSource src,
+                                       net.minecraft.world.level.levelgen.RandomState rs, net.minecraft.world.level.LevelHeightAccessor h,
+                                       Watch w, int bx, int bz) {
+        int y = gen.getFirstOccupiedHeight(bx, bz, Heightmap.Types.WORLD_SURFACE_WG, h, rs);
+        Holder<Biome> b = src.getNoiseBiome(QuartPos.fromBlock(bx), QuartPos.fromBlock(y), QuartPos.fromBlock(bz), rs.sampler());
         for (HolderSet<Biome> hs : w.biomes()) if (hs.contains(b)) return true;
+        return false;
+    }
+
+    /** How far a castle's site can wander from its start chunk's centre while it looks for level ground. */
+    public static final int SITE_SHIFT = 32;
+
+    /**
+     * The other way round: would a structure of another mod, starting in {@code chunk}, land on a castle? Castles
+     * are planned deterministically, so we can tell where one could stand before any chunk is generated. Rooms
+     * for the other structure's own footprint come from {@code reach}.
+     */
+    public static boolean onCastleGround(RegistryAccess access, long seed, net.minecraft.world.level.chunk.ChunkGenerator gen,
+                                         net.minecraft.world.level.biome.BiomeSource src, net.minecraft.world.level.levelgen.RandomState rs,
+                                         net.minecraft.world.level.LevelHeightAccessor heights, ChunkPos chunk, int reach) {
+        int x = chunk.getMiddleBlockX(), z = chunk.getMiddleBlockZ();
+        for (Watch w : watches(access)) {
+            if (w.castleSize() <= 0) continue;
+            int radius = w.castleSize() + SITE_SHIFT + reach;
+            RandomSpreadStructurePlacement p = w.placement();
+            int spacing = Math.max(1, p.spacing());
+            int c0x = SectionPos.blockToSectionCoord(x - radius), c1x = SectionPos.blockToSectionCoord(x + radius);
+            int c0z = SectionPos.blockToSectionCoord(z - radius), c1z = SectionPos.blockToSectionCoord(z + radius);
+            for (int rx = Math.floorDiv(c0x, spacing); rx <= Math.floorDiv(c1x, spacing); rx++) {
+                for (int rz = Math.floorDiv(c0z, spacing); rz <= Math.floorDiv(c1z, spacing); rz++) {
+                    ChunkPos c = p.getPotentialStructureChunk(seed, rx * spacing, rz * spacing);
+                    long dx = c.getMiddleBlockX() - x, dz = c.getMiddleBlockZ() - z;
+                    if (dx * dx + dz * dz > (long) radius * radius) continue;
+                    if (biomeAllows(gen, src, rs, heights, w, c.getMiddleBlockX(), c.getMiddleBlockZ())) return true;
+                }
+            }
+        }
         return false;
     }
 
