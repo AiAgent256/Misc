@@ -182,8 +182,11 @@ public class StormholdGameTests {
             if (i == 0) {
                 // knock holes in the walls, then have the Master Builder put them back
                 List<BlockPos> holes = new ArrayList<>();
-                for (int x = bb.minX(); x <= bb.maxX() && holes.size() < 12; x++) {
-                    BlockPos p = new BlockPos(x, bb.minY() + 2, center.getZ());
+                var lay0 = net.aiagent256.stormhold.holding.DataRegistries.layout(h.layout);
+                int wallY = h.box.minY() + lay0.ground + 1;
+                int midZ = (h.box.minZ() + h.box.maxZ()) / 2;
+                for (int x = h.box.minX(); x <= h.box.maxX() && holes.size() < 12; x++) {
+                    BlockPos p = new BlockPos(x, wallY, midZ);
                     if (!level.getBlockState(p).isAir() && !level.getBlockState(p).is(net.minecraft.world.level.block.Blocks.CHEST)) {
                         holes.add(p);
                         level.setBlock(p, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
