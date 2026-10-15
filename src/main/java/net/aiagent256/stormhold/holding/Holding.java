@@ -389,8 +389,8 @@ public class Holding {
         }
         for (var e : t.getList("Fief", 10)) {
             CompoundTag bt = (CompoundTag) e;
-            int[] b = bt.getIntArray("Box");
-            if (b.length == 6) h.fief.add(new FiefBuilding(bt.getString("Piece"), new BoundingBox(b[0], b[1], b[2], b[3], b[4], b[5])));
+            int[] fb2 = bt.getIntArray("Box");
+            if (fb2.length == 6) h.fief.add(new FiefBuilding(bt.getString("Piece"), new BoundingBox(fb2[0], fb2[1], fb2[2], fb2[3], fb2[4], fb2[5])));
         }
         h.fiefTries = t.getInt("FiefTries");
         h.fiefReport = t.getString("FiefReport");
