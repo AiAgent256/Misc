@@ -21,13 +21,16 @@ public class CastleTilePiece extends TemplateStructurePiece {
     private final String layout;
     private final String theme;
     private final BlockPos castleOrigin;
+    /** Layout y of the first air block above the castle's ground; everything below is foundation. */
+    private final int ground;
 
-    public CastleTilePiece(StructureTemplateManager manager, String layout, String theme, int tx, int tz, BlockPos origin) {
+    public CastleTilePiece(StructureTemplateManager manager, String layout, String theme, int tx, int tz, BlockPos origin, int ground) {
         super(ModStructures.CASTLE_TILE.get(), 0, manager, tileId(layout, tx, tz), tileId(layout, tx, tz).toString(),
                 settings(theme), origin.offset(tx * 32, 0, tz * 32));
         this.layout = layout;
         this.theme = theme;
         this.castleOrigin = origin;
+        this.ground = ground;
     }
 
     public CastleTilePiece(StructureTemplateManager manager, CompoundTag tag) {
@@ -35,6 +38,21 @@ public class CastleTilePiece extends TemplateStructurePiece {
         this.layout = tag.getString("Layout");
         this.theme = tag.getString("Theme");
         this.castleOrigin = NbtUtils.readBlockPos(tag.getCompound("CastleOrigin"));
+        this.ground = tag.getInt("Ground");
+    }
+
+    /**
+     * The terrain smoother (beard_box) treats the bottom of this box as ground level: it fills land up to it and
+     * carves land above it, inside the box and tapering off for a dozen blocks around. Our templates carry
+     * {@code ground} layers of foundation below the real ground floor, so the box the smoother sees starts at
+     * the floor; otherwise the land around the castle is dug down to the foundation and the gates end up on a
+     * plinth above a trench. Block placement clips to the chunk, not to this box, so the foundation still lands.
+     */
+    @Override
+    public BoundingBox getBoundingBox() {
+        BoundingBox b = super.getBoundingBox();
+        if (ground <= 0) return b;
+        return new BoundingBox(b.minX(), Math.min(b.maxY(), b.minY() + ground), b.minZ(), b.maxX(), b.maxY(), b.maxZ());
     }
 
     public static ResourceLocation tileId(String layout, int tx, int tz) {
@@ -65,6 +83,7 @@ public class CastleTilePiece extends TemplateStructurePiece {
         tag.putString("Layout", layout);
         tag.putString("Theme", theme);
         tag.put("CastleOrigin", NbtUtils.writeBlockPos(castleOrigin));
+        tag.putInt("Ground", ground);
     }
 
     @Override

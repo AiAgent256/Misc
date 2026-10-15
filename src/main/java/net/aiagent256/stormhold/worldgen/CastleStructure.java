@@ -103,14 +103,15 @@ public class CastleStructure extends Structure {
         }
         if (best == null) return Optional.empty();
         final Variant v = chosen;
-        final BlockPos origin = new BlockPos(best.cx - v.sizeX() / 2, best.y - v.ground(), best.cz - v.sizeZ() / 2);
+        // best.y is the top solid block; the layout's ground floor (first air, y = ground) goes one above it
+        final BlockPos origin = new BlockPos(best.cx - v.sizeX() / 2, best.y + 1 - v.ground(), best.cz - v.sizeZ() / 2);
         BlockPos center = new BlockPos(best.cx, best.y, best.cz);
         return Optional.of(new GenerationStub(center, b -> addPieces(b, ctx.structureTemplateManager(), v, origin)));
     }
 
     private Site evaluate(GenerationContext ctx, int cx, int cz, Variant v) {
         if (ignoreTerrain) {
-            return new Site(cx, cz, height(ctx, cx, cz, Heightmap.Types.WORLD_SURFACE_WG) + 1, 0);
+            return new Site(cx, cz, height(ctx, cx, cz, Heightmap.Types.WORLD_SURFACE_WG), 0);
         }
         int hx = v.sizeX() / 2 - 4, hz = v.sizeZ() / 2 - 4;
         int[] hs = new int[9];
@@ -170,7 +171,7 @@ public class CastleStructure extends Structure {
         for (int tx = 0; tx < nx; tx++) {
             for (int tz = 0; tz < nz; tz++) {
                 if (mgr.get(CastleTilePiece.tileId(v.name(), tx, tz)).isEmpty()) continue;
-                builder.addPiece(new CastleTilePiece(mgr, v.name(), theme, tx, tz, origin));
+                builder.addPiece(new CastleTilePiece(mgr, v.name(), theme, tx, tz, origin, v.ground()));
             }
         }
     }

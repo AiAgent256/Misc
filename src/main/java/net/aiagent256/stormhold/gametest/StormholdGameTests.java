@@ -164,6 +164,13 @@ public class StormholdGameTests {
             Holding h = net.aiagent256.stormhold.holding.Detector.createForTest(level, mgr, "test:" + id + "@" + cp.toLong(),
                     Stormhold.id(id), start);
             if (h == null || h.posts.isEmpty() || h.bannerPos.equals(BlockPos.ZERO)) throw new IllegalStateException(id + " did not attach");
+            // the terrain smoother must see ground level at the floor, not at the bottom of the foundation
+            var lay = net.aiagent256.stormhold.holding.DataRegistries.layout(h.layout);
+            for (var p : start.getPieces()) {
+                if (p.getBoundingBox().minY() != h.box.minY() + lay.ground)
+                    throw new IllegalStateException(id + " piece box bottom " + p.getBoundingBox().minY() + " is not ground level "
+                            + (h.box.minY() + lay.ground));
+            }
             if (!level.getBlockState(h.bannerPos.below()).isSolidRender(level, h.bannerPos.below()))
                 throw new IllegalStateException(id + " banner stand floats at " + h.bannerPos);
             if (!level.getBlockState(h.bannerPos).canBeReplaced()) throw new IllegalStateException(id + " banner stand is inside a block at " + h.bannerPos);
