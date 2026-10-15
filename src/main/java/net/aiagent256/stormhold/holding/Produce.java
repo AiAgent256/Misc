@@ -354,10 +354,8 @@ public final class Produce {
             if (!(child instanceof AgeableMob baby)) continue;
             baby.setAge(-24000);
             baby.moveTo(mother.getX(), mother.getY(), mother.getZ(), level.random.nextFloat() * 360F, 0);
-            if (baby instanceof net.minecraft.world.entity.Mob m) {
-                m.finalizeSpawn(level, level.getCurrentDifficultyAt(mother.blockPosition()), MobSpawnType.BREEDING, null, null);
-                m.setPersistenceRequired();
-            }
+            baby.finalizeSpawn(level, level.getCurrentDifficultyAt(mother.blockPosition()), MobSpawnType.BREEDING, null, null);
+            baby.setPersistenceRequired();
             baby.setAge(-24000);
             level.addFreshEntity(baby);
             level.sendParticles(ParticleTypes.HEART, mother.getX(), mother.getY() + 0.8, mother.getZ(), 6, 0.4, 0.3, 0.4, 0.1);

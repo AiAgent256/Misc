@@ -323,7 +323,8 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
             HoldingEvents.onGarrisonHurt(this, le);
             // a player's man striking a house's soldier counts as the player striking him
             Player blamed = le instanceof Player pl ? pl : le instanceof GarrisonEntity ge && ge.owner() != null ? ge.ownerPlayer() : null;
-            if (isHouse() && blamed instanceof Player p && this.level() instanceof net.minecraft.server.level.ServerLevel sl) {
+            if (isHouse() && blamed != null && this.level() instanceof net.minecraft.server.level.ServerLevel sl) {
+                Player p = blamed;
                 String hid = Sides.houseId(side);
                 if (hid != null) {
                     var mgr = net.aiagent256.stormhold.holding.HoldingManager.get(sl);
