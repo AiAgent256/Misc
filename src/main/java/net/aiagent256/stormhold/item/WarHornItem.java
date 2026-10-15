@@ -28,6 +28,12 @@ public class WarHornItem extends Item {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
         if (player instanceof ServerPlayer sp) {
+            if (player.isShiftKeyDown()) {
+                var mgr = net.aiagent256.stormhold.holding.HoldingManager.get(sp.serverLevel());
+                net.aiagent256.stormhold.holding.Siege.raise(sp.serverLevel(), mgr, sp);
+                player.getCooldowns().addCooldown(this, 40);
+                return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
+            }
             level.playSound(null, player.blockPosition(), SoundEvents.RAID_HORN.value(), SoundSource.PLAYERS, 0.6F, 1.1F);
             Net.openWarTable(sp);
             player.getCooldowns().addCooldown(this, 20);

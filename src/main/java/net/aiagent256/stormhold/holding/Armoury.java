@@ -95,7 +95,7 @@ public final class Armoury {
             return 0;
         }
         men.sort(Comparator.comparingDouble(m -> m.entity.distanceToSqr(player)));
-        boolean stores = h != null && Company.inRange(player, h);
+        boolean stores = h != null;
         int armed = 0, fromStores = 0, netherFromStores = 0;
         String stopped = null;
         for (Man m : men) {
@@ -103,7 +103,8 @@ public final class Armoury {
             int metal = m.tier == kit.tier ? 0 : kit.metalCost;
             int nether = m.tier == kit.tier ? 0 : kit.netheriteCost;
             int packMetal = player.getInventory().countItem(kit.metal), packNether = player.getInventory().countItem(Items.NETHERITE_INGOT);
-            int storeMetal = stores ? h.stock(key(kit.metal)) : 0, storeNether = stores ? h.stock(key(Items.NETHERITE_INGOT)) : 0;
+            int storeMetal = stores ? Stores.realmStock(mgr, h, player.getUUID(), key(kit.metal)) : 0;
+            int storeNether = stores ? Stores.realmStock(mgr, h, player.getUUID(), key(Items.NETHERITE_INGOT)) : 0;
             if (packMetal + storeMetal < metal) {
                 stopped = "out of " + name(kit.metal) + " (" + metal + " per man)";
                 break;
@@ -119,12 +120,12 @@ public final class Armoury {
             // pay
             int takeMetal = take(player, kit.metal, metal);
             if (takeMetal > 0) {
-                h.addStock(key(kit.metal), -takeMetal);
+                Stores.take(mgr, h, player.getUUID(), key(kit.metal), takeMetal);
                 fromStores += takeMetal;
             }
             int takeNether = take(player, Items.NETHERITE_INGOT, nether);
             if (takeNether > 0) {
-                h.addStock(key(Items.NETHERITE_INGOT), -takeNether);
+                Stores.take(mgr, h, player.getUUID(), key(Items.NETHERITE_INGOT), takeNether);
                 netherFromStores += takeNether;
             }
             if (enchant && !player.isCreative()) player.giveExperienceLevels(-ENCHANT_LEVELS);
@@ -137,7 +138,7 @@ public final class Armoury {
             StringBuilder msg = new StringBuilder(armed + (armed == 1 ? " man" : " men") + " now in " + (enchant ? "enchanted " : "")
                     + kit.word + " kit.");
             if (fromStores > 0 || netherFromStores > 0) {
-                msg.append(" Stores of ").append(h.name).append(" paid ");
+                msg.append(" The realm's stores paid ");
                 if (fromStores > 0) msg.append(fromStores).append(" ").append(name(kit.metal));
                 if (fromStores > 0 && netherFromStores > 0) msg.append(" and ");
                 if (netherFromStores > 0) msg.append(netherFromStores).append(" netherite");
@@ -147,9 +148,8 @@ public final class Armoury {
             if (mgr != null) mgr.setDirty();
         }
         if (stopped != null) {
-            player.sendSystemMessage(Component.literal((armed > 0 ? "Then " : "") + "The quartermaster ran " + stopped
-                    + (stores ? "" : h != null ? ". Ride within " + Company.CALL_RANGE + " blocks of " + h.name + " to draw on its stores."
-                    : ".")).withStyle(ChatFormatting.RED));
+            player.sendSystemMessage(Component.literal((armed > 0 ? "Then " : "") + "The quartermaster ran " + stopped + ".")
+                    .withStyle(ChatFormatting.RED));
         }
         return armed;
     }

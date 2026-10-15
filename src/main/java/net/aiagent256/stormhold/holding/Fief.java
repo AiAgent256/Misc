@@ -210,7 +210,7 @@ public final class Fief {
         return tx < 0 ? Rotation.CLOCKWISE_90 : Rotation.COUNTERCLOCKWISE_90;
     }
 
-    private static StructurePlaceSettings settings(Rotation rot, @Nullable String theme) {
+    static StructurePlaceSettings settings(Rotation rot, @Nullable String theme) {
         StructurePlaceSettings s = new StructurePlaceSettings().setRotation(rot).setMirror(Mirror.NONE).setIgnoreEntities(true);
         if (theme != null && !theme.isEmpty() && !theme.equals("north")) s.addProcessor(new ThemeProcessor(theme));
         return s;
@@ -277,7 +277,7 @@ public final class Fief {
     }
 
     /** Level a pad for the building: fill under it, clear trees and grass above it. The dock's water end is left alone. */
-    private static void flatten(ServerLevel level, int x0, int z0, int w, int d, int y, int height, boolean dock) {
+    static void flatten(ServerLevel level, int x0, int z0, int w, int d, int y, int height, boolean dock) {
         for (int x = x0 - 1; x <= x0 + w; x++) {
             for (int z = z0 - 1; z <= z0 + d; z++) {
                 boolean edge = x < x0 || z < z0 || x >= x0 + w || z >= z0 + d;

@@ -107,7 +107,7 @@ public final class Net {
                         : h.fiefReport;
                 if (h.fiefPlan != null && !h.fiefPlan.isEmpty() && !h.fiefReport.isEmpty()) fief += " Building: " + h.fiefPlan.get(0).replace('_', ' ') + ".";
                 out.add(new HoldingInfo(h.id, h.name, h.tier, h.mode.name(), counts, cap, Economy.stockSummary(h), h.center(),
-                        h.attackTarget, h.supplyTarget, status.toString(), fief));
+                        h.attackTarget, h.supplyTarget, status.toString(), fief, Economy.realmSummary(mgr, h, player.getUUID())));
             }
         }
         return new WarTableData(out, RecruitsCompat.loaded());
@@ -185,12 +185,13 @@ public final class Net {
                     if (h.fiefPlan == null) net.aiagent256.stormhold.holding.Fief.plan(h);
                     if (h.fiefPlan.size() >= 3) {
                         player.sendSystemMessage(Component.literal("The builders at " + h.name + " already have their hands full."));
-                    } else if (h.stock(bread) < 32 || h.stock(iron) < 8) {
-                        player.sendSystemMessage(Component.literal("Raising a building takes 32 bread and 8 iron from the stores of " + h.name + ".")
+                    } else if (net.aiagent256.stormhold.holding.Stores.realmStock(mgr, h, player.getUUID(), bread) < 32
+                            || net.aiagent256.stormhold.holding.Stores.realmStock(mgr, h, player.getUUID(), iron) < 8) {
+                        player.sendSystemMessage(Component.literal("Raising a building takes 32 bread and 8 iron from the realm's stores.")
                                 .withStyle(net.minecraft.ChatFormatting.RED));
                     } else {
-                        h.addStock(bread, -32);
-                        h.addStock(iron, -8);
+                        net.aiagent256.stormhold.holding.Stores.take(mgr, h, player.getUUID(), bread, 32);
+                        net.aiagent256.stormhold.holding.Stores.take(mgr, h, player.getUUID(), iron, 8);
                         String next = net.aiagent256.stormhold.holding.Fief.nextExtra(h);
                         h.fiefPlan.add(next);
                         player.sendSystemMessage(HoldingEvents.gold("The people of " + h.name + " will raise a " + next.replace('_', ' ') + "."));

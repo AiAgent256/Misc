@@ -75,6 +75,7 @@ public final class Campaigns {
         c.add(Role.CROSSBOWMAN, Math.max(1, (int) Math.ceil(h.count(Role.CROSSBOWMAN) * 0.7)));
         c.add(Role.ARCHER, (int) Math.ceil(h.count(Role.ARCHER) * 0.4));
         mgr.campaigns.add(c);
+        h.lastRaidAt = level.getGameTime();
         HoldingEvents.tell(level, h.ownerPlayer(), Component.literal(mgr.house(h.houseId).title() + " marches on "
                 + h.name + " with " + c.total() + " men!").withStyle(ChatFormatting.RED));
         alliedHelp(level, mgr, h);

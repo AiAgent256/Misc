@@ -88,13 +88,16 @@ public final class Builder {
                 return;
             }
             int[] cost = fortifyCost(h.fortify + 1);
-            if (stone(h) < cost[0] || h.stock(IRON) < cost[1]) {
+            java.util.UUID owner = h.ownerPlayer();
+            int haveStone = stone(mgr, h), haveIron = owner == null ? h.stock(IRON) : Stores.realmStock(mgr, h, owner, IRON);
+            if (haveStone < cost[0] || haveIron < cost[1]) {
                 player.sendSystemMessage(Component.literal("Stage " + (h.fortify + 1) + " needs " + cost[0] + " stone and " + cost[1]
-                        + " iron in the stores; " + h.name + " has " + stone(h) + " and " + h.stock(IRON) + ".").withStyle(ChatFormatting.RED));
+                        + " iron in the realm's stores; you have " + haveStone + " and " + haveIron + ".").withStyle(ChatFormatting.RED));
                 return;
             }
-            takeStone(h, cost[0]);
-            h.addStock(IRON, -cost[1]);
+            takeStone(mgr, h, cost[0]);
+            if (owner != null) Stores.take(mgr, h, owner, IRON, cost[1]);
+            else h.addStock(IRON, -cost[1]);
         }
         h.work = work;
         h.workQueue = null;
@@ -114,16 +117,23 @@ public final class Builder {
         };
     }
 
-    public static int stone(Holding h) {
+    /** Stone of any kind across the realm, this castle first. */
+    public static int stone(HoldingManager mgr, Holding h) {
+        java.util.UUID owner = h.ownerPlayer();
         int n = 0;
-        for (ResourceLocation s : STONE) n += h.stock(s);
+        for (ResourceLocation s : STONE) n += owner == null ? h.stock(s) : Stores.realmStock(mgr, h, owner, s);
         return n;
     }
 
-    private static void takeStone(Holding h, int n) {
+    private static void takeStone(HoldingManager mgr, Holding h, int n) {
+        java.util.UUID owner = h.ownerPlayer();
         for (ResourceLocation s : STONE) {
-            int take = Math.min(n, h.stock(s));
-            h.addStock(s, -take);
+            int have = owner == null ? h.stock(s) : Stores.realmStock(mgr, h, owner, s);
+            int take = Math.min(n, have);
+            if (take > 0) {
+                if (owner == null) h.addStock(s, -take);
+                else Stores.take(mgr, h, owner, s, take);
+            }
             n -= take;
             if (n <= 0) return;
         }
@@ -153,7 +163,7 @@ public final class Builder {
         // stone keeps the pace up; without it the men scavenge and go slowly
         int rate = RATE;
         if (h.work.equals(REPAIR)) {
-            if (stone(h) > 0) takeStone(h, 1);
+            if (stone(mgr, h) > 0) takeStone(mgr, h, 1);
             else rate = SLOW_RATE;
         }
         int placed = 0;

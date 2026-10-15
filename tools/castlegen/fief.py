@@ -409,6 +409,70 @@ def write(root):
     return index
 
 
+
+def siege_tower():
+    """A timber siege tower on wheels: ladders up the inside, a drawbridge at wall height, a War Table on
+    the ground floor. +z is the front (toward the wall)."""
+    W, D, GL = 7, 9, 2
+    g = Grid(W, 24, D, seed=121)
+    g.fill(0, 0, 0, W - 1, GL - 1, D - 1, "<void>")
+    LOG = "minecraft:dark_oak_log[axis=y]"
+    AX = "minecraft:dark_oak_log[axis=x]"
+    # wheels: two axles across the width, front and back
+    for z in (1, 7):
+        for x in range(0, W):
+            g.set(x, GL - 1, z, AX)
+        for x in (0, 6):
+            g.set(x, GL - 2, z, "minecraft:dark_oak_fence")
+            g.set(x, GL, z, "minecraft:dark_oak_fence")
+    # chassis
+    g.fill(1, GL, 1, 5, GL, 7, "minecraft:spruce_planks")
+    # body: 5 wide, 5 deep (z 2..6), 14 tall, corner posts
+    top = GL + 15
+    for (x, z) in ((1, 2), (5, 2), (1, 6), (5, 6)):
+        g.fill(x, GL + 1, z, x, top, z, LOG)
+    g.fill(1, GL + 1, 2, 5, top - 1, 2, "minecraft:spruce_planks")      # back wall
+    g.fill(1, GL + 1, 6, 5, top - 1, 6, "minecraft:spruce_planks")      # front wall (hides)
+    g.fill(1, GL + 1, 3, 1, top - 1, 5, "minecraft:spruce_planks")      # sides
+    g.fill(5, GL + 1, 3, 5, top - 1, 5, "minecraft:spruce_planks")
+    g.fill(2, GL + 1, 3, 4, top - 1, 5, "minecraft:air")
+    # wet hides on the front against fire
+    for y in range(GL + 2, top - 1, 2):
+        g.fill(1, y, 6, 5, y, 6, "minecraft:brown_wool")
+    # floors every 5 with a hatch over the ladder
+    g.fill(2, GL + 1, 3, 2, top - 1, 3, "minecraft:ladder[facing=east]")
+    for fy in (GL + 6, GL + 11):
+        g.fill(3, fy, 3, 4, fy, 5, "minecraft:spruce_planks")
+        g.set(2, fy, 4, "minecraft:spruce_planks")
+        g.set(2, fy, 5, "minecraft:spruce_planks")
+        g.lantern(4, fy - 1, 4)
+    # arrow slits on the sides
+    for y in (GL + 4, GL + 9, GL + 13):
+        g.set(1, y, 4, "minecraft:air")
+        g.set(5, y, 4, "minecraft:air")
+    # top platform with rails and the drawbridge forward
+    g.fill(1, top, 2, 5, top, 6, "minecraft:spruce_planks")
+    g.set(2, top, 3, "minecraft:air")
+    g.fill(1, top + 1, 2, 5, top + 1, 2, "minecraft:spruce_fence")
+    g.fill(1, top + 1, 3, 1, top + 1, 5, "minecraft:spruce_fence")
+    g.fill(5, top + 1, 3, 5, top + 1, 5, "minecraft:spruce_fence")
+    for z in (7, 8):
+        g.fill(2, top, z, 4, top, z, "minecraft:oak_trapdoor[facing=north,half=top,open=false]")
+    g.set(3, top + 1, 2, "minecraft:white_wall_banner[facing=south]")
+    g.banners.append((3, top + 1, 2))
+    # the back door and the war table on the ground floor
+    g.fill(3, GL + 1, 2, 3, GL + 2, 2, "minecraft:air")
+    g.set(4, GL + 1, 5, "stormhold:war_table")
+    g.mark("war_table", 4, GL + 1, 5)
+    g.chest(2, GL + 1, 5, "east", LOOT + "castle_armory")
+    g.lantern(3, GL + 5, 4)
+    g.mark("door", 3, GL + 1, 1)
+    return g, {"name": "siege_tower", "kind": "siege", "profession": None, "GL": GL + 1, "size": [W, D]}
+
+
+PIECES = PIECES + (siege_tower,)
+
+
 if __name__ == "__main__":
     import sys
     sys.path.insert(0, os.path.dirname(__file__))

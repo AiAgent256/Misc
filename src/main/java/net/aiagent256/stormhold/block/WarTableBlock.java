@@ -34,7 +34,10 @@ public class WarTableBlock extends Block {
     /** Items a castle knows what to do with. Anything else stays in your hand. */
     public static final Set<String> SUPPLIES = Set.of("minecraft:bread", "minecraft:iron_ingot", "minecraft:arrow",
             "minecraft:gold_ingot", "minecraft:emerald", "minecraft:wheat", "minecraft:coal", "minecraft:leather",
-            "minecraft:diamond", "minecraft:cooked_beef", "minecraft:cooked_porkchop", "minecraft:baked_potato");
+            "minecraft:diamond", "minecraft:cooked_beef", "minecraft:cooked_porkchop", "minecraft:baked_potato",
+            "minecraft:cobblestone", "minecraft:stone_bricks", "minecraft:stone", "minecraft:andesite", "minecraft:spruce_planks",
+            "minecraft:oak_planks", "minecraft:dark_oak_planks", "minecraft:netherite_ingot", "minecraft:string", "minecraft:carrot",
+            "minecraft:potato", "minecraft:cooked_mutton", "minecraft:cod", "minecraft:salmon", "minecraft:white_wool");
 
     public WarTableBlock(Properties props) {
         super(props);

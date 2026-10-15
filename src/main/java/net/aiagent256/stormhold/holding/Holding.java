@@ -118,6 +118,9 @@ public class Holding {
     }
 
     /** The Master Builder and his current job. The queue is rebuilt from the plans when needed. */
+    /** Days of peace and plenty in a row; growth happens on multiples of it. */
+    public int growth;
+    public long lastRaidAt;
     public String work = Builder.NONE;
     public int fortify;
     public int workDone;
@@ -317,6 +320,8 @@ public class Holding {
         }
         t.put("Fief", fb);
         t.putInt("FiefTries", fiefTries);
+        t.putInt("Growth", growth);
+        t.putLong("LastRaidAt", lastRaidAt);
         t.putString("Work", work);
         t.putInt("Fortify", fortify);
         t.putInt("WorkDone", workDone);
@@ -409,6 +414,8 @@ public class Holding {
             if (fb2.length == 6) h.fief.add(new FiefBuilding(bt.getString("Piece"), new BoundingBox(fb2[0], fb2[1], fb2[2], fb2[3], fb2[4], fb2[5])));
         }
         h.fiefTries = t.getInt("FiefTries");
+        h.growth = t.getInt("Growth");
+        h.lastRaidAt = t.getLong("LastRaidAt");
         if (t.contains("Work")) h.work = t.getString("Work");
         h.fortify = t.getInt("Fortify");
         h.workDone = t.getInt("WorkDone");

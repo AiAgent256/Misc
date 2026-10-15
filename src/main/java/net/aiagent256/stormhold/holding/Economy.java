@@ -60,6 +60,7 @@ public final class Economy {
                 }
             }
             Fief.census(level, mgr, h, now);
+            Growth.daily(level, mgr, h, now);
             h.nextProduce = now + 24000;
             if (h.supplyTarget != null) ship(level, mgr, h);
             mgr.setDirty();
@@ -68,10 +69,11 @@ public final class Economy {
         }
         if (now >= h.nextReplenish) {
             h.nextReplenish = now + (h.mode == Holding.Mode.DEFEND ? 1200 : 2400);
+            java.util.UUID owner = h.ownerPlayer();
             for (Role r : new Role[]{Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN, Role.CAPTAIN}) {
-                if (h.count(r) < h.capacity(r) && h.stock(BREAD) >= 4 && h.stock(IRON) >= 2) {
-                    h.addStock(BREAD, -4);
-                    h.addStock(IRON, -2);
+                if (h.count(r) < h.capacity(r) && Stores.realmStock(mgr, h, owner, BREAD) >= 4 && Stores.realmStock(mgr, h, owner, IRON) >= 2) {
+                    Stores.take(mgr, h, owner, BREAD, 4);
+                    Stores.take(mgr, h, owner, IRON, 2);
                     h.add(r, 1);
                     mgr.setDirty();
                     break;
@@ -244,6 +246,28 @@ public final class Economy {
         HoldingEvents.tell(level, origin.ownerPlayer(), HoldingEvents.gold("A courier from " + origin.name + " delivered "
                 + delivered + " goods to " + where + (leftover.isEmpty() ? "." : ". The rest found no room and went home.")));
         mgr.setDirty();
+    }
+
+    /** The realm's stock of the things that matter, for the War Table. */
+    public static String realmSummary(HoldingManager mgr, Holding h, java.util.UUID player) {
+        String[][] keys = {{"bread", "bread"}, {"iron_ingot", "iron"}, {"cobblestone", "stone"}, {"stone_bricks", "stone"},
+                {"stone", "stone"}, {"andesite", "stone"}, {"spruce_planks", "planks"}, {"oak_planks", "planks"},
+                {"emerald", "emeralds"}, {"diamond", "diamonds"}, {"gold_ingot", "gold"}, {"arrow", "arrows"}, {"wheat", "wheat"},
+                {"leather", "leather"}, {"coal", "coal"}, {"netherite_ingot", "netherite"}};
+        java.util.Map<String, Integer> totals = new java.util.LinkedHashMap<>();
+        for (String[] k : keys) {
+            int n = Stores.realmStock(mgr, h, player, new ResourceLocation("minecraft", k[0]));
+            if (n > 0) totals.merge(k[1], n, Integer::sum);
+        }
+        int castles = Stores.realm(mgr, h, player).size();
+        StringBuilder sb = new StringBuilder("Realm (" + castles + (castles == 1 ? " castle): " : " castles): "));
+        int i = 0;
+        for (var e : totals.entrySet()) {
+            if (i++ > 0) sb.append(", ");
+            sb.append(e.getValue()).append(" ").append(e.getKey());
+        }
+        if (totals.isEmpty()) sb.append("nothing in store.");
+        return sb.toString();
     }
 
     public static String stockSummary(Holding h) {
