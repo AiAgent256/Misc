@@ -109,9 +109,11 @@ public final class Columns {
             if (c.progress < 1) return;
         }
         // arrived. If the player has moved on, ride after them; if they're away, wait at the rendezvous.
-        if (player == null || player.level() != level) return;
+        // In another world (the Nether, the End) they take the portal the player took and find them there.
+        if (player == null) return;
+        ServerLevel where = player.serverLevel();
         BlockPos here = player.blockPosition();
-        if (here.distSqr(c.to) > (double) FIND_RANGE * FIND_RANGE) {
+        if (where == level && here.distSqr(c.to) > (double) FIND_RANGE * FIND_RANGE) {
             c.from = c.to;
             c.to = here;
             c.progress = 0;
@@ -120,12 +122,12 @@ public final class Columns {
         int n = 0;
         for (var e : c.counts.entrySet()) {
             for (int i = 0; i < e.getValue(); i++) {
-                if (Company.arrive(level, mgr, player, origin, e.getKey())) n++;
+                if (Company.arrive(where, mgr, player, origin, e.getKey())) n++;
             }
         }
         c.counts.clear();
         c.stage = Campaign.Stage.DONE;
-        level.playSound(null, here, SoundEvents.HORSE_GALLOP, SoundSource.PLAYERS, 1.0F, 1.0F);
+        where.playSound(null, here, SoundEvents.HORSE_GALLOP, SoundSource.PLAYERS, 1.0F, 1.0F);
         player.sendSystemMessage(HoldingEvents.gold(n + " men from " + origin.name + " have found you and fall in."));
         mgr.setDirty();
     }
@@ -172,9 +174,9 @@ public final class Columns {
         if (h.reinforceKeep <= 0 || !h.isPlayerOwned() || now < h.nextColumn || active(mgr, h)) return;
         UUID owner = h.ownerPlayer();
         ServerPlayer player = owner != null ? level.getServer().getPlayerList().getPlayer(owner) : null;
-        if (player == null || player.level() != level) return;
+        if (player == null) return;
         h.nextColumn = now + SUPPLY_INTERVAL;
-        int have = companySize(level, player);
+        int have = companySize(player.serverLevel(), player);
         int short_ = h.reinforceKeep - have;
         if (short_ <= 0) return;
         EnumMap<Role, Integer> want = new EnumMap<>(Role.class);

@@ -58,6 +58,26 @@ public final class CommonEvents {
         }
     }
 
+    /** Remember where a player stood before a portal, so their men can be found and brought through. */
+    private static final Map<UUID, BlockPos> LAST_POS = new HashMap<>();
+
+    @SubscribeEvent
+    public static void playerTick(net.minecraftforge.event.TickEvent.PlayerTickEvent e) {
+        if (e.phase == net.minecraftforge.event.TickEvent.Phase.END && e.player instanceof ServerPlayer sp && sp.tickCount % 10 == 0) {
+            LAST_POS.put(sp.getUUID(), sp.blockPosition());
+        }
+    }
+
+    @SubscribeEvent
+    public static void changedDimension(net.minecraftforge.event.entity.player.PlayerEvent.PlayerChangedDimensionEvent e) {
+        if (!(e.getEntity() instanceof ServerPlayer sp)) return;
+        ServerLevel from = sp.getServer().getLevel(e.getFrom()), to = sp.getServer().getLevel(e.getTo());
+        BlockPos left = LAST_POS.get(sp.getUUID());
+        if (from == null || to == null || left == null) return;
+        // a tick later, so the player is actually standing in the new world
+        to.getServer().execute(() -> net.aiagent256.stormhold.holding.Company.followThrough(from, to, sp, left));
+    }
+
     @SubscribeEvent
     public static void death(LivingDeathEvent e) {
         if (e.getEntity() instanceof GarrisonEntity g && !g.level().isClientSide) HoldingEvents.onDeath(g);

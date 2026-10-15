@@ -19,6 +19,8 @@ public class FollowOwnerGoal extends Goal {
     private final GarrisonEntity mob;
     private Player owner;
     private int repath;
+    private net.minecraft.world.phys.Vec3 lastPos = net.minecraft.world.phys.Vec3.ZERO;
+    private int stuck;
 
     public FollowOwnerGoal(GarrisonEntity mob) {
         this.mob = mob;
@@ -48,6 +50,8 @@ public class FollowOwnerGoal extends Goal {
     @Override
     public void start() {
         repath = 0;
+        stuck = 0;
+        lastPos = mob.position();
     }
 
     @Override
@@ -62,11 +66,67 @@ public class FollowOwnerGoal extends Goal {
         if (--repath > 0) return;
         repath = 10;
         double d2 = mob.distanceToSqr(owner);
-        if (d2 > CATCH_UP * CATCH_UP && mob.level() instanceof ServerLevel level) {
-            if (teleportNear(level)) return;
+        // a ladder, vine, rope or scaffold between us: use it
+        double dy = owner.getY() - mob.getY();
+        if (dy > 2.0 && d2 < 14 * 14 && mob.onClimbable()) {
+            mob.getNavigation().stop();
+            var d = mob.getDeltaMovement();
+            mob.setDeltaMovement(d.x * 0.5, 0.22, d.z * 0.5);
+            mob.setJumping(true);
+            return;
+        }
+        mob.setJumping(false);
+        if (dy > 2.0 && d2 < 14 * 14) {
+            BlockPos foot = ladderFoot();
+            if (foot != null) {
+                mob.getNavigation().moveTo(foot.getX() + 0.5, foot.getY(), foot.getZ() + 0.5, 1.2);
+                if (mob.distanceToSqr(net.minecraft.world.phys.Vec3.atBottomCenterOf(foot)) < 2.5) {
+                    var to = new net.minecraft.world.phys.Vec3(foot.getX() + 0.5 - mob.getX(), 0, foot.getZ() + 0.5 - mob.getZ()).normalize().scale(0.12);
+                    mob.setDeltaMovement(mob.getDeltaMovement().add(to));
+                }
+                return;
+            }
+        }
+        // no way there on foot (cliff, water, a wall): after a few seconds of no headway, find one
+        boolean moved = mob.position().distanceToSqr(lastPos) > 1.0;
+        lastPos = mob.position();
+        stuck = moved ? 0 : stuck + 1;
+        if (mob.level() instanceof ServerLevel level && (d2 > CATCH_UP * CATCH_UP || (stuck >= 6 && d2 > 8 * 8))) {
+            if (teleportNear(level)) {
+                stuck = 0;
+                return;
+            }
         }
         double speed = d2 > 14 * 14 ? 1.35 : 1.1;
         mob.getNavigation().moveTo(owner, speed);
+    }
+
+    /** The bottom of the nearest climbable column that reaches up toward the owner. */
+    @org.jetbrains.annotations.Nullable
+    private BlockPos ladderFoot() {
+        var level = mob.level();
+        BlockPos me = mob.blockPosition();
+        BlockPos best = null;
+        double bestScore = Double.MAX_VALUE;
+        for (int dx = -6; dx <= 6; dx++) {
+            for (int dz = -6; dz <= 6; dz++) {
+                for (int dy = -2; dy <= 3; dy++) {
+                    BlockPos p = me.offset(dx, dy, dz);
+                    if (!level.getBlockState(p).is(net.minecraft.tags.BlockTags.CLIMBABLE)) continue;
+                    BlockPos foot = p;
+                    while (level.getBlockState(foot.below()).is(net.minecraft.tags.BlockTags.CLIMBABLE) && me.getY() - foot.getY() < 4) foot = foot.below();
+                    BlockPos top = p;
+                    while (level.getBlockState(top.above()).is(net.minecraft.tags.BlockTags.CLIMBABLE)) top = top.above();
+                    if (top.getY() < owner.getY() - 2.5) continue;
+                    double score = foot.distSqr(me);
+                    if (score < bestScore) {
+                        bestScore = score;
+                        best = foot;
+                    }
+                }
+            }
+        }
+        return best;
     }
 
     private boolean teleportNear(ServerLevel level) {

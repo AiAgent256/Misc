@@ -162,6 +162,52 @@ public final class Company {
         return sent;
     }
 
+    /** How close a man must be when the player goes through a portal to follow them through. */
+    public static final int PORTAL_RANGE = 48;
+
+    /**
+     * The player has changed worlds: every man of theirs who was close behind goes through after them
+     * and comes out at their side. Men holding a spot or clearing a building stay where they were told.
+     */
+    public static void followThrough(ServerLevel from, ServerLevel to, net.minecraft.server.level.ServerPlayer player, BlockPos left) {
+        var mode = Orders.mode(player.getUUID());
+        if (mode == Orders.Mode.HOLD || mode == Orders.Mode.CLEAR) return;
+        var men = from.getEntitiesOfClass(GarrisonEntity.class, new AABB(left).inflate(PORTAL_RANGE, 24, PORTAL_RANGE),
+                g -> g.isAlive() && player.getUUID().equals(g.owner()));
+        int n = 0;
+        for (GarrisonEntity g : men) {
+            BlockPos at = null;
+            for (int i = 0; i < 8 && at == null; i++) {
+                at = Garrisons.standable(to, player.blockPosition().offset(to.random.nextInt(5) - 2, 0, to.random.nextInt(5) - 2));
+            }
+            if (at == null) at = player.blockPosition();
+            final BlockPos spot = at;
+            Entity moved = g.changeDimension(to, new net.minecraftforge.common.util.ITeleporter() {
+                @Override
+                public Entity placeEntity(Entity e, ServerLevel cur, ServerLevel dest, float yaw,
+                                          java.util.function.Function<Boolean, Entity> repositionEntity) {
+                    Entity r = repositionEntity.apply(false);
+                    r.moveTo(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5, yaw, 0);
+                    return r;
+                }
+
+                @Override
+                public boolean playTeleportSound(net.minecraft.server.level.ServerPlayer p, ServerLevel cur, ServerLevel dest) {
+                    return false;
+                }
+            });
+            if (moved instanceof GarrisonEntity mg) {
+                mg.setOwner(player.getUUID());
+                mg.setTarget(null);
+                n++;
+            }
+        }
+        if (n > 0) {
+            to.playSound(null, player.blockPosition(), SoundEvents.PORTAL_TRAVEL, SoundSource.PLAYERS, 0.4F, 1.4F);
+            player.sendSystemMessage(HoldingEvents.gold(n + (n == 1 ? " man follows" : " men follow") + " you through."));
+        }
+    }
+
     private static String plural(Role r, int n) {
         return switch (r) {
             case KNIGHT -> n == 1 ? "knight" : "knights";
