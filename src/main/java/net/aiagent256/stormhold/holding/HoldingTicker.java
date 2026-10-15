@@ -17,6 +17,7 @@ public final class HoldingTicker {
             for (Holding h : mgr.holdings.values()) if (near(level, h) && level.isLoaded(h.center())) Gates.tick(level, mgr, h);
         }
         if (t % 20 != 0) return;
+        Orders.tick(level);
         for (Holding h : mgr.holdings.values()) tickHolding(level, mgr, h, t);
         if (t - mgr.lastStandingDrift >= 24000) {
             mgr.lastStandingDrift = t;
@@ -68,6 +69,7 @@ public final class HoldingTicker {
             if (!h.fiefPlan.isEmpty() && now % 40 == 0) Fief.buildNext(level, mgr, h);
         }
         Builder.tick(level, mgr, h);
+        Produce.tick(level, mgr, h, now);
         if (now % 200 == 0) Builder.ensureBuilder(level, h);
         greet(level, mgr, h);
         if (!h.villagersSpawned) Garrisons.spawnVillagers(level, h);

@@ -25,9 +25,14 @@ public class FollowOwnerGoal extends Goal {
         this.setFlags(EnumSet.of(Flag.MOVE));
     }
 
+    private boolean following() {
+        var m = net.aiagent256.stormhold.holding.Orders.mode(mob.owner());
+        return m == net.aiagent256.stormhold.holding.Orders.Mode.FOLLOW || m == net.aiagent256.stormhold.holding.Orders.Mode.AGGRESSIVE;
+    }
+
     @Override
     public boolean canUse() {
-        if (mob.owner() == null || mob.getTarget() != null) return false;
+        if (mob.owner() == null || mob.getTarget() != null || !following()) return false;
         Player p = mob.ownerPlayer();
         if (p == null || p.isSpectator()) return false;
         if (mob.distanceToSqr(p) < WALK * WALK) return false;
@@ -37,7 +42,7 @@ public class FollowOwnerGoal extends Goal {
 
     @Override
     public boolean canContinueToUse() {
-        return owner != null && owner.isAlive() && mob.getTarget() == null && mob.distanceToSqr(owner) > STAND * STAND;
+        return owner != null && owner.isAlive() && mob.getTarget() == null && following() && mob.distanceToSqr(owner) > STAND * STAND;
     }
 
     @Override

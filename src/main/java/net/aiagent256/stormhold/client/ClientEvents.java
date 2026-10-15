@@ -23,6 +23,12 @@ public final class ClientEvents {
         e.registerEntityRenderer(ModEntities.COURIER.get(), GarrisonRenderer::new);
     }
 
+    @SubscribeEvent
+    public static void setup(net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent e) {
+        e.enqueueWork(() -> net.minecraft.client.gui.screens.MenuScreens.register(
+                net.aiagent256.stormhold.registry.ModMenus.SOLDIER.get(), SoldierScreen::new));
+    }
+
     private ClientEvents() {
     }
 }

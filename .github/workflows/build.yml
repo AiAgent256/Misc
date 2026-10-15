@@ -23,6 +23,20 @@ jobs:
         with:
           gradle-version: 8.1.1
 
+      - name: Check resource JSON
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, sys
+          bad = []
+          for f in pathlib.Path("src/main/resources").rglob("*.json"):
+              try:
+                  json.loads(f.read_text(encoding="utf-8"))
+              except Exception as e:
+                  bad.append(f"{f}: {e}")
+          print("\n".join(bad) or "all resource JSON parses")
+          sys.exit(1 if bad else 0)
+          PY
+
       - name: Build
         run: |
           set -o pipefail

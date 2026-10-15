@@ -69,8 +69,17 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     @Nullable private BlockPos marchVia;
     /** The waypoint after {@link #marchVia}: outside the gate, once we're through it. */
     @Nullable private BlockPos marchVia2;
-    /** The player this soldier rides with, if mustered into a company. */
-    @Nullable private UUID owner;
+    /** The player this soldier rides with, if mustered into a company. Synced so the client knows whose man he is. */
+    private static final net.minecraft.network.syncher.EntityDataAccessor<java.util.Optional<UUID>> DATA_OWNER =
+            net.minecraft.network.syncher.SynchedEntityData.defineId(GarrisonEntity.class,
+                    net.minecraft.network.syncher.EntityDataSerializers.OPTIONAL_UUID);
+    /** A company man's food pouch: he eats from it when he's hurt. */
+    private final net.minecraft.core.NonNullList<ItemStack> pouch = net.minecraft.core.NonNullList.withSize(3, ItemStack.EMPTY);
+    /** His name without the health readout. */
+    private String baseName = "";
+    private int shownHealth = -1;
+    private int eatCooldown;
+    private int lastDamagedTick = -1000;
     /** A wall archer that has come down to fight; counts down back to holding the wall. */
     public int sortieTicks;
     private boolean holdPosition;
@@ -133,6 +142,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         }
         this.goalSelector.addGoal(3, new OpenDoorGoal(this, true));
         this.goalSelector.addGoal(3, new FollowOwnerGoal(this));
+        this.goalSelector.addGoal(3, new net.aiagent256.stormhold.entity.ai.CompanyPostGoal(this));
         this.goalSelector.addGoal(4, new MarchGoal(this));
         this.goalSelector.addGoal(5, new ReturnToPostGoal(this));
         if (r != Role.LORD && !r.ranged) this.goalSelector.addGoal(7, new GuardStrollGoal(this));
@@ -174,14 +184,28 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     public void setMarchVia(@Nullable BlockPos p) { this.marchVia = p; }
     @Nullable public BlockPos marchVia2() { return marchVia2; }
     public void setMarchVia2(@Nullable BlockPos p) { this.marchVia2 = p; }
-    @Nullable public UUID owner() { return owner; }
-    public void setOwner(@Nullable UUID id) { this.owner = id; }
-    public boolean holdsPosition() { return holdPosition && marchTarget == null && owner == null; }
+    @Nullable public UUID owner() { return this.entityData.get(DATA_OWNER).orElse(null); }
+    public void setOwner(@Nullable UUID id) { this.entityData.set(DATA_OWNER, java.util.Optional.ofNullable(id)); }
+    public boolean holdsPosition() { return holdPosition && marchTarget == null && owner() == null; }
+    public net.minecraft.core.NonNullList<ItemStack> pouch() { return pouch; }
+    public void setBaseName(String name) {
+        this.baseName = name;
+        this.shownHealth = -1;
+        this.setCustomName(net.minecraft.network.chat.Component.literal(name));
+    }
+    public String baseName() { return baseName.isEmpty() ? this.getName().getString() : baseName; }
+
+    @Override
+    protected void defineSynchedData() {
+        super.defineSynchedData();
+        this.entityData.define(DATA_OWNER, java.util.Optional.empty());
+    }
 
     /** The player this soldier follows, if they're online and in this level. */
     @Nullable
     public Player ownerPlayer() {
-        return owner == null ? null : this.level().getPlayerByUUID(owner);
+        UUID o = owner();
+        return o == null ? null : this.level().getPlayerByUUID(o);
     }
     public int tier() { return tier; }
     public int renown() { return renown; }
@@ -196,8 +220,11 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
 
     public boolean isHostileTo(LivingEntity e) {
         if (e == this || !e.isAlive() || side.isEmpty()) return false;
+        // a company man only picks fights his orders allow (close to his lord, inside the building he's clearing)
+        if (owner() != null && !net.aiagent256.stormhold.holding.Orders.inScope(this, e)) return false;
         if (e instanceof GarrisonEntity g) {
-            return !g.side.isEmpty() && !g.side.equals(side);
+            if (g.side.isEmpty() || g.side.equals(side)) return false;
+            return !atPeaceWith(g);
         }
         if (e instanceof Player p) {
             if (p.isCreative() || p.isSpectator()) return false;
@@ -229,6 +256,34 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     @Nullable private UUID friendCache;
     private long friendCacheTime;
     private boolean friendCached;
+    @Nullable private String peaceKey;
+    private long peaceTime;
+    private boolean peaceCached;
+
+    /**
+     * A house's soldier and a player's soldier leave each other alone when the house counts the player a
+     * friend, unless one of them has just been hurt or is already fighting the other's side.
+     */
+    private boolean atPeaceWith(GarrisonEntity g) {
+        String house = isHouse() ? side : g.isHouse() ? g.side : null;
+        String player = !isHouse() ? side : !g.isHouse() ? g.side : null;
+        if (house == null || player == null) return false;
+        if (alarmTicks > 0 || g.alarmTicks > 0) return false;
+        LivingEntity gt = g.getTarget();
+        if (gt != null && (gt == this || isAlly(gt))) return false;
+        LivingEntity mt = this.getTarget();
+        if (mt != null && (mt == g || g.isAlly(mt))) return false;
+        String hid = Sides.houseId(house);
+        UUID pid = Sides.playerId(player);
+        if (hid == null || pid == null || !(this.level() instanceof net.minecraft.server.level.ServerLevel sl)) return false;
+        String key = hid + "|" + pid;
+        long now = sl.getGameTime();
+        if (key.equals(peaceKey) && now - peaceTime < 10) return peaceCached;
+        peaceKey = key;
+        peaceTime = now;
+        peaceCached = net.aiagent256.stormhold.house.Standing.friendly(net.aiagent256.stormhold.holding.HoldingManager.get(sl), hid, pid);
+        return peaceCached;
+    }
 
     @Override
     public boolean isAlliedTo(Entity other) {
@@ -263,9 +318,12 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
             }
         }
         boolean result = super.hurt(src, amount);
+        if (result) lastDamagedTick = this.tickCount;
         if (result && !this.level().isClientSide && attacker instanceof LivingEntity le) {
             HoldingEvents.onGarrisonHurt(this, le);
-            if (isHouse() && le instanceof Player p && this.level() instanceof net.minecraft.server.level.ServerLevel sl) {
+            // a player's man striking a house's soldier counts as the player striking him
+            Player blamed = le instanceof Player pl ? pl : le instanceof GarrisonEntity ge && ge.owner() != null ? ge.ownerPlayer() : null;
+            if (isHouse() && blamed instanceof Player p && this.level() instanceof net.minecraft.server.level.ServerLevel sl) {
                 String hid = Sides.houseId(side);
                 if (hid != null) {
                     var mgr = net.aiagent256.stormhold.holding.HoldingManager.get(sl);
@@ -300,6 +358,11 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     /** A friendly lord sells supplies: an emerald buys 8 bread, or 4 iron ingots when sneaking. */
     @Override
     protected net.minecraft.world.InteractionResult mobInteract(Player player, net.minecraft.world.InteractionHand hand) {
+        UUID o = owner();
+        if (o != null && o.equals(player.getUUID())) {
+            if (!this.level().isClientSide && player instanceof ServerPlayer sp) ownerInteract(sp, hand);
+            return net.minecraft.world.InteractionResult.sidedSuccess(this.level().isClientSide);
+        }
         if (role() != Role.LORD || !isHouse() || !(this.level() instanceof net.minecraft.server.level.ServerLevel sl)) {
             return super.mobInteract(player, hand);
         }
@@ -320,6 +383,161 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         if (!player.getInventory().add(goods)) player.drop(goods, false);
         this.playSound(SoundEvents.VILLAGER_YES, 1.0F, 1.0F);
         return net.minecraft.world.InteractionResult.sidedSuccess(sl.isClientSide);
+    }
+
+    /**
+     * The lord deals with one of his own men: empty hand opens his kit (sneak for a word on how he is),
+     * food or a potion heals him (or goes in his pouch if he's whole), armour or a weapon goes straight on.
+     */
+    private void ownerInteract(ServerPlayer player, net.minecraft.world.InteractionHand hand) {
+        ItemStack held = player.getItemInHand(hand);
+        if (held.isEmpty()) {
+            if (player.isShiftKeyDown()) {
+                int food = 0;
+                for (ItemStack s : pouch) food += s.getCount();
+                player.displayClientMessage(net.minecraft.network.chat.Component.literal(baseName() + ": " + (int) Math.ceil(getHealth())
+                        + "/" + (int) getMaxHealth() + " health, " + food + " food in his pouch, orders: "
+                        + net.aiagent256.stormhold.holding.Orders.mode(owner()).name().toLowerCase() + "."), true);
+                return;
+            }
+            net.minecraftforge.network.NetworkHooks.openScreen(player, new net.minecraft.world.SimpleMenuProvider(
+                    (id, inv, p) -> new net.aiagent256.stormhold.menu.SoldierMenu(id, inv, new net.aiagent256.stormhold.menu.SoldierKit(this), this),
+                    net.minecraft.network.chat.Component.literal(baseName())), buf -> buf.writeVarInt(this.getId()));
+            return;
+        }
+        if (held.isEdible() || isDrinkable(held)) {
+            if (getHealth() < getMaxHealth()) {
+                ItemStack use = player.getAbilities().instabuild ? held.copy() : held;
+                boolean potion = isDrinkable(use);
+                if (consume(use) && potion && !player.getAbilities().instabuild) {
+                    ItemStack bottle = new ItemStack(Items.GLASS_BOTTLE);
+                    if (!player.getInventory().add(bottle)) player.drop(bottle, false);
+                }
+                player.displayClientMessage(net.minecraft.network.chat.Component.literal(baseName() + " is at " + (int) Math.ceil(getHealth())
+                        + "/" + (int) getMaxHealth() + "."), true);
+            } else {
+                ItemStack rest = stow(player.getAbilities().instabuild ? held.copy() : held);
+                player.displayClientMessage(net.minecraft.network.chat.Component.literal(rest.isEmpty() || rest.getCount() < held.getCount()
+                        ? baseName() + " stows it in his pouch." : baseName() + "'s pouch is full."), true);
+            }
+            return;
+        }
+        EquipmentSlot slot = gearSlot(held);
+        if (slot != null) {
+            ItemStack old = this.getItemBySlot(slot).copy();
+            this.setItemSlot(slot, player.getAbilities().instabuild ? held.copyWithCount(1) : held.split(1));
+            this.setDropChance(slot, 0.0F);
+            if (!old.isEmpty() && !player.getInventory().add(old)) player.drop(old, false);
+            this.playSound(SoundEvents.ARMOR_EQUIP_IRON, 1.0F, 1.0F);
+            player.displayClientMessage(net.minecraft.network.chat.Component.literal(baseName() + " takes the "
+                    + this.getItemBySlot(slot).getHoverName().getString() + "."), true);
+            return;
+        }
+        player.displayClientMessage(net.minecraft.network.chat.Component.literal(baseName() + " has no use for that. Empty hand opens his kit."), true);
+    }
+
+    /** Where a piece of gear goes on a soldier, or null if it isn't gear. */
+    @Nullable
+    public static EquipmentSlot gearSlot(ItemStack s) {
+        if (s.isEmpty()) return null;
+        EquipmentSlot es = Mob.getEquipmentSlotForItem(s);
+        if (es.getType() == EquipmentSlot.Type.ARMOR) return es;
+        if (s.getItem() instanceof ShieldItem) return EquipmentSlot.OFFHAND;
+        var it = s.getItem();
+        if (it instanceof net.minecraft.world.item.SwordItem || it instanceof net.minecraft.world.item.AxeItem
+                || it instanceof net.minecraft.world.item.ProjectileWeaponItem || it instanceof net.minecraft.world.item.TridentItem
+                || it instanceof net.minecraft.world.item.TieredItem) return EquipmentSlot.MAINHAND;
+        return null;
+    }
+
+    public static boolean isDrinkable(ItemStack s) {
+        return s.getItem() instanceof net.minecraft.world.item.PotionItem
+                && !(s.getItem() instanceof net.minecraft.world.item.ThrowablePotionItem);
+    }
+
+    /** Put food in the pouch; returns what didn't fit (the same stack, shrunk). */
+    public ItemStack stow(ItemStack s) {
+        for (int i = 0; i < pouch.size() && !s.isEmpty(); i++) {
+            ItemStack p = pouch.get(i);
+            if (p.isEmpty()) {
+                pouch.set(i, s.split(s.getCount()));
+            } else if (ItemStack.isSameItemSameTags(p, s) && p.getCount() < p.getMaxStackSize()) {
+                int n = Math.min(s.getCount(), p.getMaxStackSize() - p.getCount());
+                p.grow(n);
+                s.shrink(n);
+            }
+        }
+        return s;
+    }
+
+    /** Eat or drink one of {@code s} (shrinking it) and heal. False if it isn't food or drink. */
+    public boolean consume(ItemStack s) {
+        if (s.isEmpty()) return false;
+        ItemStack shown = s.copyWithCount(1);
+        if (s.isEdible()) {
+            var food = s.getFoodProperties(this);
+            float heal = food == null ? 2 : Math.max(2, food.getNutrition() * 1.5F);
+            this.eat(this.level(), s);
+            this.heal(heal);
+        } else if (isDrinkable(s)) {
+            for (var e : net.minecraft.world.item.alchemy.PotionUtils.getMobEffects(s)) {
+                if (e.getEffect().isInstantenous()) e.getEffect().applyInstantenousEffect(this, this, this, e.getAmplifier(), 1.0D);
+                else this.addEffect(new net.minecraft.world.effect.MobEffectInstance(e));
+            }
+            s.shrink(1);
+            this.playSound(SoundEvents.GENERIC_DRINK, 1.0F, 1.0F);
+        } else {
+            return false;
+        }
+        if (this.level() instanceof net.minecraft.server.level.ServerLevel sl) {
+            sl.sendParticles(new net.minecraft.core.particles.ItemParticleOption(net.minecraft.core.particles.ParticleTypes.ITEM, shown),
+                    this.getX(), this.getEyeY() - 0.2, this.getZ(), 8, 0.2, 0.1, 0.2, 0.05);
+        }
+        shownHealth = -1;
+        return true;
+    }
+
+    /** A company man looks after himself: slow healing out of a fight, and his pouch when he's badly hurt. */
+    private void tickCare() {
+        if (eatCooldown > 0) eatCooldown--;
+        boolean calm = this.getTarget() == null && this.tickCount - lastDamagedTick > 100;
+        if (calm && this.tickCount % 40 == 0 && this.getHealth() < this.getMaxHealth()) this.heal(1.0F);
+        if (eatCooldown <= 0 && this.getHealth() < this.getMaxHealth() * 0.5F) {
+            for (ItemStack s : pouch) {
+                if (consume(s)) {
+                    eatCooldown = 80;
+                    break;
+                }
+            }
+        }
+        if (this.tickCount % 20 == 0) {
+            int hp = (int) Math.ceil(this.getHealth());
+            if (hp != shownHealth) {
+                shownHealth = hp;
+                this.setCustomName(net.minecraft.network.chat.Component.literal(baseName() + " ")
+                        .append(net.minecraft.network.chat.Component.literal("\u2764" + hp).withStyle(net.minecraft.ChatFormatting.RED)));
+            }
+        }
+    }
+
+    /** A company man drops everything he carries: it's the lord's kit. */
+    @Override
+    protected void dropCustomDeathLoot(DamageSource src, int looting, boolean recentlyHit) {
+        if (owner() == null) {
+            super.dropCustomDeathLoot(src, looting, recentlyHit);
+            return;
+        }
+        for (EquipmentSlot s : EquipmentSlot.values()) {
+            ItemStack st = this.getItemBySlot(s);
+            if (!st.isEmpty()) {
+                this.spawnAtLocation(st.copy());
+                this.setItemSlot(s, ItemStack.EMPTY);
+            }
+        }
+        for (int i = 0; i < pouch.size(); i++) {
+            if (!pouch.get(i).isEmpty()) this.spawnAtLocation(pouch.get(i).copy());
+            pouch.set(i, ItemStack.EMPTY);
+        }
     }
 
     @Override
@@ -362,8 +580,19 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         if (alarmTicks > 0) alarmTicks--;
         if (backOffTicks > 0) backOffTicks--;
         if (sortieTicks > 0) sortieTicks--;
+        if (owner() != null) {
+            tickCare();
+            // a marked target overrides whatever he picked for himself
+            var order = net.aiagent256.stormhold.holding.Orders.peek(owner());
+            if (order != null && order.target != null && this.tickCount % 10 == 0
+                    && this.level() instanceof net.minecraft.server.level.ServerLevel sl
+                    && sl.getEntity(order.target) instanceof LivingEntity marked && marked.isAlive() && marked != this
+                    && this.getTarget() != marked && marked.distanceToSqr(this) < 48 * 48) {
+                this.setTarget(marked);
+            }
+        }
         // in a company: take up whatever is attacking the player, or whatever they just hit
-        if (owner != null && this.tickCount % 10 == 0 && (this.getTarget() == null || !this.getTarget().isAlive())) {
+        if (owner() != null && this.tickCount % 10 == 0 && (this.getTarget() == null || !this.getTarget().isAlive())) {
             Player p = ownerPlayer();
             if (p != null) {
                 LivingEntity foe = p.getLastHurtByMob();
@@ -456,7 +685,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     /** Garrisons are re-created from holding counts, so never write them to chunk data. A player's company is saved. */
     @Override
     public boolean shouldBeSaved() {
-        return owner != null && !this.isRemoved();
+        return owner() != null && !this.isRemoved();
     }
 
     @Override
@@ -468,7 +697,11 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         tag.putInt("Tier", tier);
         tag.putInt("Renown", renown);
         tag.putInt("Color", color.getId());
-        if (owner != null) tag.putUUID("Owner", owner);
+        if (owner() != null) tag.putUUID("Owner", owner());
+        if (!baseName.isEmpty()) tag.putString("BaseName", baseName);
+        net.minecraft.nbt.ListTag pt = new net.minecraft.nbt.ListTag();
+        for (ItemStack st : pouch) pt.add(st.save(new CompoundTag()));
+        tag.put("Pouch", pt);
     }
 
     @Override
@@ -480,6 +713,9 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         tier = Math.max(1, tag.getInt("Tier"));
         if (tag.contains("Renown")) renown = Math.max(1, Math.min(5, tag.getInt("Renown")));
         color = DyeColor.byId(tag.getInt("Color"));
-        if (tag.hasUUID("Owner")) owner = tag.getUUID("Owner");
+        if (tag.hasUUID("Owner")) setOwner(tag.getUUID("Owner"));
+        baseName = tag.getString("BaseName");
+        var pt = tag.getList("Pouch", 10);
+        for (int i = 0; i < pouch.size() && i < pt.size(); i++) pouch.set(i, ItemStack.of(pt.getCompound(i)));
     }
 }

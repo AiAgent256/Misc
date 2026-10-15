@@ -117,6 +117,9 @@ public class Holding {
     public record FiefBuilding(String piece, BoundingBox box) {
     }
 
+    /** Working faces of the fief's mines, keyed by the mine building's corner. */
+    public final Map<Long, Produce.Dig> digs = new HashMap<>();
+
     /** The Master Builder and his current job. The queue is rebuilt from the plans when needed. */
     /** Days of peace and plenty in a row; growth happens on multiples of it. */
     public int growth;
@@ -320,6 +323,9 @@ public class Holding {
         }
         t.put("Fief", fb);
         t.putInt("FiefTries", fiefTries);
+        CompoundTag dg = new CompoundTag();
+        digs.forEach((k, v) -> dg.put(Long.toString(k), v.save()));
+        t.put("Digs", dg);
         t.putInt("Growth", growth);
         t.putLong("LastRaidAt", lastRaidAt);
         t.putString("Work", work);
@@ -414,6 +420,13 @@ public class Holding {
             if (fb2.length == 6) h.fief.add(new FiefBuilding(bt.getString("Piece"), new BoundingBox(fb2[0], fb2[1], fb2[2], fb2[3], fb2[4], fb2[5])));
         }
         h.fiefTries = t.getInt("FiefTries");
+        CompoundTag dg = t.getCompound("Digs");
+        for (String k : dg.getAllKeys()) {
+            try {
+                h.digs.put(Long.parseLong(k), Produce.Dig.load(dg.getCompound(k)));
+            } catch (Exception ignored) {
+            }
+        }
         h.growth = t.getInt("Growth");
         h.lastRaidAt = t.getLong("LastRaidAt");
         if (t.contains("Work")) h.work = t.getString("Work");

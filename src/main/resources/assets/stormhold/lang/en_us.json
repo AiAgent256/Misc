@@ -27,5 +27,9 @@
   "block.stormhold.muster_post": "Muster Post",
   "block.stormhold.notice_board": "Notice Board",
   "item.stormhold.war_horn": "War Horn",
-  "item.stormhold.war_horn.tip": "Sound it to command your castles from anywhere. Within 128 blocks of one, call its men to you. Sneak-use on open ground to raise a siege tower (48 planks, 8 iron)."
-}\n
+  "item.stormhold.war_horn.tip": "Sound it to command your castles from anywhere. Within 128 blocks of one, call its men to you. Sneak-use on open ground to raise a siege tower (48 planks, 8 iron).",
+  "item.stormhold.marshal_baton": "Marshal's Baton",
+  "item.stormhold.marshal_baton.tip1": "Point at a creature or soldier: your men attack it.",
+  "item.stormhold.marshal_baton.tip2": "Point at a block: they clear the building around it. Sneak: they hold that spot.",
+  "item.stormhold.marshal_baton.tip3": "Point at the sky: follow / aggressive. Sneak: fall in."
+}

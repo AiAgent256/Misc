@@ -19,8 +19,8 @@ import java.util.UUID;
 
 /**
  * The men who ride with the player. Mustering takes soldiers out of a castle's garrison and puts them at the
- * player's side; dismissing sends the ones nearby back into a garrison. With Villager Recruits installed the
- * company is made of its units (so its follow/guard orders apply); otherwise Stormhold's own soldiers follow.
+ * player's side; dismissing sends the ones nearby back into a garrison. The company is made of Stormhold's own
+ * soldiers, who take orders from the Marshal's Baton; the config can hand them to Villager Recruits instead.
  */
 public final class Company {
     /** How close to a castle you must be to call its men to you, or send yours into it. */
@@ -55,13 +55,7 @@ public final class Company {
                 }
             }
             GarrisonEntity standing = leaving != null && level.getEntity(leaving) instanceof GarrisonEntity g ? g : null;
-            boolean ok;
-            if (RecruitsCompat.loaded()) {
-                ok = RecruitsCompat.muster(level, player, role);
-            } else {
-                ok = spawnFollower(level, mgr, player, h, role) != null;
-            }
-            if (!ok) break;
+            if (!arrive(level, mgr, player, h, role)) break;
             if (leaving != null) {
                 h.live.remove(leaving);
                 if (standing != null) {
@@ -77,7 +71,7 @@ public final class Company {
             player.sendSystemMessage(HoldingEvents.gold(done + " " + plural(role, done) + " of " + h.name + " ride with you."));
         } else {
             player.sendSystemMessage(Component.literal(h.count(role) <= KEEP ? h.name + " can't spare any more " + plural(role, 2) + "."
-                    : "No one could be mustered" + (RecruitsCompat.loaded() ? " (Recruits may have reached its unit limit)." : "."))
+                    : "No one could be mustered" + (useRecruits() ? " (Recruits may have reached its unit limit)." : "."))
                     .withStyle(ChatFormatting.RED));
         }
         mgr.setDirty();
@@ -86,8 +80,36 @@ public final class Company {
 
     /** A man from {@code h} joins the player's company at their side (a column arriving, say). */
     public static boolean arrive(ServerLevel level, HoldingManager mgr, Player player, Holding h, Role role) {
-        if (RecruitsCompat.loaded()) return RecruitsCompat.muster(level, player, role);
+        if (useRecruits()) return RecruitsCompat.muster(level, player, role);
         return spawnFollower(level, mgr, player, h, role) != null;
+    }
+
+    /** Hand the company to Villager Recruits instead of Stormhold's own soldiers (config, off by default). */
+    public static boolean useRecruits() {
+        return RecruitsCompat.loaded() && net.aiagent256.stormhold.Config.COMPANY_RECRUITS.get();
+    }
+
+    /** Bread each man takes from the realm's stores for his pouch when he joins. */
+    public static final int RATIONS = 3;
+
+    /**
+     * Make {@code e} one of the player's own men: sworn to them, following them, named, with a few days'
+     * bread in his pouch from the realm's stores if there is any.
+     */
+    public static void enlist(ServerLevel level, HoldingManager mgr, GarrisonEntity e, Player player, @org.jetbrains.annotations.Nullable Holding from) {
+        e.setup(Sides.player(player.getUUID()), null, from != null ? from.tier : e.tier(), from != null ? from.renown : e.renown(),
+                e.color(), null, false);
+        e.setOwner(player.getUUID());
+        e.setPost(null);
+        String name = e.hasCustomName() ? e.getCustomName().getString() : "Ser " + NameGen.first(level.random);
+        e.setBaseName(name);
+        var bread = new net.minecraft.resources.ResourceLocation("minecraft", "bread");
+        int have = Stores.realmStock(mgr, from, player.getUUID(), bread);
+        int take = Math.min(RATIONS, have);
+        if (take > 0) {
+            Stores.take(mgr, from, player.getUUID(), bread, take);
+            e.pouch().set(0, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BREAD, take));
+        }
     }
 
     private static GarrisonEntity spawnFollower(ServerLevel level, HoldingManager mgr, Player player, Holding h, Role role) {
@@ -101,10 +123,7 @@ public final class Company {
         if (e == null) return null;
         // spawn() files the soldier under the holding; he belongs to the player now
         h.live.remove(e.getUUID());
-        e.setup(Sides.player(player.getUUID()), null, h.tier, h.renown, e.color(), null, false);
-        e.setOwner(player.getUUID());
-        e.setPost(null);
-        if (role != Role.CAPTAIN) e.setCustomName(Component.literal("Ser " + NameGen.first(level.random)));
+        enlist(level, mgr, e, player, h);
         return e;
     }
 

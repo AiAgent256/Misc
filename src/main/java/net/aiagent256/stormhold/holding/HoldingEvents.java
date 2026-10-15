@@ -91,6 +91,10 @@ public final class HoldingEvents {
         if (!(g.level() instanceof ServerLevel level)) return;
         HoldingManager mgr = HoldingManager.get(level);
         Role role = g.role();
+        if (g.owner() != null) {
+            tell(level, g.owner(), Component.literal(g.baseName() + " has fallen. His kit lies where he died.")
+                    .withStyle(net.minecraft.ChatFormatting.RED));
+        }
         if (g.holdingId() != null) {
             Holding h = mgr.holdings.get(g.holdingId());
             if (h != null && h.live.remove(g.getUUID()) != null) {

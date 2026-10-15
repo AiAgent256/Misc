@@ -554,6 +554,180 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** Your men take orders, wear what you give them, heal, and keep the peace with a friendly house. */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void companyOrdersKitAndCare(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = new net.minecraft.world.entity.player.Player(level, g.absolutePos(new BlockPos(8, 2, 8)), 0.0F,
+                new com.mojang.authlib.GameProfile(UUID.randomUUID(), "stormhold-company")) {
+            @Override public boolean isSpectator() { return false; }
+            @Override public boolean isCreative() { return false; }
+        };
+        BlockPos at = g.absolutePos(new BlockPos(8, 2, 8));
+        player.moveTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, 0, 0);
+        GarrisonEntity man = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(6, 2, 6)), Sides.player(player.getUUID()), false);
+        GarrisonEntity guard = null;
+        net.minecraft.world.entity.monster.Zombie near = null, far = null;
+        if (man == null) throw new IllegalStateException("no man");
+        try {
+            net.aiagent256.stormhold.holding.Company.enlist(level, mgr, man, player, null);
+            if (!player.getUUID().equals(man.owner()) || man.baseName().isEmpty()) throw new IllegalStateException("not enlisted");
+            // kit
+            var kit = new net.aiagent256.stormhold.menu.SoldierKit(man);
+            var chest = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIAMOND_CHESTPLATE);
+            if (net.aiagent256.stormhold.menu.SoldierKit.allowed(0, chest) || !net.aiagent256.stormhold.menu.SoldierKit.allowed(1, chest))
+                throw new IllegalStateException("kit slot rules wrong for a chestplate");
+            if (net.aiagent256.stormhold.menu.SoldierKit.allowed(6, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIRT)))
+                throw new IllegalStateException("dirt allowed in the pouch");
+            kit.setItem(1, chest);
+            if (!man.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).is(net.minecraft.world.item.Items.DIAMOND_CHESTPLATE))
+                throw new IllegalStateException("kit did not dress him");
+            // healing from the pouch
+            man.setHealth(6);
+            man.pouch().set(0, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BREAD, 3));
+            if (!man.consume(man.pouch().get(0)) || man.getHealth() <= 6 || man.pouch().get(0).getCount() != 2)
+                throw new IllegalStateException("eating did not heal: " + man.getHealth() + " pouch " + man.pouch().get(0));
+            // peace with a friendly house, war with a wary one
+            String houseId = "companypeace";
+            mgr.house(houseId).disposition = 0;
+            mgr.standing.remove(houseId);
+            guard = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(9, 2, 9)), Sides.house(houseId), false);
+            if (!man.isHostileTo(guard) || !guard.isHostileTo(man)) throw new IllegalStateException("a wary house's guard and your man ignored each other");
+            net.aiagent256.stormhold.house.Standing.change(level, mgr, houseId, player.getUUID(), 60, "test");
+            guard.discard();
+            guard = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(9, 2, 10)), Sides.house(houseId), false);
+            man.discard();
+            man = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(6, 2, 6)), Sides.player(player.getUUID()), false);
+            net.aiagent256.stormhold.holding.Company.enlist(level, mgr, man, player, null);
+            if (man.isHostileTo(guard) || guard.isHostileTo(man)) throw new IllegalStateException("your man and a friendly house's guard fought");
+            // clearing a building: only foes inside count, and it reports clear once they're gone
+            BlockPos room = g.absolutePos(new BlockPos(3, 2, 3));
+            near = net.minecraft.world.entity.EntityType.ZOMBIE.create(level);
+            near.moveTo(room.getX() + 0.5, room.getY(), room.getZ() + 0.5, 0, 0);
+            level.addFreshEntity(near);
+            far = net.minecraft.world.entity.EntityType.ZOMBIE.create(level);
+            far.moveTo(room.getX() + 40.5, room.getY(), room.getZ() + 0.5, 0, 0);
+            level.addFreshEntity(far);
+            var order = net.aiagent256.stormhold.holding.Orders.of(player.getUUID());
+            order.mode = net.aiagent256.stormhold.holding.Orders.Mode.CLEAR;
+            order.pos = room;
+            order.since = level.getGameTime();
+            if (!man.isHostileTo(near)) throw new IllegalStateException("zombie in the room not a target");
+            if (man.isHostileTo(far)) throw new IllegalStateException("zombie 40 blocks off counted as in the room");
+            net.aiagent256.stormhold.holding.Orders.tickClear(level, player, order, level.getGameTime());
+            if (man.getTarget() != near) throw new IllegalStateException("man not sent at the zombie in the room");
+            near.discard();
+            man.moveTo(room.getX() + 0.5, room.getY(), room.getZ() + 0.5, 0, 0);
+            man.setTarget(null);
+            for (int i = 0; i < 3; i++) net.aiagent256.stormhold.holding.Orders.tickClear(level, player, order, level.getGameTime());
+            if (order.mode != net.aiagent256.stormhold.holding.Orders.Mode.FOLLOW) throw new IllegalStateException("room never reported clear");
+            // following: only what's close to the lord
+            if (man.isHostileTo(far)) throw new IllegalStateException("following man would chase a zombie 40 blocks off");
+            net.aiagent256.stormhold.holding.Orders.attack(level, player, far);
+            if (man.getTarget() != far) throw new IllegalStateException("attack order ignored");
+        } finally {
+            net.aiagent256.stormhold.holding.Orders.forget(player.getUUID());
+            if (man != null) man.discard();
+            if (guard != null) guard.discard();
+            if (near != null) near.discard();
+            if (far != null) far.discard();
+        }
+        g.succeed();
+    }
+
+    /** The mine digs a real tunnel and pays in what it digs; the pen breeds and the butcher culls; ripe crops are cut. */
+    @GameTest(template = "arena", timeoutTicks = 600)
+    public static void fiefWorkIsReal(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        int cx = -6000 - (int) (Math.floorMod(g.absolutePos(BlockPos.ZERO).asLong(), 7L)) * 300, cz = 6000;
+        int cc = cx >> 4, ccz = cz >> 4;
+        for (int dx = -7; dx <= 7; dx++) {
+            for (int dz = -7; dz <= 7; dz++) {
+                level.setChunkForced(cc + dx, ccz + dz, true);
+                level.getChunk(cc + dx, ccz + dz);
+            }
+        }
+        int y = 80;
+        for (int x = cx - 95; x <= cx + 95; x++) {
+            for (int z = cz - 95; z <= cz + 95; z++) {
+                for (int yy = y - 24; yy < y - 3; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(), 2);
+                for (int yy = y - 3; yy < y - 1; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), 2);
+                level.setBlock(new BlockPos(x, y - 1, z), net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(), 2);
+                for (int yy = y; yy < y + 24; yy++) {
+                    if (!level.getBlockState(new BlockPos(x, yy, z)).isAir()) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
+                }
+            }
+        }
+        // a seam of iron for the miners to find
+        for (int x = cx - 95; x <= cx + 95; x++) {
+            for (int z = cz - 95; z <= cz + 95; z++) {
+                if ((x + z) % 3 != 0) continue;
+                for (int yy = y - 14; yy <= y - 10; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.IRON_ORE.defaultBlockState(), 2);
+            }
+        }
+        Holding h = sample(g);
+        h.box = new BoundingBox(cx - 8, y, cz - 8, cx + 7, y + 7, cz + 7);
+        h.gatePos = new BlockPos(cx, y, cz + 8);
+        h.owner = Sides.player(UUID.randomUUID());
+        mgr.add(h);
+        var area = new net.minecraft.world.phys.AABB(new BlockPos(cx, y, cz)).inflate(110, 60, 110);
+        try {
+            var minePiece = net.aiagent256.stormhold.holding.DataRegistries.fiefPiece("mine");
+            var penPiece = net.aiagent256.stormhold.holding.DataRegistries.fiefPiece("pasture");
+            boolean mineOk = false, penOk = false;
+            for (int i = 0; i < 40 && !mineOk; i++) mineOk = net.aiagent256.stormhold.holding.Fief.place(level, mgr, h, minePiece);
+            for (int i = 0; i < 40 && !penOk; i++) penOk = net.aiagent256.stormhold.holding.Fief.place(level, mgr, h, penPiece);
+            if (!mineOk || !penOk) throw new IllegalStateException("could not place mine " + mineOk + " pasture " + penOk);
+            Holding.FiefBuilding mine = h.fief.stream().filter(b -> b.piece().equals("mine")).findFirst().orElseThrow();
+            Holding.FiefBuilding pen = h.fief.stream().filter(b -> b.piece().equals("pasture")).findFirst().orElseThrow();
+            // the mine
+            var d = net.aiagent256.stormhold.holding.Produce.dig(level, h, mine);
+            if (d == null) throw new IllegalStateException("no working face found in the mine at " + mine.box());
+            BlockPos first = d.next;
+            java.util.Map<String, Integer> made = new java.util.HashMap<>();
+            for (int i = 0; i < 40; i++) net.aiagent256.stormhold.holding.Produce.slice(level, d, made);
+            Stormhold.LOGGER.info("Mine test: dug {} slices, {} down, {} turns, made {}", d.dug, d.down, d.turns, made);
+            if (d.dug < 30) throw new IllegalStateException("mine dug only " + d.dug + " slices (turns " + d.turns + ", done " + d.done + ")");
+            if (!level.getBlockState(first.above()).isAir()) throw new IllegalStateException("first slice not cut at " + first);
+            if (made.getOrDefault("cobblestone", 0) < 100) throw new IllegalStateException("mine yielded " + made);
+            if (made.getOrDefault("iron_ingot", 0) < 1) throw new IllegalStateException("mine never reached the iron: " + made + ", " + d.down + " down");
+            // the herd
+            var herd0 = level.getEntitiesOfClass(net.minecraft.world.entity.animal.Animal.class, net.minecraft.world.phys.AABB.of(pen.box()).inflate(1, 4, 1));
+            if (herd0.size() < 6) throw new IllegalStateException("pen has " + herd0.size() + " beasts");
+            int born = net.aiagent256.stormhold.holding.Produce.breed(level, pen, 2);
+            if (born < 1) throw new IllegalStateException("no young in a pen of " + herd0.size());
+            BlockPos inPen = pen.box().getCenter();
+            for (int i = 0; i < 10; i++) {
+                var cow = net.minecraft.world.entity.EntityType.COW.create(level);
+                cow.moveTo(inPen.getX() + 0.5, pen.box().minY() + 4, inPen.getZ() + 0.5, 0, 0);
+                level.addFreshEntity(cow);
+            }
+            java.util.Map<String, Integer> meat = new java.util.HashMap<>();
+            int culled = net.aiagent256.stormhold.holding.Produce.cull(level, pen, meat);
+            if (culled < 1 || meat.getOrDefault("cooked_beef", 0) < 3) throw new IllegalStateException("butcher took " + culled + ": " + meat);
+            // the field
+            BlockPos f0 = new BlockPos(cx + 30, y, cz - 40);
+            for (int i = 0; i < 5; i++) {
+                level.setBlock(f0.offset(i, -1, 0), net.minecraft.world.level.block.Blocks.FARMLAND.defaultBlockState(), 2);
+                level.setBlock(f0.offset(i, 0, 0), ((net.minecraft.world.level.block.CropBlock) net.minecraft.world.level.block.Blocks.WHEAT).getStateForAge(7), 2);
+            }
+            java.util.Map<String, Integer> crop = new java.util.HashMap<>();
+            int cut = net.aiagent256.stormhold.holding.Produce.harvest(level, new BoundingBox(f0.getX() - 1, y - 2, f0.getZ() - 1, f0.getX() + 6, y + 2, f0.getZ() + 1), crop);
+            if (cut != 5 || crop.getOrDefault("wheat", 0) != 5) throw new IllegalStateException("harvest cut " + cut + ": " + crop);
+            if (level.getBlockState(f0).getValue(net.minecraft.world.level.block.CropBlock.AGE) != 0)
+                throw new IllegalStateException("wheat not replanted");
+        } finally {
+            for (var e : level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, area, e -> !(e instanceof net.minecraft.world.entity.player.Player))) e.discard();
+            Garrisons.discardLive(level, h.live, false);
+            mgr.holdings.remove(h.id);
+            mgr.byKey.remove(h.key);
+            for (int dx = -7; dx <= 7; dx++) for (int dz = -7; dz <= 7; dz++) level.setChunkForced(cc + dx, ccz + dz, false);
+        }
+        g.succeed();
+    }
+
     /** A hamlet of commoners grows outside a watchtower's walls and its people fill the stores. */
     @GameTest(template = "arena", timeoutTicks = 600)
     public static void fiefGrowsAndProduces(GameTestHelper g) {

@@ -105,11 +105,11 @@ public final class City {
                     .withStyle(ChatFormatting.RED), true);
             return;
         }
-        boolean viaRecruits = RecruitsCompat.loaded() && RecruitsCompat.muster(level, p, r);
+        boolean viaRecruits = Company.useRecruits() && RecruitsCompat.muster(level, p, r);
         if (!viaRecruits) {
             BlockPos at = Garrisons.standable(level, p.blockPosition().east(2));
             GarrisonEntity e = Garrisons.spawn(level, mgr, null, r, at != null ? at : p.blockPosition(), Sides.player(p.getUUID()), false);
-            if (e != null) e.setCustomName(Component.literal("Ser " + NameGen.first(level.random)));
+            if (e != null) Company.enlist(level, mgr, e, p, null);
         }
         level.playSound(null, post, SoundEvents.VILLAGER_YES, SoundSource.PLAYERS, 1.0F, 1.0F);
         p.displayClientMessage(Component.literal("A " + r.name().toLowerCase() + " of " + h.name + " takes your coin"

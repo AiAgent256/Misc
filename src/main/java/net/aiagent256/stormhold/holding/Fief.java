@@ -98,7 +98,7 @@ public final class Fief {
     private record Site(int x, int z, int y, Rotation rot) {
     }
 
-    static boolean place(ServerLevel level, HoldingManager mgr, Holding h, FiefPiece piece) {
+    public static boolean place(ServerLevel level, HoldingManager mgr, Holding h, FiefPiece piece) {
         var tmpl = level.getStructureManager().get(new ResourceLocation(Stormhold.MODID, piece.template));
         if (tmpl.isEmpty()) return false;
         StructureTemplate template = tmpl.get();
@@ -351,8 +351,6 @@ public final class Fief {
         h.fiefHerd = herd;
         h.fiefJobs.clear();
         h.fiefJobs.putAll(jobs);
-        int fields = 0;
-        for (Holding.FiefBuilding b : h.fief) if (b.piece().equals("field")) fields++;
         // what they made
         Map<String, Integer> made = new java.util.LinkedHashMap<>();
         double mult = !h.isPlayerOwned() ? 0 : h.mode == Holding.Mode.PRODUCE ? 1.5 : h.mode == Holding.Mode.ATTACK ? 0.75 : 1.0;
@@ -366,13 +364,13 @@ public final class Fief {
                     if (q > 0) made.merge(kv[0], q, Integer::sum);
                 }
             }
-            if (fields > 0) made.merge("wheat", (int) Math.round(4 * fields * mult), Integer::sum);
-            if (herd > 0) {
-                made.merge("leather", (int) Math.round(herd * 0.5 * mult), Integer::sum);
-                made.merge("cooked_beef", (int) Math.round(herd * 0.5 * mult), Integer::sum);
-            }
             for (var e : made.entrySet()) h.addStock(new ResourceLocation("minecraft", e.getKey()), e.getValue());
         }
+        // the real work: what the mine dug, the butcher and shearer took, the fields gave up (already in the stores)
+        Map<String, Integer> real = Produce.daily(level, mgr, h);
+        real.forEach((k, v) -> made.merge(k, v, Integer::sum));
+        int dug = 0;
+        for (Produce.Dig d : h.digs.values()) dug += d.dug;
         StringBuilder sb = new StringBuilder(h.fiefName()).append(" of ").append(pop).append(pop == 1 ? " soul" : " souls");
         if (!jobs.isEmpty()) {
             sb.append(" (");
@@ -385,12 +383,15 @@ public final class Fief {
             sb.append(")");
         }
         if (herd > 0) sb.append(", herd of ").append(herd);
+        if (dug > 0) sb.append(", mine ").append(dug).append(" blocks deep");
         sb.append(".");
         if (!made.isEmpty()) {
             sb.append(" Yesterday:");
             int i = 0;
-            for (var e : made.entrySet()) {
-                if (i++ >= 6) break;
+            List<Map.Entry<String, Integer>> top = new ArrayList<>(made.entrySet());
+            top.sort((a, b) -> b.getValue() - a.getValue());
+            for (var e : top) {
+                if (i++ >= 7) break;
                 sb.append(i > 1 ? ", " : " ").append(e.getValue()).append(" ").append(e.getKey().replace('_', ' '));
             }
             sb.append(".");

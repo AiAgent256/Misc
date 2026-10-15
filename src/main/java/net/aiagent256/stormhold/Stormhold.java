@@ -39,6 +39,7 @@ public class Stormhold {
         ModItems.ITEMS.register(bus);
         ModItems.TABS.register(bus);
         ModEntities.ENTITIES.register(bus);
+        net.aiagent256.stormhold.registry.ModMenus.MENUS.register(bus);
         ModStructures.STRUCTURE_TYPES.register(bus);
         ModStructures.PIECES.register(bus);
         ModStructures.PROCESSORS.register(bus);
