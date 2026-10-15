@@ -15,7 +15,7 @@ import java.util.List;
 
 /** Command every castle you hold: stance, march orders, supply lines, mustering. */
 public class WarTableScreen extends Screen {
-    private static final int W = 430, H = 298;
+    private static final int W = 430, H = 324;
     private Net.WarTableData data;
     private int selected;
     private int page;
@@ -74,7 +74,11 @@ public class WarTableScreen extends Screen {
         HoldingInfo h = current();
         if (h == null) return;
         int rx = x0 + 128;
-        int y = y0 + 92;
+        int y = y0 + 118;
+        this.addRenderableWidget(Button.builder(Component.literal("Expand"), b -> Net.sendAction(h.id(), Net.EXPAND_FIEF, BlockPos.ZERO, 0))
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("The people raise one more building (a pasture, a mine, a mill, "
+                        + "then more cottages) for 32 bread and 8 iron from the stores. More folk, more produce.")))
+                .bounds(rx + 236, y0 + 86, 54, 16).build());
         String[] modes = {"DEFEND", "PRODUCE", "ATTACK"};
         String[] labels = {"Defend", "Produce", "Attack"};
         for (int i = 0; i < 3; i++) {
@@ -260,36 +264,37 @@ public class WarTableScreen extends Screen {
                     + "  Crossbows " + c[3] + "/" + cap[3] + "  Captains " + c[0], rx, y0 + 36, 0xE0D0B0, false);
             g.drawString(this.font, "Stores: " + trim(h.stock(), 56), rx, y0 + 50, 0xC8B898, false);
             g.drawWordWrap(this.font, Component.literal(h.status().isEmpty() ? "Quiet." : h.status()), rx, y0 + 64, W - 136, 0xD8A070);
-            g.drawString(this.font, "Stance", rx, y0 + 82, 0xF0D8A0, false);
-            g.drawString(this.font, "March on", rx, y0 + 131, 0xE0D0B0, false);
-            g.drawString(this.font, "x", rx + 58, y0 + 131, 0xE0D0B0, false);
-            g.drawString(this.font, "z", rx + 114, y0 + 131, 0xE0D0B0, false);
-            g.drawString(this.font, "Supply to", rx, y0 + 161, 0xE0D0B0, false);
-            g.drawString(this.font, "x", rx + 58, y0 + 161, 0xE0D0B0, false);
-            g.drawString(this.font, "y", rx + 114, y0 + 161, 0xE0D0B0, false);
-            g.drawString(this.font, "z", rx + 170, y0 + 161, 0xE0D0B0, false);
-            g.drawString(this.font, "Company", rx, y0 + 191, 0xF0D8A0, false);
+            g.drawWordWrap(this.font, Component.literal(h.fief()), rx, y0 + 86, W - 136 - 60, 0xB8C8A0);
+            g.drawString(this.font, "Stance", rx, y0 + 108, 0xF0D8A0, false);
+            g.drawString(this.font, "March on", rx, y0 + 155, 0xE0D0B0, false);
+            g.drawString(this.font, "x", rx + 58, y0 + 155, 0xE0D0B0, false);
+            g.drawString(this.font, "z", rx + 114, y0 + 155, 0xE0D0B0, false);
+            g.drawString(this.font, "Supply to", rx, y0 + 185, 0xE0D0B0, false);
+            g.drawString(this.font, "x", rx + 58, y0 + 185, 0xE0D0B0, false);
+            g.drawString(this.font, "y", rx + 114, y0 + 185, 0xE0D0B0, false);
+            g.drawString(this.font, "z", rx + 170, y0 + 185, 0xE0D0B0, false);
+            g.drawString(this.font, "Company", rx, y0 + 215, 0xF0D8A0, false);
             String[] roles = {"Knights", "Archers", "Crossbows"};
             int[] c2 = h.counts();
             int[] have = {c2[1], c2[2], c2[3]};
             for (int i = 0; i < 3; i++) {
                 int bx = rx + 52 + i * 70;
-                g.drawString(this.font, roles[i] + " (" + have[i] + ")", bx, y0 + 177, 0xC8B898, false);
-                g.drawCenteredString(this.font, String.valueOf(want[i]), bx + 27, y0 + 191, 0xFFFFFF);
+                g.drawString(this.font, roles[i] + " (" + have[i] + ")", bx, y0 + 201, 0xC8B898, false);
+                g.drawCenteredString(this.font, String.valueOf(want[i]), bx + 27, y0 + 215, 0xFFFFFF);
             }
             boolean near = inCallRange(h);
             g.drawString(this.font, near ? "Men you call appear at your side." + (data.recruits() ? " (Recruits)" : "")
                     : "Too far: get within " + net.aiagent256.stormhold.holding.Company.CALL_RANGE + " blocks of " + trim(h.name(), 14) + ".",
-                    rx, y0 + 231, near ? 0x9C8C6C : 0xD88060, false);
-            g.drawString(this.font, "Armoury", rx, y0 + 247, 0xF0D8A0, false);
+                    rx, y0 + 255, near ? 0x9C8C6C : 0xD88060, false);
+            g.drawString(this.font, "Armoury", rx, y0 + 271, 0xF0D8A0, false);
             var mc = Minecraft.getInstance().player;
             int iron = mc != null ? mc.getInventory().countItem(net.minecraft.world.item.Items.IRON_INGOT) : 0;
             int dia = mc != null ? mc.getInventory().countItem(net.minecraft.world.item.Items.DIAMOND) : 0;
             int neth = mc != null ? mc.getInventory().countItem(net.minecraft.world.item.Items.NETHERITE_INGOT) : 0;
             int lvl = mc != null ? mc.experienceLevel : 0;
-            g.drawString(this.font, "Each: 26 iron | 26 diamond | 26 diamond + 5 netherite", rx, y0 + 264, 0x9C8C6C, false);
-            g.drawString(this.font, "Pack: " + iron + " iron, " + dia + " diamond, " + neth + " netherite, " + lvl + " lvl", rx, y0 + 274, 0x9C8C6C, false);
-            g.drawString(this.font, h.supply() == null ? "No supply line." : "Couriers take surplus to " + h.supply().toShortString() + " daily.", rx, y0 + 284, 0x9C8C6C, false);
+            g.drawString(this.font, "Each: 26 iron | 26 diamond | 26 diamond + 5 netherite", rx, y0 + 290, 0x9C8C6C, false);
+            g.drawString(this.font, "Pack: " + iron + " iron, " + dia + " diamond, " + neth + " netherite, " + lvl + " lvl", rx, y0 + 300, 0x9C8C6C, false);
+            g.drawString(this.font, h.supply() == null ? "No supply line." : "Couriers take surplus to " + h.supply().toShortString() + " daily.", rx, y0 + 310, 0x9C8C6C, false);
         }
         super.render(g, mouseX, mouseY, partial);
     }

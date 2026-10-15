@@ -63,6 +63,10 @@ public final class HoldingTicker {
         if (!h.surroundingsDone && PostScanner.allLoaded(level, h) && level.getServer().getAverageTickTime() < 45f)
             Roads.plan(level, mgr, h);
         Garrisons.materialize(level, mgr, h);
+        if (h.surroundingsDone && Config.FIEFS_ENABLED.get()) {
+            if (h.fiefPlan == null) Fief.plan(h);
+            if (!h.fiefPlan.isEmpty() && now % 40 == 0) Fief.buildNext(level, mgr, h);
+        }
         greet(level, mgr, h);
         if (!h.villagersSpawned) Garrisons.spawnVillagers(level, h);
         HoldingEvents.contest(level, mgr, h);

@@ -24,6 +24,7 @@ public final class DataRegistries {
     private static final Gson GSON = new GsonBuilder().create();
     private static volatile Map<String, Layout> layouts = Map.of();
     private static volatile Map<String, Map<Block, Weighted>> themes = Map.of();
+    private static volatile Map<String, FiefPiece> fief = Map.of();
 
     public record Weighted(Block[] blocks, int[] cumulative, int total) {
         public Block pick(long hash) {
@@ -36,6 +37,35 @@ public final class DataRegistries {
 
     public static Layout layout(String name) {
         return layouts.get(name);
+    }
+
+    public static FiefPiece fiefPiece(String name) {
+        return fief.get(name);
+    }
+
+    public static java.util.Collection<FiefPiece> fiefPieces() {
+        return fief.values();
+    }
+
+    public static class FiefListener extends SimpleJsonResourceReloadListener {
+        public FiefListener() {
+            super(GSON, "fief");
+        }
+
+        @Override
+        protected void apply(Map<ResourceLocation, JsonElement> map, ResourceManager rm, ProfilerFiller p) {
+            Map<String, FiefPiece> out = new HashMap<>();
+            map.forEach((id, json) -> {
+                try {
+                    FiefPiece f = FiefPiece.parse(json.getAsJsonObject());
+                    out.put(f.name, f);
+                } catch (Exception e) {
+                    Stormhold.LOGGER.error("Bad fief piece {}", id, e);
+                }
+            });
+            fief = Map.copyOf(out);
+            Stormhold.LOGGER.info("Stormhold: {} fief pieces", out.size());
+        }
     }
 
     public static Map<Block, Weighted> theme(String name) {

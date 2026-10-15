@@ -36,7 +36,7 @@ public final class Net {
             () -> VERSION, VERSION::equals, VERSION::equals);
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
-            MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15;
+            MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -93,8 +93,13 @@ public final class Net {
                     long days = Math.max(0, (h.nextRaid - level.getGameTime()) / 24000);
                     status.append(h.raidWarned ? "Raid expected within a day." : "Next raid in about " + days + " days.");
                 }
+                String fief = h.fiefReport.isEmpty()
+                        ? (h.fiefPlan != null && !h.fiefPlan.isEmpty() ? "The fief is being laid out: " + h.fiefPlan.size() + " buildings to go."
+                        : h.fief.isEmpty() ? "No fief." : h.fiefName() + " of " + h.fief.size() + " buildings; census at dawn.")
+                        : h.fiefReport;
+                if (h.fiefPlan != null && !h.fiefPlan.isEmpty() && !h.fiefReport.isEmpty()) fief += " Building: " + h.fiefPlan.get(0).replace('_', ' ') + ".";
                 out.add(new HoldingInfo(h.id, h.name, h.tier, h.mode.name(), counts, cap, Economy.stockSummary(h), h.center(),
-                        h.attackTarget, h.supplyTarget, status.toString()));
+                        h.attackTarget, h.supplyTarget, status.toString(), fief));
             }
         }
         return new WarTableData(out, RecruitsCompat.loaded());
@@ -164,6 +169,23 @@ public final class Net {
                         want.put(Role.ARCHER, Math.max(0, Math.min(60, a.pos().getY())));
                         want.put(Role.CROSSBOWMAN, Math.max(0, Math.min(60, a.pos().getZ())));
                         net.aiagent256.stormhold.holding.Columns.send(level, mgr, player, h, want);
+                    }
+                }
+                case EXPAND_FIEF -> {
+                    var bread = new net.minecraft.resources.ResourceLocation("minecraft", "bread");
+                    var iron = new net.minecraft.resources.ResourceLocation("minecraft", "iron_ingot");
+                    if (h.fiefPlan == null) net.aiagent256.stormhold.holding.Fief.plan(h);
+                    if (h.fiefPlan.size() >= 3) {
+                        player.sendSystemMessage(Component.literal("The builders at " + h.name + " already have their hands full."));
+                    } else if (h.stock(bread) < 32 || h.stock(iron) < 8) {
+                        player.sendSystemMessage(Component.literal("Raising a building takes 32 bread and 8 iron from the stores of " + h.name + ".")
+                                .withStyle(net.minecraft.ChatFormatting.RED));
+                    } else {
+                        h.addStock(bread, -32);
+                        h.addStock(iron, -8);
+                        String next = net.aiagent256.stormhold.holding.Fief.nextExtra(h);
+                        h.fiefPlan.add(next);
+                        player.sendSystemMessage(HoldingEvents.gold("The people of " + h.name + " will raise a " + next.replace('_', ' ') + "."));
                     }
                 }
                 case KEEP_WITH_ME -> {

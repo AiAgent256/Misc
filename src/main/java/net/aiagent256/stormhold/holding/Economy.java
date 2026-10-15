@@ -42,12 +42,24 @@ public final class Economy {
     };
 
     public static void tickHolding(ServerLevel level, HoldingManager mgr, Holding h, long now) {
-        if (!h.isPlayerOwned()) return;
-        if (h.mode == Holding.Mode.PRODUCE && now >= h.nextProduce) {
-            for (String g : GOODS[Math.max(1, Math.min(Holding.MAX_TIER, h.tier)) - 1]) {
-                String[] kv = g.split(":");
-                h.addStock(new ResourceLocation("minecraft", kv[0]), Integer.parseInt(kv[1]));
+        if (!h.isPlayerOwned()) {
+            if (!h.fief.isEmpty() && now >= h.nextProduce) {
+                h.nextProduce = now + 24000;
+                Fief.census(level, mgr, h, now);
             }
+            return;
+        }
+        if (now >= h.nextProduce) {
+            // the castle's own stores: the full ration only where there's no fief to feed it
+            double own = h.fief.isEmpty() ? 1.0 : 0.3;
+            if (h.mode == Holding.Mode.PRODUCE) {
+                for (String g : GOODS[Math.max(1, Math.min(Holding.MAX_TIER, h.tier)) - 1]) {
+                    String[] kv = g.split(":");
+                    int n = (int) Math.round(Integer.parseInt(kv[1]) * own);
+                    if (n > 0) h.addStock(new ResourceLocation("minecraft", kv[0]), n);
+                }
+            }
+            Fief.census(level, mgr, h, now);
             h.nextProduce = now + 24000;
             if (h.supplyTarget != null) ship(level, mgr, h);
             mgr.setDirty();

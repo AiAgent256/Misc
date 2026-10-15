@@ -5,6 +5,7 @@ import net.aiagent256.stormhold.Sides;
 import net.aiagent256.stormhold.entity.Role;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
@@ -104,6 +105,32 @@ public class Holding {
     public boolean villagersSpawned;
     public boolean bannersDirty = true;
     public boolean surroundingsDone;
+    /** The fief: what's still to build (piece names), what stands (name + box), and the last census. */
+    @Nullable public List<String> fiefPlan;
+    public final List<FiefBuilding> fief = new ArrayList<>();
+    public int fiefTries;
+    public String fiefReport = "";
+    public int fiefPop;
+    public final Map<String, Integer> fiefJobs = new java.util.LinkedHashMap<>();
+    public int fiefHerd;
+
+    public record FiefBuilding(String piece, BoundingBox box) {
+    }
+
+    public int fiefLevel() {
+        int cottages = 0;
+        for (FiefBuilding b : fief) if (b.piece().startsWith("cottage")) cottages++;
+        return fief.isEmpty() ? 0 : cottages >= 6 ? 3 : cottages >= 4 ? 2 : 1;
+    }
+
+    public String fiefName() {
+        return switch (fiefLevel()) {
+            case 3 -> "Town";
+            case 2 -> "Village";
+            case 1 -> "Hamlet";
+            default -> "No fief";
+        };
+    }
     @Nullable public String contestSide;
     public int contestProgress;
     public int contestDefenders;
@@ -265,6 +292,26 @@ public class Holding {
         t.putBoolean("Villagers", villagersSpawned);
         t.putBoolean("BannersDirty", bannersDirty);
         t.putBoolean("Surroundings", surroundingsDone);
+        if (fiefPlan != null) {
+            ListTag fp = new ListTag();
+            for (String n : fiefPlan) fp.add(StringTag.valueOf(n));
+            t.put("FiefPlan", fp);
+        }
+        ListTag fb = new ListTag();
+        for (FiefBuilding b : fief) {
+            CompoundTag bt = new CompoundTag();
+            bt.putString("Piece", b.piece());
+            bt.putIntArray("Box", new int[]{b.box().minX(), b.box().minY(), b.box().minZ(), b.box().maxX(), b.box().maxY(), b.box().maxZ()});
+            fb.add(bt);
+        }
+        t.put("Fief", fb);
+        t.putInt("FiefTries", fiefTries);
+        t.putString("FiefReport", fiefReport);
+        t.putInt("FiefPop", fiefPop);
+        t.putInt("FiefHerd", fiefHerd);
+        CompoundTag fj = new CompoundTag();
+        fiefJobs.forEach(fj::putInt);
+        t.put("FiefJobs", fj);
         return t;
     }
 
@@ -336,6 +383,21 @@ public class Holding {
         h.villagersSpawned = t.getBoolean("Villagers");
         h.bannersDirty = t.getBoolean("BannersDirty");
         h.surroundingsDone = t.getBoolean("Surroundings");
+        if (t.contains("FiefPlan")) {
+            h.fiefPlan = new ArrayList<>();
+            for (var e : t.getList("FiefPlan", 8)) h.fiefPlan.add(e.getAsString());
+        }
+        for (var e : t.getList("Fief", 10)) {
+            CompoundTag bt = (CompoundTag) e;
+            int[] b = bt.getIntArray("Box");
+            if (b.length == 6) h.fief.add(new FiefBuilding(bt.getString("Piece"), new BoundingBox(b[0], b[1], b[2], b[3], b[4], b[5])));
+        }
+        h.fiefTries = t.getInt("FiefTries");
+        h.fiefReport = t.getString("FiefReport");
+        h.fiefPop = t.getInt("FiefPop");
+        h.fiefHerd = t.getInt("FiefHerd");
+        CompoundTag fj = t.getCompound("FiefJobs");
+        for (String k : fj.getAllKeys()) h.fiefJobs.put(k, fj.getInt(k));
         return h;
     }
 

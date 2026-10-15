@@ -23,6 +23,7 @@ public final class Config {
     public static final ForgeConfigSpec.BooleanValue ROADS_ENABLED;
     public static final ForgeConfigSpec.IntValue ROAD_MAX_CHUNKS;
     public static final ForgeConfigSpec.BooleanValue VILLAGERS_ENABLED;
+    public static final ForgeConfigSpec.BooleanValue FIEFS_ENABLED;
     public static final ForgeConfigSpec.BooleanValue EPIC_KNIGHTS_GEAR;
 
     static {
@@ -64,6 +65,7 @@ public final class Config {
         MATERIALIZE_DISTANCE = b.comment("Garrisons appear when a player is this many blocks from a castle's edge.")
                 .defineInRange("materializeDistance", 72, 24, 256);
         VILLAGERS_ENABLED = b.comment("Villagers live and work inside castles.").define("villagers", true);
+        FIEFS_ENABLED = b.comment("A hamlet, village or town of commoners grows around every castle and feeds its stores.").define("fiefs", true);
         EPIC_KNIGHTS_GEAR = b.comment("Use Epic Knights armor for garrisons when that mod is installed.").define("epicKnightsGear", true);
         b.pop();
         b.push("raids");

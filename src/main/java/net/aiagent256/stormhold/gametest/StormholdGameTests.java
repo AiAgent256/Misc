@@ -513,6 +513,61 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** A hamlet of commoners grows outside a watchtower's walls and its people fill the stores. */
+    @GameTest(template = "arena", timeoutTicks = 600)
+    public static void fiefGrowsAndProduces(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        // somewhere of our own, so the buildings can't land on another test's arena
+        int cx = 4000 + (int) (g.absolutePos(BlockPos.ZERO).asLong() % 7) * 300, cz = 4000;
+        int cc = cx >> 4, ccz = cz >> 4;
+        for (int dx = -6; dx <= 6; dx++) {
+            for (int dz = -6; dz <= 6; dz++) {
+                level.setChunkForced(cc + dx, ccz + dz, true);
+                level.getChunk(cc + dx, ccz + dz);   // blocks until it's really there
+            }
+        }
+        Holding h = sample(g);
+        int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, cx, cz);
+        h.box = new BoundingBox(cx - 8, y, cz - 8, cx + 7, y + 7, cz + 7);
+        h.gatePos = new BlockPos(cx, y, cz + 8);
+        h.owner = Sides.player(g.makeMockPlayer().getUUID());
+        h.surroundingsDone = true;
+        mgr.add(h);
+        try {
+            net.aiagent256.stormhold.holding.Fief.plan(h);
+            if (h.fiefPlan == null || h.fiefPlan.size() != 3) throw new IllegalStateException("hamlet plan " + h.fiefPlan);
+            for (int i = 0; i < 80 && !h.fiefPlan.isEmpty(); i++) net.aiagent256.stormhold.holding.Fief.buildNext(level, mgr, h);
+            if (h.fief.size() != 3) throw new IllegalStateException("built " + h.fief.size() + " of 3: " + h.fief + " plan left " + h.fiefPlan);
+            int beds = 0;
+            for (var b : h.fief) {
+                if (!b.piece().startsWith("cottage")) continue;
+                for (int x = b.box().minX(); x <= b.box().maxX(); x++)
+                    for (int yy = b.box().minY(); yy <= b.box().maxY(); yy++)
+                        for (int z = b.box().minZ(); z <= b.box().maxZ(); z++)
+                            if (level.getBlockState(new BlockPos(x, yy, z)).getBlock() instanceof net.minecraft.world.level.block.BedBlock) beds++;
+            }
+            if (beds < 4) throw new IllegalStateException("cottages have " + beds + " bed blocks");
+            var folk = level.getEntitiesOfClass(net.minecraft.world.entity.npc.Villager.class,
+                    new net.minecraft.world.phys.AABB(new BlockPos(cx, y, cz)).inflate(120, 60, 120));
+            if (folk.size() < 4) throw new IllegalStateException("only " + folk.size() + " villagers");
+            if (!h.posts.get(Role.KNIGHT).stream().anyMatch(p -> !h.box.isInside(p))) throw new IllegalStateException("no patrol post outside the walls");
+            net.aiagent256.stormhold.holding.Fief.census(level, mgr, h, level.getGameTime());
+            if (h.fiefPop < 4 || !h.fiefJobs.containsKey("farmer")) throw new IllegalStateException("census: " + h.fiefReport);
+            if (h.stock(new net.minecraft.resources.ResourceLocation("minecraft:bread")) <= 0) throw new IllegalStateException("farmers made no bread: " + h.fiefReport);
+            Stormhold.LOGGER.info("Fief test: {}", h.fiefReport);
+            for (var v : folk) v.discard();
+            for (var a : level.getEntitiesOfClass(net.minecraft.world.entity.animal.Animal.class,
+                    new net.minecraft.world.phys.AABB(new BlockPos(cx, y, cz)).inflate(120, 60, 120))) a.discard();
+        } finally {
+            Garrisons.discardLive(level, h.live, false);
+            mgr.holdings.remove(h.id);
+            mgr.byKey.remove(h.key);
+            for (int dx = -6; dx <= 6; dx++) for (int dz = -6; dz <= 6; dz++) level.setChunkForced(cc + dx, ccz + dz, false);
+        }
+        g.succeed();
+    }
+
     /** A column rides to the player on the clock and the men fall in on arrival. */
     @GameTest(template = "arena")
     public static void columnRidesToPlayer(GameTestHelper g) {

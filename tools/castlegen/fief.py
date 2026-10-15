@@ -363,7 +363,7 @@ def dock():
     """A fishing jetty: the placer puts the far end over water (+z)."""
     W, D, GL = 7, 17, 4
     g = _base(W, D, H=12, GL=GL, seed=111)
-    g.fill(0, 0, 6, W - 1, GL - 1, D - 1, "minecraft:air")
+    g.fill(0, 0, 6, W - 1, GL - 1, D - 1, "<void>")
     g.fill(2, GL - 1, 0, 4, GL - 1, 5, "minecraft:spruce_planks")
     g.fill(2, GL - 1, 6, 4, GL - 1, D - 1, "minecraft:spruce_planks")
     for z in range(6, D, 3):

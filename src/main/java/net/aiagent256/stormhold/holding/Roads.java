@@ -14,6 +14,7 @@ import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 
 import java.util.ArrayDeque;
 import java.util.HashMap;
@@ -195,7 +196,12 @@ public final class Roads {
             int pz = c.getZ() + (int) (Math.sin(ang) * (rz + 12) * dist);
             if (h.box.inflatedBy(6).isInside(new BlockPos(px, h.box.minY() + 5, pz))) continue;
             boolean orchard = placed == plots - 1 && rnd.nextBoolean();
-            if (plot(level, h, px, pz, 9 + rnd.nextInt(4), 7 + rnd.nextInt(4), orchard, rnd)) placed++;
+            int w = 9 + rnd.nextInt(4), d = 7 + rnd.nextInt(4);
+            if (plot(level, h, px, pz, w, d, orchard, rnd)) {
+                placed++;
+                int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, px, pz);
+                h.fief.add(new Holding.FiefBuilding(orchard ? "orchard" : "field", new BoundingBox(px - 2, y - 2, pz - 2, px + w + 2, y + 6, pz + d + 2)));
+            }
         }
     }
 

@@ -61,6 +61,12 @@ public final class CommonEvents {
     @SubscribeEvent
     public static void death(LivingDeathEvent e) {
         if (e.getEntity() instanceof GarrisonEntity g && !g.level().isClientSide) HoldingEvents.onDeath(g);
+        if (e.getEntity() instanceof net.minecraft.world.entity.npc.Villager v && v.level() instanceof ServerLevel level
+                && e.getSource().getEntity() instanceof Player killer && !killer.isCreative()) {
+            HoldingManager mgr = HoldingManager.get(level);
+            Holding h = net.aiagent256.stormhold.holding.Fief.fiefAt(mgr, v.blockPosition());
+            if (h != null) net.aiagent256.stormhold.house.Standing.change(level, mgr, h.houseId, killer.getUUID(), -6, "you killed one of their people");
+        }
         // killing monsters at a house's gates earns a little goodwill
         if (!(e.getEntity() instanceof GarrisonEntity) && e.getEntity() instanceof net.minecraft.world.entity.monster.Enemy
                 && e.getEntity().level() instanceof ServerLevel level && e.getSource().getEntity() instanceof Player killer) {
@@ -78,6 +84,7 @@ public final class CommonEvents {
     public static void reload(AddReloadListenerEvent e) {
         e.addListener(new DataRegistries.LayoutListener());
         e.addListener(new DataRegistries.ThemeListener());
+        e.addListener(new DataRegistries.FiefListener());
     }
 
     @SubscribeEvent
