@@ -434,6 +434,61 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** Calling men out of a castle to ride with you, and sending them back in. Also: a war party heads for the gate. */
+    @GameTest(template = "arena")
+    public static void companyMustersAndDismisses(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        player.moveTo(g.absolutePos(new BlockPos(8, 2, 8)).getX() + 0.5, g.absolutePos(new BlockPos(8, 2, 8)).getY(),
+                g.absolutePos(new BlockPos(8, 2, 8)).getZ() + 0.5, 0, 0);
+        Holding h = sample(g);
+        h.owner = Sides.player(player.getUUID());
+        h.houseId = "testhouse";
+        mgr.add(h);
+        try {
+            int knights = h.count(Role.KNIGHT), archers = h.count(Role.ARCHER);
+            for (int i = 0; i < 4; i++) Garrisons.materialize(level, mgr, h);
+            int standing = h.live.size();
+            if (standing < 6) throw new IllegalStateException("only " + standing + " men standing");
+            int got = net.aiagent256.stormhold.holding.Company.muster(level, mgr, player, h, Role.KNIGHT, 2);
+            got += net.aiagent256.stormhold.holding.Company.muster(level, mgr, player, h, Role.ARCHER, 1);
+            if (got != 3) throw new IllegalStateException("mustered " + got);
+            if (h.count(Role.KNIGHT) != knights - 2 || h.count(Role.ARCHER) != archers - 1) throw new IllegalStateException("garrison not debited");
+            if (h.live.size() != standing - 3) throw new IllegalStateException("standing men did not leave their posts: " + h.live.size() + " of " + standing);
+            var mine = level.getEntitiesOfClass(net.aiagent256.stormhold.entity.GarrisonEntity.class, player.getBoundingBox().inflate(12),
+                    e -> player.getUUID().equals(e.owner()));
+            if (mine.size() != 3) throw new IllegalStateException("company has " + mine.size() + " men");
+            for (var m : mine) {
+                if (m.holdsPosition() || !m.shouldBeSaved() || m.holdingId() != null) throw new IllegalStateException("company man is still a garrison soldier");
+                if (!m.isAlly(player)) throw new IllegalStateException("company man is not the player's ally");
+            }
+            // far away: can't call or dismiss
+            player.moveTo(player.getX() + 400, player.getY(), player.getZ(), 0, 0);
+            if (net.aiagent256.stormhold.holding.Company.muster(level, mgr, player, h, Role.KNIGHT, 1) != 0) throw new IllegalStateException("mustered from afar");
+            player.moveTo(player.getX() - 400, player.getY(), player.getZ(), 0, 0);
+            int back = net.aiagent256.stormhold.holding.Company.dismiss(level, mgr, player, h);
+            if (back != 3 || h.count(Role.KNIGHT) != knights || h.count(Role.ARCHER) != archers) throw new IllegalStateException("dismiss returned " + back);
+            // a war party raised here heads for the gate first
+            h.attackTarget = g.absolutePos(new BlockPos(8, 2, 8)).offset(300, 0, 0);
+            var party = net.aiagent256.stormhold.holding.Campaigns.launchParty(level, mgr, h, h.attackTarget);
+            if (party == null) throw new IllegalStateException("no party");
+            boolean via = false;
+            for (var id : party.live.keySet()) {
+                if (level.getEntity(id) instanceof net.aiagent256.stormhold.entity.GarrisonEntity ge && ge.marchVia() != null) via = true;
+            }
+            if (!party.live.isEmpty() && !via) throw new IllegalStateException("party does not route through the gate");
+            Garrisons.discardLive(level, party.live, false);
+            mgr.campaigns.remove(party);
+        } finally {
+            for (var e : level.getEntitiesOfClass(net.aiagent256.stormhold.entity.GarrisonEntity.class, player.getBoundingBox().inflate(64))) e.discard();
+            Garrisons.discardLive(level, h.live, false);
+            mgr.holdings.remove(h.id);
+            mgr.byKey.remove(h.key);
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

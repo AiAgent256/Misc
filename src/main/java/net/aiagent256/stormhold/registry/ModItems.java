@@ -2,6 +2,7 @@ package net.aiagent256.stormhold.registry;
 
 import net.aiagent256.stormhold.Stormhold;
 import net.aiagent256.stormhold.item.WarBannerItem;
+import net.aiagent256.stormhold.item.WarHornItem;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.BlockItem;
@@ -22,6 +23,8 @@ public final class ModItems {
 
     public static final RegistryObject<Item> WAR_BANNER = ITEMS.register("war_banner",
             () -> new WarBannerItem(new Item.Properties().stacksTo(1)));
+    public static final RegistryObject<Item> WAR_HORN = ITEMS.register("war_horn",
+            () -> new WarHornItem(new Item.Properties().stacksTo(1)));
     public static final RegistryObject<Item> PORTCULLIS = ITEMS.register("portcullis",
             () -> new BlockItem(ModBlocks.PORTCULLIS.get(), new Item.Properties()));
     public static final RegistryObject<Item> BANNER_STAND = ITEMS.register("banner_stand",
@@ -58,6 +61,7 @@ public final class ModItems {
             .icon(() -> new ItemStack(WAR_BANNER.get()))
             .displayItems((params, out) -> {
                 out.accept(WAR_BANNER.get());
+                out.accept(WAR_HORN.get());
                 out.accept(WAR_TABLE.get());
                 out.accept(PORTCULLIS.get());
                 out.accept(BANNER_STAND.get());

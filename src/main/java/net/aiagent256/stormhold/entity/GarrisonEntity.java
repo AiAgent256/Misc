@@ -4,6 +4,7 @@ import net.aiagent256.stormhold.Sides;
 import net.aiagent256.stormhold.compat.RecruitsCompat;
 import net.aiagent256.stormhold.entity.ai.BackOffGoal;
 import net.aiagent256.stormhold.entity.ai.ClimbGoal;
+import net.aiagent256.stormhold.entity.ai.FollowOwnerGoal;
 import net.aiagent256.stormhold.entity.ai.GarrisonRangedGoal;
 import net.aiagent256.stormhold.entity.ai.KnightMeleeGoal;
 import net.aiagent256.stormhold.entity.ai.GuardStrollGoal;
@@ -64,6 +65,12 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     @Nullable private UUID shipmentId;
     @Nullable private BlockPos post;
     @Nullable private BlockPos marchTarget;
+    /** Somewhere to pass through on the way to the march target: the gate, when leaving a castle. */
+    @Nullable private BlockPos marchVia;
+    /** The player this soldier rides with, if mustered into a company. */
+    @Nullable private UUID owner;
+    /** A wall archer that has come down to fight; counts down back to holding the wall. */
+    public int sortieTicks;
     private boolean holdPosition;
     private int tier = 1;
     private int renown = 2;
@@ -123,6 +130,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
             this.goalSelector.addGoal(2, new KnightMeleeGoal(this, 1.2));
         }
         this.goalSelector.addGoal(3, new OpenDoorGoal(this, true));
+        this.goalSelector.addGoal(3, new FollowOwnerGoal(this));
         this.goalSelector.addGoal(4, new MarchGoal(this));
         this.goalSelector.addGoal(5, new ReturnToPostGoal(this));
         if (r != Role.LORD && !r.ranged) this.goalSelector.addGoal(7, new GuardStrollGoal(this));
@@ -160,7 +168,17 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     public void setPost(@Nullable BlockPos p) { this.post = p; }
     @Nullable public BlockPos marchTarget() { return marchTarget; }
     public void setMarchTarget(@Nullable BlockPos p) { this.marchTarget = p; }
-    public boolean holdsPosition() { return holdPosition && marchTarget == null; }
+    @Nullable public BlockPos marchVia() { return marchVia; }
+    public void setMarchVia(@Nullable BlockPos p) { this.marchVia = p; }
+    @Nullable public UUID owner() { return owner; }
+    public void setOwner(@Nullable UUID id) { this.owner = id; }
+    public boolean holdsPosition() { return holdPosition && marchTarget == null && owner == null; }
+
+    /** The player this soldier follows, if they're online and in this level. */
+    @Nullable
+    public Player ownerPlayer() {
+        return owner == null ? null : this.level().getPlayerByUUID(owner);
+    }
     public int tier() { return tier; }
     public int renown() { return renown; }
     public DyeColor color() { return color; }
@@ -338,6 +356,21 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         super.customServerAiStep();
         if (alarmTicks > 0) alarmTicks--;
         if (backOffTicks > 0) backOffTicks--;
+        if (sortieTicks > 0) sortieTicks--;
+        // in a company: take up whatever is attacking the player, or whatever they just hit
+        if (owner != null && this.tickCount % 10 == 0 && (this.getTarget() == null || !this.getTarget().isAlive())) {
+            Player p = ownerPlayer();
+            if (p != null) {
+                LivingEntity foe = p.getLastHurtByMob();
+                if (foe == null || !foe.isAlive() || foe.distanceToSqr(p) > 24 * 24 || p.tickCount - p.getLastHurtByMobTimestamp() > 200) {
+                    foe = p.getLastHurtMob();
+                    if (foe != null && (!foe.isAlive() || foe.distanceToSqr(p) > 24 * 24 || p.tickCount - p.getLastHurtMobTimestamp() > 200)) foe = null;
+                }
+                if (foe != null && foe != this && !isAlly(foe) && !(foe instanceof Player fp && (fp.isCreative() || fp.isSpectator()))) {
+                    this.setTarget(foe);
+                }
+            }
+        }
         if (!role().ranged && role() != Role.COURIER) {
             LivingEntity t = this.getTarget();
             if (t != null && targetOutOfReach(t) && !climbing) {
@@ -415,10 +448,10 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         return false;
     }
 
-    /** Garrisons are re-created from holding counts, so never write them to chunk data. */
+    /** Garrisons are re-created from holding counts, so never write them to chunk data. A player's company is saved. */
     @Override
     public boolean shouldBeSaved() {
-        return false;
+        return owner != null && !this.isRemoved();
     }
 
     @Override
@@ -430,6 +463,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         tag.putInt("Tier", tier);
         tag.putInt("Renown", renown);
         tag.putInt("Color", color.getId());
+        if (owner != null) tag.putUUID("Owner", owner);
     }
 
     @Override
@@ -441,5 +475,6 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         tier = Math.max(1, tag.getInt("Tier"));
         if (tag.contains("Renown")) renown = Math.max(1, Math.min(5, tag.getInt("Renown")));
         color = DyeColor.byId(tag.getInt("Color"));
+        if (tag.hasUUID("Owner")) owner = tag.getUUID("Owner");
     }
 }

@@ -32,6 +32,9 @@ public class Campaign {
     public int color;
     public final EnumMap<Role, Integer> counts = new EnumMap<>(Role.class);
     public final Map<UUID, Role> live = new HashMap<>();
+    /** Not saved: how long the live party has made no headway while a player watches. */
+    public double lastProgress = -1;
+    public int stallSeconds;
 
     public int total() {
         int n = 0;

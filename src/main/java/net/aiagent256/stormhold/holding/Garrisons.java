@@ -150,6 +150,11 @@ public final class Garrisons {
         return null;
     }
 
+    /** True if a mob can stand with its feet in {@code q}: nothing solid there or above, something solid below. */
+    public static boolean canStand(ServerLevel level, BlockPos q) {
+        return fits(level, q);
+    }
+
     private static boolean fits(ServerLevel level, BlockPos q) {
         if (!level.isLoaded(q) || !level.isLoaded(q.above())) return false;
         BlockState feet = level.getBlockState(q), head = level.getBlockState(q.above());

@@ -6,7 +6,6 @@ import net.aiagent256.stormhold.entity.Role;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Mob;
@@ -58,6 +57,20 @@ public final class RecruitsCompat {
         }
     }
 
+    /** The Stormhold role a Recruits unit stands in for, by its type; null if it isn't a recruit. */
+    @Nullable
+    public static Role roleOf(Entity e) {
+        if (!loaded() || !recruitClass.isInstance(e)) return null;
+        ResourceLocation id = ForgeRegistries.ENTITY_TYPES.getKey(e.getType());
+        if (id == null) return Role.KNIGHT;
+        return switch (id.getPath()) {
+            case "bowman" -> Role.ARCHER;
+            case "crossbowman" -> Role.CROSSBOWMAN;
+            case "captain" -> Role.CAPTAIN;
+            default -> Role.KNIGHT;
+        };
+    }
+
     private static String typeFor(Role r) {
         return switch (r) {
             case ARCHER -> "bowman";
@@ -68,7 +81,7 @@ public final class RecruitsCompat {
     }
 
     /** Spawn a hired Recruits unit next to the player. Returns false if Recruits refused. */
-    public static boolean muster(ServerLevel level, ServerPlayer player, Role role) {
+    public static boolean muster(ServerLevel level, Player player, Role role) {
         if (!loaded()) return false;
         EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(new ResourceLocation("recruits", typeFor(role)));
         if (type == null) return false;

@@ -116,7 +116,8 @@ public final class Campaigns {
                     net.aiagent256.stormhold.house.Standing.RAIDED_THEM, "you marched on " + enemy.name);
         }
         c.to = enemy != null ? enemy.bannerPos : target;
-        c.from = h.gatePos.equals(BlockPos.ZERO) ? h.center() : h.gatePos;
+        c.from = gateOutside(h);
+        BlockPos via = gateOutside(h);
         for (Role r : new Role[]{Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN}) {
             int keep = r == Role.KNIGHT ? 3 : 1;
             int send = Math.max(0, Math.min(h.count(r) - keep, (int) Math.ceil(h.count(r) * 0.6)));
@@ -142,9 +143,12 @@ public final class Campaigns {
             Entity e = level.getEntity(id);
             if (e instanceof GarrisonEntity g && h.count(r) < Garrisons.liveCount(h.live, r)) {
                 h.live.remove(id);
-                g.setup(c.side, null, c.tier, g.color(), null, false);
+                if (g.post() != null) h.usedPosts.remove(g.post());
+                g.setup(c.side, null, c.tier, g.renown(), g.color(), null, false);
                 g.setCampaignId(c.id);
+                g.setMarchVia(via);
                 g.setMarchTarget(c.to);
+                g.setTarget(null);
                 c.live.put(id, r);
                 toRemove--;
             }
@@ -154,6 +158,25 @@ public final class Campaigns {
                 + h.name + (enemy != null ? " against " + enemy.name : " toward " + target.getX() + ", " + target.getZ()) + "."));
         mgr.setDirty();
         return c;
+    }
+
+    /** A spot a few blocks outside a castle's gate, where marching men file in and out. */
+    static BlockPos gateOutside(Holding h) {
+        if (h.gatePos.equals(BlockPos.ZERO)) return h.center();
+        BlockPos c = h.center();
+        double dx = h.gatePos.getX() - c.getX(), dz = h.gatePos.getZ() - c.getZ();
+        double len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 1) return h.gatePos;
+        return h.gatePos.offset((int) Math.round(dx / len * 7), 0, (int) Math.round(dz / len * 7));
+    }
+
+    /** Where a campaign's men should pass on the way to {@code dest}: the gate of the castle they're entering. */
+    @Nullable
+    private static BlockPos viaFor(HoldingManager mgr, Campaign c, BlockPos dest) {
+        Holding h = c.stage == Campaign.Stage.RETURN ? (c.origin != null ? mgr.holdings.get(c.origin) : null)
+                : (c.target != null ? mgr.holdings.get(c.target) : null);
+        if (h == null || !h.box.inflatedBy(4).isInside(dest)) return null;
+        return gateOutside(h);
     }
 
     // ------------------------------------------------------------ ticking (once a second)
@@ -187,6 +210,9 @@ public final class Campaigns {
             at = at.offset((int) (dx / len * 16), 0, (int) (dz / len * 16));
         }
         if (!level.isLoaded(at)) return;
+        BlockPos via = marchTo != null ? viaFor(mgr, c, marchTo) : null;
+        // already past the gate: don't send them back out to it
+        if (via != null && at.distSqr(marchTo) < via.distSqr(marchTo)) via = null;
         int budget = 6;
         for (var e : c.counts.entrySet()) {
             Role r = e.getKey();
@@ -201,6 +227,7 @@ public final class Campaigns {
                     net.aiagent256.stormhold.entity.Loadouts.equip(g, r, c.tier, c.renown, g.color(), mgr.houseOf(c.side));
                 }
                 g.setCampaignId(c.id);
+                g.setMarchVia(via);
                 g.setMarchTarget(marchTo);
                 g.setPost(null);
                 c.live.put(g.getUUID(), r);
@@ -343,6 +370,19 @@ public final class Campaigns {
         if (near) {
             if (c.live.size() < c.total()) materialize(level, mgr, c, dest);
             syncProgress(level, c);
+            // a watched party that can't find its way (walls, water, a cliff) stops being a set of stuck
+            // entities and marches on as a count; it shows up again further down the road
+            if (c.stage != Campaign.Stage.SIEGE && !c.live.isEmpty()) {
+                if (c.progress > c.lastProgress + 1e-4) {
+                    c.lastProgress = c.progress;
+                    c.stallSeconds = 0;
+                } else if (++c.stallSeconds > 60) {
+                    c.stallSeconds = 0;
+                    Garrisons.discardLive(level, c.live, true);
+                    c.progress = Math.min(1, c.progress + 12 / c.length());
+                    c.lastProgress = c.progress;
+                }
+            }
         } else if (c.live.isEmpty() && c.progress < 1) {
             c.progress += MARCH_SPEED / c.length();
         }

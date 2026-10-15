@@ -6,11 +6,10 @@ import net.aiagent256.stormhold.compat.RecruitsCompat;
 import net.aiagent256.stormhold.entity.Role;
 import net.aiagent256.stormhold.holding.Campaign;
 import net.aiagent256.stormhold.holding.Campaigns;
+import net.aiagent256.stormhold.holding.Company;
 import net.aiagent256.stormhold.holding.Economy;
 import net.aiagent256.stormhold.holding.Holding;
-import net.aiagent256.stormhold.holding.HoldingEvents;
 import net.aiagent256.stormhold.holding.HoldingManager;
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -36,7 +35,7 @@ public final class Net {
             () -> VERSION, VERSION::equals, VERSION::equals);
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
-            MUSTER = 6, REFRESH = 7, MARCH_NOW = 8;
+            MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -148,7 +147,10 @@ public final class Net {
                         player.sendSystemMessage(Component.literal("Not enough men to spare, or a war party is already out."));
                     }
                 }
-                case MUSTER -> muster(level, mgr, player, h, Math.max(1, Math.min(10, a.amount())));
+                case MUSTER, MUSTER_KNIGHTS -> Company.muster(level, mgr, player, h, Role.KNIGHT, Math.max(1, Math.min(40, a.amount())));
+                case MUSTER_ARCHERS -> Company.muster(level, mgr, player, h, Role.ARCHER, Math.max(1, Math.min(40, a.amount())));
+                case MUSTER_CROSSBOWMEN -> Company.muster(level, mgr, player, h, Role.CROSSBOWMAN, Math.max(1, Math.min(40, a.amount())));
+                case DISMISS -> Company.dismiss(level, mgr, player, h);
                 default -> {
                 }
             }
@@ -156,26 +158,6 @@ public final class Net {
             break;
         }
         openWarTable(player);
-    }
-
-    private static void muster(ServerLevel level, HoldingManager mgr, ServerPlayer player, Holding h, int n) {
-        if (!RecruitsCompat.loaded()) {
-            player.sendSystemMessage(Component.literal("Villager Recruits is not installed."));
-            return;
-        }
-        int done = 0;
-        for (int i = 0; i < n; i++) {
-            Role r = h.count(Role.KNIGHT) > 2 ? Role.KNIGHT : h.count(Role.CROSSBOWMAN) > 0 ? Role.CROSSBOWMAN
-                    : h.count(Role.ARCHER) > 1 ? Role.ARCHER : null;
-            if (r == null) break;
-            if (!RecruitsCompat.muster((ServerLevel) player.level(), player, r)) break;
-            h.add(r, -1);
-            done++;
-        }
-        player.sendSystemMessage(done > 0
-                ? HoldingEvents.gold(done + " soldiers of " + h.name + " join your company.")
-                : Component.literal("No one could be mustered (Recruits may have reached its unit limit).").withStyle(ChatFormatting.RED));
-        mgr.setDirty();
     }
 
     private Net() {

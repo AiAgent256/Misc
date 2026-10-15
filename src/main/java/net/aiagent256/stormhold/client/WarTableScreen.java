@@ -15,7 +15,7 @@ import java.util.List;
 
 /** Command every castle you hold: stance, march orders, supply lines, mustering. */
 public class WarTableScreen extends Screen {
-    private static final int W = 430, H = 236;
+    private static final int W = 430, H = 262;
     private Net.WarTableData data;
     private int selected;
     private int page;
@@ -110,12 +110,47 @@ public class WarTableScreen extends Screen {
         this.addRenderableWidget(Button.builder(Component.literal("Clear"), b -> Net.sendAction(h.id(), Net.CLEAR_SUPPLY, BlockPos.ZERO, 0))
                 .bounds(rx + 256, y, 34, 18).build());
         y += 30;
-        if (data.recruits()) {
-            this.addRenderableWidget(Button.builder(Component.literal("Muster 5 to me (Recruits)"),
-                    b -> Net.sendAction(h.id(), Net.MUSTER, BlockPos.ZERO, 5)).bounds(rx, y, 160, 20).build());
+        // ---- your company: how many ride with you
+        int[] c = h.counts();
+        int[] max = {Math.max(0, c[1] - 1), Math.max(0, c[2] - 1), Math.max(0, c[3] - 1)};
+        int[] acts = {Net.MUSTER_KNIGHTS, Net.MUSTER_ARCHERS, Net.MUSTER_CROSSBOWMEN};
+        for (int i = 0; i < 3; i++) {
+            final int k = i;
+            want[k] = Math.min(want[k], max[k]);
+            int bx = rx + 52 + i * 70;
+            this.addRenderableWidget(Button.builder(Component.literal("-"), b -> {
+                want[k] = Math.max(0, want[k] - (hasShiftDown() ? 5 : 1));
+                rebuildWidgets();
+            }).bounds(bx, y, 14, 18).build());
+            this.addRenderableWidget(Button.builder(Component.literal("+"), b -> {
+                want[k] = Math.min(max[k], want[k] + (hasShiftDown() ? 5 : 1));
+                rebuildWidgets();
+            }).bounds(bx + 40, y, 14, 18).build());
         }
+        boolean near = inCallRange(h);
+        Button muster = Button.builder(Component.literal("Muster"), b -> {
+            for (int i = 0; i < 3; i++) if (want[i] > 0) Net.sendAction(h.id(), acts[i], BlockPos.ZERO, want[i]);
+        }).bounds(rx + 250, y, 48, 18).build();
+        muster.active = near && (want[0] + want[1] + want[2]) > 0;
+        this.addRenderableWidget(muster);
+        y += 24;
+        Button dismiss = Button.builder(Component.literal("Dismiss my men here into " + trim(h.name(), 14)),
+                b -> Net.sendAction(h.id(), Net.DISMISS, BlockPos.ZERO, 0)).bounds(rx, y, 230, 18).build();
+        dismiss.active = near;
+        this.addRenderableWidget(dismiss);
         this.addRenderableWidget(Button.builder(Component.literal("Refresh"), b -> Net.sendAction(h.id(), Net.REFRESH, BlockPos.ZERO, 0))
-                .bounds(rx + 166, y, 60, 20).build());
+                .bounds(rx + 236, y, 54, 18).build());
+    }
+
+    /** How many of each (knights, archers, crossbowmen) the player wants to take; kept between refreshes. */
+    private final int[] want = {4, 2, 0};
+
+    private static boolean inCallRange(HoldingInfo h) {
+        var p = Minecraft.getInstance().player;
+        if (p == null) return false;
+        double dx = p.getX() - h.pos().getX(), dz = p.getZ() - h.pos().getZ();
+        int r = net.aiagent256.stormhold.holding.Company.CALL_RANGE;
+        return dx * dx + dz * dz <= (double) r * r;
     }
 
     /** Depot marked with a War Banner somewhere in the player's inventory. */
@@ -184,7 +219,20 @@ public class WarTableScreen extends Screen {
             g.drawString(this.font, "x", rx + 58, y0 + 161, 0xE0D0B0, false);
             g.drawString(this.font, "y", rx + 114, y0 + 161, 0xE0D0B0, false);
             g.drawString(this.font, "z", rx + 170, y0 + 161, 0xE0D0B0, false);
-            g.drawString(this.font, h.supply() == null ? "No supply line." : "Couriers take surplus to " + h.supply().toShortString() + " daily.", rx, y0 + 214, 0x9C8C6C, false);
+            g.drawString(this.font, "Company", rx, y0 + 191, 0xF0D8A0, false);
+            String[] roles = {"Knights", "Archers", "Crossbows"};
+            int[] c2 = h.counts();
+            int[] have = {c2[1], c2[2], c2[3]};
+            for (int i = 0; i < 3; i++) {
+                int bx = rx + 52 + i * 70;
+                g.drawString(this.font, roles[i] + " (" + have[i] + ")", bx, y0 + 177, 0xC8B898, false);
+                g.drawCenteredString(this.font, String.valueOf(want[i]), bx + 27, y0 + 191, 0xFFFFFF);
+            }
+            boolean near = inCallRange(h);
+            g.drawString(this.font, near ? "Men you call appear at your side." + (data.recruits() ? " (Recruits units)" : "")
+                    : "Too far: ride within " + net.aiagent256.stormhold.holding.Company.CALL_RANGE + " blocks of " + trim(h.name(), 16)
+                    + " to muster or dismiss.", rx, y0 + 234, near ? 0x9C8C6C : 0xD88060, false);
+            g.drawString(this.font, h.supply() == null ? "No supply line." : "Couriers take surplus to " + h.supply().toShortString() + " daily.", rx, y0 + 246, 0x9C8C6C, false);
         }
         super.render(g, mouseX, mouseY, partial);
     }

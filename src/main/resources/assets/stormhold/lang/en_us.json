@@ -25,5 +25,7 @@
   "entity.stormhold.courier": "Courier",
   "item.stormhold.courier_spawn_egg": "Courier Spawn Egg",
   "block.stormhold.muster_post": "Muster Post",
-  "block.stormhold.notice_board": "Notice Board"
+  "block.stormhold.notice_board": "Notice Board",
+  "item.stormhold.war_horn": "War Horn",
+  "item.stormhold.war_horn.tip": "Sound it to command your castles from anywhere. Within 128 blocks of one, call its men to ride with you."
 }

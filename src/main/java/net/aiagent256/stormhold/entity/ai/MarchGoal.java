@@ -1,17 +1,27 @@
 package net.aiagent256.stormhold.entity.ai;
 
 import net.aiagent256.stormhold.entity.GarrisonEntity;
+import net.aiagent256.stormhold.holding.Garrisons;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.EnumSet;
 
-/** Walks toward a distant target in legs short enough for the pathfinder. */
+/**
+ * Walks toward a distant target in legs short enough for the pathfinder. A soldier leaving a castle
+ * heads for the gate first ({@link GarrisonEntity#marchVia()}); the pathfinder can't see a route over
+ * the walls to a point outside, so without that they'd stand on the battlements forever. A player's
+ * own man who still can't find his way to the gate after a while is moved there, so a war party always
+ * gets out of the castle it was raised in.
+ */
 public class MarchGoal extends Goal {
     private final GarrisonEntity mob;
     private int repath;
+    private Vec3 lastPos = Vec3.ZERO;
+    private int stuckLegs;
 
     public MarchGoal(GarrisonEntity mob) {
         this.mob = mob;
@@ -32,14 +42,35 @@ public class MarchGoal extends Goal {
     @Override
     public void start() {
         repath = 0;
+        stuckLegs = 0;
+        lastPos = mob.position();
     }
 
     @Override
     public void tick() {
         if (--repath > 0 && !mob.getNavigation().isDone()) return;
         repath = 40;
-        BlockPos t = mob.marchTarget();
+        BlockPos via = mob.marchVia();
+        if (via != null && mob.distanceToSqr(Vec3.atBottomCenterOf(via)) < 4 * 4) {
+            mob.setMarchVia(null);
+            via = null;
+        }
+        BlockPos t = via != null ? via : mob.marchTarget();
         if (t == null) return;
+        // not getting anywhere?
+        if (mob.position().distanceToSqr(lastPos) < 1.0) stuckLegs++;
+        else stuckLegs = 0;
+        lastPos = mob.position();
+        if (via != null && stuckLegs >= 4 && !mob.isHouse() && mob.level() instanceof ServerLevel level) {
+            BlockPos p = Garrisons.standable(level, via);
+            if (p != null) {
+                mob.getNavigation().stop();
+                mob.teleportTo(p.getX() + 0.5, p.getY(), p.getZ() + 0.5);
+                mob.setMarchVia(null);
+                stuckLegs = 0;
+                return;
+            }
+        }
         Vec3 here = mob.position();
         Vec3 dir = Vec3.atBottomCenterOf(t).subtract(here);
         double dist = Math.sqrt(dir.x * dir.x + dir.z * dir.z);
