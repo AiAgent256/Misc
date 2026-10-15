@@ -564,8 +564,18 @@ public class StormholdGameTests {
                 level.getChunk(cc + dx, ccz + dz);   // blocks until it's really there
             }
         }
+        // a flat meadow to build on, whatever the world is
+        int y = 70;
+        for (int x = cx - 60; x <= cx + 60; x++) {
+            for (int z = cz - 60; z <= cz + 60; z++) {
+                for (int yy = y - 3; yy < y; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), 2);
+                level.setBlock(new BlockPos(x, y - 1, z), net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(), 2);
+                for (int yy = y; yy < y + 24; yy++) {
+                    if (!level.getBlockState(new BlockPos(x, yy, z)).isAir()) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
+                }
+            }
+        }
         Holding h = sample(g);
-        int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, cx, cz);
         h.box = new BoundingBox(cx - 8, y, cz - 8, cx + 7, y + 7, cz + 7);
         h.gatePos = new BlockPos(cx, y, cz + 8);
         h.owner = Sides.player(g.makeMockPlayer().getUUID());

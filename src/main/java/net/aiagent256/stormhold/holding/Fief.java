@@ -41,7 +41,7 @@ public final class Fief {
     /** How far from the walls the fief reaches. */
     public static final int REACH = 110;
     /** Give up on a building after this many failed sitings; the land is just too rough. */
-    private static final int MAX_TRIES = 60;
+    private static final int MAX_TRIES = 90;
 
     private static final List<String> HAMLET = List.of("cottage_a", "well", "cottage_c");
     private static final List<String> VILLAGE = List.of("cottage_a", "well", "cottage_b", "pasture", "cottage_c", "mine", "cottage_d",
@@ -108,7 +108,7 @@ public final class Fief {
         double gateAng = Math.atan2(gate.getZ() - c.getZ(), gate.getX() - c.getX());
         int half = Math.max(h.box.getXSpan(), h.box.getZSpan()) / 2;
         boolean near = piece.kind.equals("cottage") || piece.kind.equals("well") || piece.kind.equals("chapel") || piece.kind.equals("mill");
-        for (int attempt = 0; attempt < 4; attempt++) {
+        for (int attempt = 0; attempt < 6; attempt++) {
             double ang = near ? gateAng + (rnd.nextDouble() - 0.5) * Math.PI * 1.1 : rnd.nextDouble() * Math.PI * 2;
             int dist = half + (near ? 10 + rnd.nextInt(36) : 22 + rnd.nextInt(60));
             int cx = c.getX() + (int) (Math.cos(ang) * dist), cz = c.getZ() + (int) (Math.sin(ang) * dist);
@@ -154,7 +154,7 @@ public final class Fief {
         }
         int[] sorted = hs.clone();
         java.util.Arrays.sort(sorted);
-        int slopeMax = piece.kind.equals("cottage") || piece.kind.equals("well") ? 3 : 4;
+        int slopeMax = piece.kind.equals("cottage") || piece.kind.equals("well") ? 5 : 6;
         if (!piece.water) {
             if (water > 0 || sorted[8] - sorted[0] > slopeMax) return null;
         } else if (sorted[8] - sorted[0] > 5) {

@@ -208,10 +208,12 @@ public final class Builder {
         BlockPos origin = new BlockPos(h.box.minX(), h.box.minY(), h.box.minZ());
         int nx = (l.sizeX + 31) / 32, nz = (l.sizeZ + 31) / 32;
         List<Job> jobs = new ArrayList<>();
+        int tiles = 0, scanned = 0, differ = 0;
         for (int tx = 0; tx < nx; tx++) {
             for (int tz = 0; tz < nz; tz++) {
                 var t = level.getStructureManager().get(CastleTilePiece.tileId(l.name, tx, tz));
                 if (t.isEmpty()) continue;
+                tiles++;
                 CompoundTag tag = t.get().save(new CompoundTag());
                 ListTag palette = tag.getList("palette", 10);
                 BlockState[] states = new BlockState[palette.size()];
@@ -228,7 +230,9 @@ public final class Builder {
                     DataRegistries.Weighted w = theme.get(want.getBlock());
                     if (w != null) want = ThemeProcessor.copy(want, w.pick(Mth.getSeed(pos)));
                     BlockState have = level.getBlockState(pos);
+                    scanned++;
                     if (have.getBlock() == want.getBlock()) continue;
+                    differ++;
                     if (!(have.isAir() || have.is(CommonEvents.SIEGE_PLACEABLE) || !have.getFluidState().isEmpty() || have.is(Blocks.FIRE)
                             || have.canBeReplaced())) continue;
                     jobs.add(new Job(pos, want, true));
@@ -239,7 +243,8 @@ public final class Builder {
         jobs.sort((a, b) -> a.pos.getY() != b.pos.getY() ? Integer.compare(a.pos.getY(), b.pos.getY())
                 : Integer.compare(a.pos.getX() + a.pos.getZ(), b.pos.getX() + b.pos.getZ()));
         h.workQueue.addAll(jobs);
-        Stormhold.LOGGER.info("Stormhold: {} needs {} blocks of repair", h.name, jobs.size());
+        Stormhold.LOGGER.info("Stormhold: {} needs {} blocks of repair ({} tiles, {} blocks checked, {} differ, origin {})", h.name,
+                jobs.size(), tiles, scanned, differ, origin);
         return true;
     }
 
