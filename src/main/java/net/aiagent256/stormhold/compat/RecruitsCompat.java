@@ -23,7 +23,7 @@ import java.util.UUID;
 public final class RecruitsCompat {
     private static Boolean loaded;
     private static Class<?> recruitClass;
-    private static Method getOwnerUUID, getIsOwned, hire;
+    private static Method getOwnerUUID, getIsOwned, hire, getInventory;
 
     public static boolean loaded() {
         if (loaded == null) {
@@ -35,6 +35,11 @@ public final class RecruitsCompat {
                     getIsOwned = recruitClass.getMethod("getIsOwned");
                     Class<?> group = Class.forName("com.talhanation.recruits.world.RecruitsGroup");
                     hire = recruitClass.getMethod("hire", Player.class, group, boolean.class);
+                    try {
+                        getInventory = recruitClass.getMethod("getInventory");
+                    } catch (Throwable t) {
+                        Stormhold.LOGGER.warn("Stormhold: can't reach recruit inventories; armoury will only set equipment", t);
+                    }
                     loaded = true;
                 } catch (Throwable t) {
                     Stormhold.LOGGER.warn("Stormhold: Villager Recruits found but its API changed; muster disabled", t);
@@ -55,6 +60,30 @@ public final class RecruitsCompat {
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    /** A recruit's own inventory (slots 0-3 armour head to feet, 4 off hand, 5 main hand), or null. */
+    @Nullable
+    public static net.minecraft.world.Container inventoryOf(Entity e) {
+        if (!loaded() || getInventory == null || !recruitClass.isInstance(e)) return null;
+        try {
+            Object inv = getInventory.invoke(e);
+            return inv instanceof net.minecraft.world.Container c ? c : null;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** Which inventory slot a recruit keeps a piece of equipment in. */
+    public static int inventorySlot(net.minecraft.world.entity.EquipmentSlot slot) {
+        return switch (slot) {
+            case HEAD -> 0;
+            case CHEST -> 1;
+            case LEGS -> 2;
+            case FEET -> 3;
+            case OFFHAND -> 4;
+            case MAINHAND -> 5;
+        };
     }
 
     /** The Stormhold role a Recruits unit stands in for, by its type; null if it isn't a recruit. */

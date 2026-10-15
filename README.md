@@ -27,6 +27,8 @@ Private Forge 1.20.1 mod for the Dungeons and Homestead pack. Castles held by ri
 - *Supply to*: any chest, barrel, or modded inventory (MineColonies huts work), or another castle you hold. Sneak-use your War Banner on a chest to mark it as a depot and the table pre-fills it. Couriers walk the road and can be ambushed by brigands.
 - *Company*: pick how many knights, archers and crossbowmen you want (shift-click for fives) and *Muster*. They walk out of the garrison and fall in beside you; each castle keeps at least one of each. *Dismiss* sends every man of yours within 24 blocks into that castle's garrison. Both need you within 128 blocks of the castle. With Villager Recruits installed your company is Recruits units (use its follow/guard orders); without it they're Stormhold soldiers who follow you, catch up if you ride off, and go after whatever attacks you.
 
+- *Armoury*: *Iron*, *Diamond* or *Netherite* gives a full set of armour and a weapon for the role (sword, bow or crossbow) to every man of yours within 24 blocks who's wearing worse: 26 iron, 26 diamonds, or 26 diamonds + 5 netherite ingots per man, paid from your pack first and then the castle's stores when you're within 128 blocks of it. *Enchanted* adds Protection and Sharpness/Power (II iron, III diamond, IV netherite), Unbreaking III, fire and piercing on netherite, for 10 experience levels per man. Old kit comes back to you. Works on Recruits units too.
+
 **War Horn.** A War Table you carry: War Banner + gold ingot + 4 copper ingots. Sound it anywhere to open the same screen, so you can call your men out of a castle as you ride past it and send them home when you're done.
 
 **Houses and standing.** Every house has an opinion of you, from sworn enemy to sworn friend. About a third start friendly. `/stormhold houses` lists them. A friendly house's guards ignore you, its lord sells bread (an emerald) or iron (sneak + emerald), it never raids you, and it sends knights when someone else does. If its lord is dead you can take the castle by bending the knee: raise your banner and the garrison swears to you at once, no counterattack. You earn standing by killing monsters at their gates and running supply lines to their castles. You lose it by hitting their guards, marching on them, or taking their castles. Standing drifts back toward the house's nature one point a day.
@@ -46,6 +48,8 @@ Private Forge 1.20.1 mod for the Dungeons and Homestead pack. Castles held by ri
 **Lived-in world.** Villagers work inside the walls, fields and orchards appear outside, and a road is laid from the gate to the nearest village as the chunks load. Castles are sited on high, dry ground and keep clear of villages and towns from any mod (anything in `#minecraft:village`, plus a few extras in `#stormhold:castle_avoid`); a watchtower or holdfast never lands inside a great castle.
 
 ## Commands
+
+`/stormhold version` prints the commit the jar was built from; it's also in the corner of the War Table.
 `/stormhold list | nearest | info | houses` for everyone; `capture | raid | killlord | befriend` for ops (testing).
 
 ## Building

@@ -15,7 +15,7 @@ import java.util.List;
 
 /** Command every castle you hold: stance, march orders, supply lines, mustering. */
 public class WarTableScreen extends Screen {
-    private static final int W = 430, H = 262;
+    private static final int W = 430, H = 298;
     private Net.WarTableData data;
     private int selected;
     private int page;
@@ -140,7 +140,28 @@ public class WarTableScreen extends Screen {
         this.addRenderableWidget(dismiss);
         this.addRenderableWidget(Button.builder(Component.literal("Refresh"), b -> Net.sendAction(h.id(), Net.REFRESH, BlockPos.ZERO, 0))
                 .bounds(rx + 236, y, 54, 18).build());
+        // ---- armoury: kit for the men around you
+        y += 32;
+        String[] kits = {"Iron", "Diamond", "Netherite"};
+        for (int i = 0; i < 3; i++) {
+            final int tier = i + 1;
+            this.addRenderableWidget(Button.builder(Component.literal(kits[i]),
+                    b -> Net.sendAction(h.id(), Net.ARM, new BlockPos(enchant ? 1 : 0, 0, 0), tier))
+                    .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Full " + kits[i].toLowerCase()
+                            + " armour and a weapon for every man of yours within 24 blocks who's wearing worse. Paid from your pack, then "
+                            + h.name() + "'s stores when you're within " + net.aiagent256.stormhold.holding.Company.CALL_RANGE
+                            + " blocks. Old kit comes back to you.")))
+                    .bounds(rx + 52 + i * 64, y, 60, 18).build());
+        }
+        this.addRenderableWidget(Button.builder(Component.literal(enchant ? "[Enchanted]" : "Enchanted"), b -> {
+            enchant = !enchant;
+            rebuildWidgets();
+        }).tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Protection and Sharpness/Power II-IV by metal, Unbreaking III; "
+                + "fire and piercing on netherite. " + net.aiagent256.stormhold.holding.Armoury.ENCHANT_LEVELS + " experience levels per man.")))
+                .bounds(rx + 246, y, 56, 18).build());
     }
+
+    private boolean enchant;
 
     /** How many of each (knights, archers, crossbowmen) the player wants to take; kept between refreshes. */
     private final int[] want = {4, 2, 0};
@@ -197,6 +218,7 @@ public class WarTableScreen extends Screen {
         g.fill(x0 + 2, y0 + 2, x0 + W - 2, y0 + H - 2, 0xE03a2e20);
         g.fill(x0 + 122, y0 + 18, x0 + 123, y0 + H - 6, 0xFF6b5a40);
         g.drawString(this.font, "War Table", x0 + 8, y0 + 7, 0xF0D8A0, false);
+        g.drawString(this.font, "build " + net.aiagent256.stormhold.Stormhold.buildId(), x0 + 8, y0 + H - 12, 0x7C6C4C, false);
         HoldingInfo h = current();
         int rx = x0 + 128;
         if (h == null) {
@@ -229,10 +251,18 @@ public class WarTableScreen extends Screen {
                 g.drawCenteredString(this.font, String.valueOf(want[i]), bx + 27, y0 + 191, 0xFFFFFF);
             }
             boolean near = inCallRange(h);
-            g.drawString(this.font, near ? "Men you call appear at your side." + (data.recruits() ? " (Recruits units)" : "")
-                    : "Too far: ride within " + net.aiagent256.stormhold.holding.Company.CALL_RANGE + " blocks of " + trim(h.name(), 16)
-                    + " to muster or dismiss.", rx, y0 + 234, near ? 0x9C8C6C : 0xD88060, false);
-            g.drawString(this.font, h.supply() == null ? "No supply line." : "Couriers take surplus to " + h.supply().toShortString() + " daily.", rx, y0 + 246, 0x9C8C6C, false);
+            g.drawString(this.font, near ? "Men you call appear at your side." + (data.recruits() ? " (Recruits)" : "")
+                    : "Too far: get within " + net.aiagent256.stormhold.holding.Company.CALL_RANGE + " blocks of " + trim(h.name(), 14) + ".",
+                    rx, y0 + 231, near ? 0x9C8C6C : 0xD88060, false);
+            g.drawString(this.font, "Armoury", rx, y0 + 247, 0xF0D8A0, false);
+            var mc = Minecraft.getInstance().player;
+            int iron = mc != null ? mc.getInventory().countItem(net.minecraft.world.item.Items.IRON_INGOT) : 0;
+            int dia = mc != null ? mc.getInventory().countItem(net.minecraft.world.item.Items.DIAMOND) : 0;
+            int neth = mc != null ? mc.getInventory().countItem(net.minecraft.world.item.Items.NETHERITE_INGOT) : 0;
+            int lvl = mc != null ? mc.experienceLevel : 0;
+            g.drawString(this.font, "Each: 26 iron | 26 diamond | 26 diamond + 5 netherite", rx, y0 + 264, 0x9C8C6C, false);
+            g.drawString(this.font, "Pack: " + iron + " iron, " + dia + " diamond, " + neth + " netherite, " + lvl + " lvl", rx, y0 + 274, 0x9C8C6C, false);
+            g.drawString(this.font, h.supply() == null ? "No supply line." : "Couriers take surplus to " + h.supply().toShortString() + " daily.", rx, y0 + 284, 0x9C8C6C, false);
         }
         super.render(g, mouseX, mouseY, partial);
     }

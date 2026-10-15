@@ -35,7 +35,7 @@ public final class Net {
             () -> VERSION, VERSION::equals, VERSION::equals);
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
-            MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12;
+            MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -151,6 +151,10 @@ public final class Net {
                 case MUSTER_ARCHERS -> Company.muster(level, mgr, player, h, Role.ARCHER, Math.max(1, Math.min(40, a.amount())));
                 case MUSTER_CROSSBOWMEN -> Company.muster(level, mgr, player, h, Role.CROSSBOWMAN, Math.max(1, Math.min(40, a.amount())));
                 case DISMISS -> Company.dismiss(level, mgr, player, h);
+                case ARM -> {
+                    var kit = net.aiagent256.stormhold.holding.Armoury.Kit.byTier(a.amount());
+                    if (kit != null) net.aiagent256.stormhold.holding.Armoury.arm(level, mgr, player, h, kit, a.pos().getX() != 0);
+                }
                 default -> {
                 }
             }

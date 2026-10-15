@@ -463,6 +463,29 @@ public class StormholdGameTests {
                 if (m.holdsPosition() || !m.shouldBeSaved() || m.holdingId() != null) throw new IllegalStateException("company man is still a garrison soldier");
                 if (!m.isAlly(player)) throw new IllegalStateException("company man is not the player's ally");
             }
+            // the armoury: diamond kit for 2 of the 3 from the pack, the third from the castle's stores
+            player.getInventory().add(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.DIAMOND, 60));
+            var diamondKey = new net.minecraft.resources.ResourceLocation("minecraft:diamond");
+            int armed = net.aiagent256.stormhold.holding.Armoury.arm(level, mgr, player, h, net.aiagent256.stormhold.holding.Armoury.Kit.DIAMOND, false);
+            if (armed != 2) throw new IllegalStateException("armed " + armed + " from a pack of 60 diamonds");
+            if (player.getInventory().countItem(net.minecraft.world.item.Items.DIAMOND) != 8) throw new IllegalStateException("pack not charged");
+            h.addStock(diamondKey, 30);
+            armed = net.aiagent256.stormhold.holding.Armoury.arm(level, mgr, player, h, net.aiagent256.stormhold.holding.Armoury.Kit.DIAMOND, true);
+            // the two already in diamond only need the enchantments (the mock player is creative, so no levels are charged)
+            if (armed != 3) throw new IllegalStateException("armed " + armed + " with stores");
+            if (h.stock(diamondKey) != 12) throw new IllegalStateException("stores charged " + (30 - h.stock(diamondKey)));
+            int diamondChests = 0, enchanted = 0;
+            for (var m : mine) {
+                if (m.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).is(net.minecraft.world.item.Items.DIAMOND_CHESTPLATE)) diamondChests++;
+                if (m.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).isEnchanted()) enchanted++;
+                if (m.role() == Role.ARCHER && !m.getMainHandItem().is(net.minecraft.world.item.Items.BOW)) throw new IllegalStateException("archer lost his bow");
+                if (m.role() == Role.KNIGHT && !m.getMainHandItem().is(net.minecraft.world.item.Items.DIAMOND_SWORD)) throw new IllegalStateException("knight has no diamond sword");
+            }
+            if (diamondChests != 3 || enchanted != 3) throw new IllegalStateException(diamondChests + " in diamond, " + enchanted + " enchanted");
+            if (player.getInventory().countItem(net.minecraft.world.item.Items.IRON_CHESTPLATE)
+                    + player.getInventory().countItem(net.minecraft.world.item.Items.CHAINMAIL_CHESTPLATE)
+                    + player.getInventory().countItem(net.minecraft.world.item.Items.LEATHER_CHESTPLATE) < 1)
+                throw new IllegalStateException("old kit did not come back");
             // far away: can't call or dismiss
             player.moveTo(player.getX() + 400, player.getY(), player.getZ(), 0, 0);
             if (net.aiagent256.stormhold.holding.Company.muster(level, mgr, player, h, Role.KNIGHT, 1) != 0) throw new IllegalStateException("mustered from afar");

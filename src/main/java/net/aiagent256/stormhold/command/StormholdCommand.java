@@ -1,5 +1,7 @@
 package net.aiagent256.stormhold.command;
 
+import net.aiagent256.stormhold.Stormhold;
+
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
 import net.aiagent256.stormhold.Sides;
@@ -21,6 +23,10 @@ public final class StormholdCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> d) {
         d.register(Commands.literal("stormhold")
+                .then(Commands.literal("version").executes(c -> {
+                    c.getSource().sendSuccess(() -> net.minecraft.network.chat.Component.literal("Stormhold build " + Stormhold.buildId()), false);
+                    return 1;
+                }))
                 .then(Commands.literal("list").executes(StormholdCommand::list))
                 .then(Commands.literal("nearest").executes(StormholdCommand::nearest))
                 .then(Commands.literal("info").executes(StormholdCommand::info))

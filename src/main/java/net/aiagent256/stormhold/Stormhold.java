@@ -19,6 +19,19 @@ import org.slf4j.Logger;
 public class Stormhold {
     public static final String MODID = "stormhold";
     public static final Logger LOGGER = LogUtils.getLogger();
+    private static String buildId;
+
+    /** The commit and time this jar was built from, written into the jar by Gradle. */
+    public static String buildId() {
+        if (buildId == null) {
+            try (var in = Stormhold.class.getClassLoader().getResourceAsStream("stormhold-build.txt")) {
+                buildId = in == null ? "unknown" : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).trim();
+            } catch (java.io.IOException e) {
+                buildId = "unknown";
+            }
+        }
+        return buildId;
+    }
 
     public Stormhold() {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
@@ -35,7 +48,7 @@ public class Stormhold {
 
     private void commonSetup(final FMLCommonSetupEvent event) {
         event.enqueueWork(Net::register);
-        LOGGER.info("Stormhold loaded. The banners are raised.");
+        LOGGER.info("Stormhold {} loaded. The banners are raised.", buildId());
     }
 
     public static ResourceLocation id(String path) {
