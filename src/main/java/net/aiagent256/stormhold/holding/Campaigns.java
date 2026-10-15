@@ -117,7 +117,7 @@ public final class Campaigns {
         }
         c.to = enemy != null ? enemy.bannerPos : target;
         c.from = gateOutside(h);
-        BlockPos via = gateOutside(h);
+        BlockPos via = gateInside(h), via2 = gateOutside(h);
         for (Role r : new Role[]{Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN}) {
             int keep = r == Role.KNIGHT ? 3 : 1;
             int send = Math.max(0, Math.min(h.count(r) - keep, (int) Math.ceil(h.count(r) * 0.6)));
@@ -147,6 +147,7 @@ public final class Campaigns {
                 g.setup(c.side, null, c.tier, g.renown(), g.color(), null, false);
                 g.setCampaignId(c.id);
                 g.setMarchVia(via);
+                g.setMarchVia2(via2);
                 g.setMarchTarget(c.to);
                 g.setTarget(null);
                 c.live.put(id, r);
@@ -168,6 +169,17 @@ public final class Campaigns {
         double len = Math.sqrt(dx * dx + dz * dz);
         if (len < 1) return h.gatePos;
         return h.gatePos.offset((int) Math.round(dx / len * 7), 0, (int) Math.round(dz / len * 7));
+    }
+
+    /** A spot in the yard just inside the gatehouse, where men gather before the portcullis is raised for them. */
+    static BlockPos gateInside(Holding h) {
+        if (h.gatePos.equals(BlockPos.ZERO)) return h.center();
+        BlockPos c = h.center();
+        double dx = c.getX() - h.gatePos.getX(), dz = c.getZ() - h.gatePos.getZ();
+        double len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 1) return h.gatePos;
+        int step = (int) Math.min(18, len * 0.5);
+        return h.gatePos.offset((int) Math.round(dx / len * step), 0, (int) Math.round(dz / len * step));
     }
 
     /** Where a campaign's men should pass on the way to {@code dest}: the gate of the castle they're entering. */
@@ -277,6 +289,19 @@ public final class Campaigns {
                 }
             }
             syncProgress(level, c);
+            // held at the gate: after a while they bring the ram up and the portcullis comes down
+            if (!c.live.isEmpty() && !c.rammed) {
+                if (c.progress > c.lastProgress + 1e-4) {
+                    c.lastProgress = c.progress;
+                    c.stallSeconds = 0;
+                } else if (++c.stallSeconds > 45 && c.progress > 0.6) {
+                    c.rammed = true;
+                    if (Gates.breach(level, h)) {
+                        HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The gate of " + h.name + " is broken! They're inside the walls.")
+                                .withStyle(ChatFormatting.RED));
+                    }
+                }
+            }
             return;
         }
         if (!c.live.isEmpty()) return;

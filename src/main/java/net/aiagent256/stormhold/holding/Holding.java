@@ -111,6 +111,8 @@ public class Holding {
     // runtime only
     public final Map<UUID, Role> live = new HashMap<>();
     public final Set<BlockPos> usedPosts = new HashSet<>();
+    /** Portcullis planes, found on first tick near the castle; null until scanned. Not saved. */
+    public java.util.List<Gates.Plane> gates;
     @Nullable public ServerBossEvent bar;
     public int idleSeconds;
 

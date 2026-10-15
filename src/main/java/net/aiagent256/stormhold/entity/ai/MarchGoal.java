@@ -13,9 +13,9 @@ import java.util.EnumSet;
 /**
  * Walks toward a distant target in legs short enough for the pathfinder. A soldier leaving a castle
  * heads for the gate first ({@link GarrisonEntity#marchVia()}); the pathfinder can't see a route over
- * the walls to a point outside, so without that they'd stand on the battlements forever. A player's
- * own man who still can't find his way to the gate after a while is moved there, so a war party always
- * gets out of the castle it was raised in.
+ * the walls to a point outside, so without that they'd stand on the battlements forever. The gate guard
+ * raises the portcullis as they come up to it. A player's own man who still can't find his way out after
+ * a good while is moved to the gate, so a war party always gets out of the castle it was raised in.
  */
 public class MarchGoal extends Goal {
     private final GarrisonEntity mob;
@@ -52,8 +52,11 @@ public class MarchGoal extends Goal {
         repath = 40;
         BlockPos via = mob.marchVia();
         if (via != null && mob.distanceToSqr(Vec3.atBottomCenterOf(via)) < 4 * 4) {
-            mob.setMarchVia(null);
-            via = null;
+            // reached this waypoint; the next one (outside the gate) takes its place
+            via = mob.marchVia2();
+            mob.setMarchVia(via);
+            mob.setMarchVia2(null);
+            stuckLegs = 0;
         }
         BlockPos t = via != null ? via : mob.marchTarget();
         if (t == null) return;
@@ -61,12 +64,13 @@ public class MarchGoal extends Goal {
         if (mob.position().distanceToSqr(lastPos) < 1.0) stuckLegs++;
         else stuckLegs = 0;
         lastPos = mob.position();
-        if (via != null && stuckLegs >= 4 && !mob.isHouse() && mob.level() instanceof ServerLevel level) {
+        if (via != null && stuckLegs >= 8 && !mob.isHouse() && mob.level() instanceof ServerLevel level) {
             BlockPos p = Garrisons.standable(level, via);
             if (p != null) {
                 mob.getNavigation().stop();
                 mob.teleportTo(p.getX() + 0.5, p.getY(), p.getZ() + 0.5);
-                mob.setMarchVia(null);
+                mob.setMarchVia(mob.marchVia2());
+                mob.setMarchVia2(null);
                 stuckLegs = 0;
                 return;
             }

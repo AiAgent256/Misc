@@ -13,6 +13,9 @@ public final class HoldingTicker {
         HoldingManager mgr = HoldingManager.get(level);
         if (t % 100 == 13) Detector.detect(level, mgr);
         Roads.tick(level, mgr);
+        if (t % 10 == 5) {
+            for (Holding h : mgr.holdings.values()) if (near(level, h) && level.isLoaded(h.center())) Gates.tick(level, mgr, h);
+        }
         if (t % 20 != 0) return;
         for (Holding h : mgr.holdings.values()) tickHolding(level, mgr, h, t);
         if (t - mgr.lastStandingDrift >= 24000) {

@@ -14,7 +14,7 @@ import net.minecraftforge.registries.RegistryObject;
 public final class ModBlocks {
     public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, Stormhold.MODID);
 
-    public static final RegistryObject<Block> PORTCULLIS = BLOCKS.register("portcullis", () -> new Block(
+    public static final RegistryObject<Block> PORTCULLIS = BLOCKS.register("portcullis", () -> new net.aiagent256.stormhold.block.PortcullisBlock(
             BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(25.0F, 6.0F)
                     .requiresCorrectToolForDrops().sound(SoundType.CHAIN).noOcclusion()));
 

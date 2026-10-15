@@ -35,6 +35,8 @@ public class Campaign {
     /** Not saved: how long the live party has made no headway while a player watches. */
     public double lastProgress = -1;
     public int stallSeconds;
+    /** Not saved: the raiders have already broken this castle's gate. */
+    public boolean rammed;
 
     public int total() {
         int n = 0;

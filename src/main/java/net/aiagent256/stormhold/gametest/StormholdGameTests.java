@@ -512,6 +512,49 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** The portcullis raises for the castle's own men on the move and stays down with an enemy at it. */
+    @GameTest(template = "arena")
+    public static void portcullisRaisesForGarrison(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = sample(g);
+        mgr.add(h);
+        BlockPos gate = h.gatePos;
+        for (int dx = -1; dx <= 1; dx++) for (int dy = 0; dy < 3; dy++) level.setBlock(gate.offset(dx, dy, 0),
+                net.aiagent256.stormhold.registry.ModBlocks.PORTCULLIS.get().defaultBlockState(), 3);
+        net.aiagent256.stormhold.entity.GarrisonEntity knight = null;
+        try {
+            h.gates = null;
+            net.aiagent256.stormhold.holding.Gates.tick(level, mgr, h);
+            if (h.gates == null || h.gates.size() != 1) throw new IllegalStateException("gate planes found: " + (h.gates == null ? "none" : h.gates.size()));
+            if (level.getBlockState(gate).getValue(net.aiagent256.stormhold.block.PortcullisBlock.OPEN)) throw new IllegalStateException("gate starts open");
+            // a posted guard beside it doesn't raise it
+            knight = Garrisons.spawn(level, mgr, h, Role.KNIGHT, gate.offset(0, 0, -3), h.owner, false);
+            if (knight == null) throw new IllegalStateException("no knight");
+            for (int i = 0; i < 6; i++) net.aiagent256.stormhold.holding.Gates.tick(level, mgr, h);
+            if (level.getBlockState(gate).getValue(net.aiagent256.stormhold.block.PortcullisBlock.OPEN)) throw new IllegalStateException("a posted guard opened the gate");
+            // one marching out does
+            knight.setMarchTarget(gate.offset(0, 0, 40));
+            for (int i = 0; i < 6; i++) net.aiagent256.stormhold.holding.Gates.tick(level, mgr, h);
+            if (!level.getBlockState(gate).getValue(net.aiagent256.stormhold.block.PortcullisBlock.OPEN)) throw new IllegalStateException("gate did not raise for a marching knight");
+            if (!level.getBlockState(gate).getCollisionShape(level, gate).isEmpty()) throw new IllegalStateException("raised gate still blocks");
+            // an enemy at the gate keeps it down
+            var foe = Garrisons.spawn(level, mgr, null, Role.KNIGHT, gate.offset(0, 0, 3), Sides.house("otherhouse"), false);
+            for (int i = 0; i < 8; i++) net.aiagent256.stormhold.holding.Gates.tick(level, mgr, h);
+            if (level.getBlockState(gate).getValue(net.aiagent256.stormhold.block.PortcullisBlock.OPEN)) throw new IllegalStateException("gate stayed up with an enemy at it");
+            if (foe != null) foe.discard();
+            // the ram
+            if (!net.aiagent256.stormhold.holding.Gates.breach(level, h)) throw new IllegalStateException("breach did nothing");
+            if (!level.getBlockState(gate).isAir()) throw new IllegalStateException("gate survived the ram");
+        } finally {
+            if (knight != null) knight.discard();
+            Garrisons.discardLive(level, h.live, false);
+            mgr.holdings.remove(h.id);
+            mgr.byKey.remove(h.key);
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

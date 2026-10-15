@@ -67,6 +67,8 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     @Nullable private BlockPos marchTarget;
     /** Somewhere to pass through on the way to the march target: the gate, when leaving a castle. */
     @Nullable private BlockPos marchVia;
+    /** The waypoint after {@link #marchVia}: outside the gate, once we're through it. */
+    @Nullable private BlockPos marchVia2;
     /** The player this soldier rides with, if mustered into a company. */
     @Nullable private UUID owner;
     /** A wall archer that has come down to fight; counts down back to holding the wall. */
@@ -170,6 +172,8 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     public void setMarchTarget(@Nullable BlockPos p) { this.marchTarget = p; }
     @Nullable public BlockPos marchVia() { return marchVia; }
     public void setMarchVia(@Nullable BlockPos p) { this.marchVia = p; }
+    @Nullable public BlockPos marchVia2() { return marchVia2; }
+    public void setMarchVia2(@Nullable BlockPos p) { this.marchVia2 = p; }
     @Nullable public UUID owner() { return owner; }
     public void setOwner(@Nullable UUID id) { this.owner = id; }
     public boolean holdsPosition() { return holdPosition && marchTarget == null && owner == null; }

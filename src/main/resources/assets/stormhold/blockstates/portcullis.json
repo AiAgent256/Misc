@@ -1,7 +1,10 @@
 {
   "variants": {
-    "": {
+    "open=false": {
       "model": "stormhold:block/portcullis"
+    },
+    "open=true": {
+      "model": "stormhold:block/portcullis_open"
     }
   }
 }
