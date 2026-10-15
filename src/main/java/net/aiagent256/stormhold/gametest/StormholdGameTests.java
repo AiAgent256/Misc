@@ -179,6 +179,16 @@ public class StormholdGameTests {
                 throw new IllegalStateException(id + " war table spot is blocked or floating at " + h.warTablePos);
             if (!level.getBlockState(h.lordPos).canBeReplaced() || level.getBlockState(h.lordPos.below()).canBeReplaced())
                 throw new IllegalStateException(id + " lord's spot is blocked or floating at " + h.lordPos);
+            // every castle has a gate, and a lost gate goes back up
+            net.aiagent256.stormhold.holding.Gates.tick(level, mgr, h);
+            if (h.gates == null || h.gates.isEmpty()) throw new IllegalStateException(id + " has no gate");
+            for (var plane : h.gates) {
+                if (plane.blocks.isEmpty()) throw new IllegalStateException(id + " has an empty gate plane");
+            }
+            if (!net.aiagent256.stormhold.holding.Gates.breach(level, h)) throw new IllegalStateException(id + " gate would not break");
+            h.gates = null;
+            net.aiagent256.stormhold.holding.Gates.tick(level, mgr, h);
+            if (h.gates == null || h.gates.isEmpty()) throw new IllegalStateException(id + " gate was not rebuilt");
             if (i == 0) {
                 // knock holes in the walls, then have the Master Builder put them back
                 List<BlockPos> holes = new ArrayList<>();

@@ -11,6 +11,7 @@ LOOT = "stormhold:chests/"
 
 
 def portcullis_plane(g, x0, x1, y0, height, z):
+    g.__dict__.setdefault("gate_planes", []).append([x0, y0, z, x1, y0 + height - 1, z])
     for y in range(y0, y0 + height):
         for x in range(x0, x1 + 1):
             if g.get(x, y, z) == "minecraft:air":
@@ -707,6 +708,10 @@ def watchtower_a(seed=5):
     g.fill(c - 2, GL - 1, c + 13, c + 2, GL - 1, W - 1, ROAD)
     for x in (c - 3, c + 3):
         g.fill(x, GL, c + 14, x, GL + 6, c + 15, STONE)
+    # lintel and a portcullis between the pillars
+    g.fill(c - 3, GL + 6, c + 14, c + 3, GL + 6, c + 15, STONE)
+    g.fill(c - 3, GL + 7, c + 14, c + 3, GL + 7, c + 15, SLAB_CAP)
+    portcullis_plane(g, c - 2, c + 2, GL, 6, c + 15)
     g.mark("gate", c, GL, W - 1)
     top = GL + 30
     # a proper tower: 19 wide, so the floors are rooms around the stair and not a ledge beside it

@@ -13,6 +13,7 @@ AIR = "minecraft:air"
 
 
 def portcullis_plane_x(g, z0, z1, y0, height, x):
+    g.__dict__.setdefault("gate_planes", []).append([x, y0, z0, x, y0 + height - 1, z1])
     for y in range(y0, y0 + height):
         for z in range(z0, z1 + 1):
             if g.get(x, y, z) == AIR:
@@ -618,6 +619,7 @@ def watchtower_b(seed=9):
     for x in (14, 19):
         g.fill(x, GL, 31, x, GL + 5, 31, "minecraft:spruce_log[axis=y]")
     g.fill(14, GL + 6, 31, 19, GL + 6, 31, "minecraft:spruce_log[axis=x]")
+    portcullis_plane(g, 15, 18, GL, 6, 31)
     g.mark("gate", 16, GL, W - 1)
     top = GL + 28
     square_tower(g, 10, 7, 23, 20, top, GL, floors=(GL + 7, GL + 14, GL + 21), spiral_at=(15, 12),

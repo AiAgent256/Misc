@@ -1,6 +1,6 @@
 {
   "textures": {
-    "particle": "minecraft:block/iron_bars"
+    "particle": "stormhold:block/portcullis"
   },
   "elements": []
 }

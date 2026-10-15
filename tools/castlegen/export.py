@@ -112,6 +112,7 @@ def write_layout(g, meta, tiles, path):
         "gate": posts.pop("gate")[0],
         "rally": posts.pop("rally", [[X // 2, meta["GL"], Z // 2]])[0],
         "posts": posts,
+        "gate_planes": [list(p) for p in getattr(g, "gate_planes", [])],
         "banners": [list(b) for b in g.banners if g.get(*b).endswith("wall_banner" ) or "wall_banner" in g.get(*b)],
     }
     os.makedirs(os.path.dirname(path), exist_ok=True)

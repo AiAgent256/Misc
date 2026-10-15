@@ -21,6 +21,8 @@ public class Layout {
     public final List<BlockPos> banners = new ArrayList<>();
     /** Non-garrison markers: barracks, notice_board, house, inn, smithy. */
     public final java.util.Map<String, List<BlockPos>> extras = new java.util.HashMap<>();
+    /** Each portcullis plane as {x0, y0, z0, x1, y1, z1}, so a lost gate can be put back. */
+    public final List<int[]> gatePlanes = new ArrayList<>();
 
     private Layout(JsonObject o) {
         name = o.get("name").getAsString();
@@ -51,6 +53,14 @@ public class Layout {
             posts.put(role, list);
         }
         for (JsonElement el : o.getAsJsonArray("banners")) banners.add(pos(el));
+        if (o.has("gate_planes")) {
+            for (JsonElement el : o.getAsJsonArray("gate_planes")) {
+                JsonArray a = el.getAsJsonArray();
+                int[] box = new int[6];
+                for (int i = 0; i < 6; i++) box[i] = a.get(i).getAsInt();
+                gatePlanes.add(box);
+            }
+        }
     }
 
     private static BlockPos pos(JsonElement e) {

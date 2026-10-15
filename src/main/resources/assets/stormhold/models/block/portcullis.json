@@ -2,7 +2,7 @@
   "parent": "minecraft:block/cube_all",
   "render_type": "minecraft:cutout",
   "textures": {
-    "all": "minecraft:block/iron_bars",
-    "particle": "minecraft:block/iron_bars"
+    "all": "stormhold:block/portcullis",
+    "particle": "stormhold:block/portcullis"
   }
 }

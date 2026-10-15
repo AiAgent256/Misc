@@ -38,7 +38,7 @@ public final class Gates {
     private static final int SCAN = 16;
 
     public static final class Plane {
-        final List<BlockPos> blocks = new ArrayList<>();
+        public final List<BlockPos> blocks = new ArrayList<>();
         AABB area;
         boolean open;
         int holdTicks;
@@ -46,13 +46,60 @@ public final class Gates {
 
     public static void tick(ServerLevel level, HoldingManager mgr, Holding h) {
         if (h.gates == null) {
-            if (!scan(level, h)) return;
+            if (!scan(level, mgr, h)) return;
         }
         for (Plane p : h.gates) tickPlane(level, mgr, h, p);
     }
 
+    /** Nobody about: any gate left up comes down, so a castle never sits there with its gate invisible. */
+    public static void idle(ServerLevel level, Holding h) {
+        if (h.gates == null) return;
+        for (Plane p : h.gates) {
+            if (p.open && level.isLoaded(p.blocks.get(0))) set(level, p, false, false);
+        }
+    }
+
+    /**
+     * Put back any gate the castle's layout has and the world doesn't: castles generated before their
+     * template had a gate, and gates rammed in a raid that's since ended. Only fills air (and grass,
+     * snow and the like), never a block someone placed. Returns the blocks placed.
+     */
+    public static int restore(ServerLevel level, HoldingManager mgr, Holding h) {
+        Layout l = h.layout != null ? DataRegistries.layout(h.layout) : null;
+        if (l == null || l.gatePlanes.isEmpty() || h.box == null) return 0;
+        for (Campaign c : mgr.campaigns) {
+            if (c.stage != Campaign.Stage.DONE && h.id.equals(c.target)) return 0;     // not mid-siege
+        }
+        BlockPos o = new BlockPos(h.box.minX(), h.box.minY(), h.box.minZ());
+        BlockState gate = ModBlocks.PORTCULLIS.get().defaultBlockState();
+        int placed = 0;
+        for (int[] b : l.gatePlanes) {
+            BlockPos a = o.offset(b[0], b[1], b[2]), z = o.offset(b[3], b[4], b[5]);
+            if (!level.isLoaded(a) || !level.isLoaded(z)) continue;
+            boolean standing = false;
+            for (BlockPos q : BlockPos.betweenClosed(a, z)) {
+                if (level.getBlockState(q).is(ModBlocks.PORTCULLIS.get())) {
+                    standing = true;
+                    break;
+                }
+            }
+            if (standing) continue;
+            for (BlockPos q : BlockPos.betweenClosed(a, z)) {
+                BlockState s = level.getBlockState(q);
+                if (s.isAir() || (s.canBeReplaced() && s.getFluidState().isEmpty())) {
+                    level.setBlock(q.immutable(), gate, 3);
+                    placed++;
+                }
+            }
+        }
+        if (placed > 0) {
+            net.aiagent256.stormhold.Stormhold.LOGGER.info("Stormhold: rebuilt the gate of {} ({} blocks)", h.name, placed);
+        }
+        return placed;
+    }
+
     /** Find the portcullis planes around the gate markers. False if those chunks aren't loaded yet. */
-    private static boolean scan(ServerLevel level, Holding h) {
+    private static boolean scan(ServerLevel level, HoldingManager mgr, Holding h) {
         List<BlockPos> markers = new ArrayList<>();
         if (!h.gatePos.equals(BlockPos.ZERO)) markers.add(h.gatePos);
         for (var e : h.extras.entrySet()) if (e.getKey().startsWith("gate")) markers.addAll(e.getValue());
@@ -60,14 +107,17 @@ public final class Gates {
             h.gates = List.of();
             return true;
         }
+        for (BlockPos m : markers) {
+            for (int x = m.getX() - SCAN; x <= m.getX() + SCAN + 15; x += 16) {
+                for (int z = m.getZ() - SCAN; z <= m.getZ() + SCAN + 15; z += 16) {
+                    if (!level.isLoaded(new BlockPos(Math.min(x, m.getX() + SCAN), m.getY(), Math.min(z, m.getZ() + SCAN)))) return false;
+                }
+            }
+        }
+        restore(level, mgr, h);
         Set<BlockPos> seen = new HashSet<>();
         List<Plane> planes = new ArrayList<>();
         for (BlockPos m : markers) {
-            for (int x = m.getX() - SCAN; x <= m.getX() + SCAN; x += 16) {
-                for (int z = m.getZ() - SCAN; z <= m.getZ() + SCAN; z += 16) {
-                    if (!level.isLoaded(new BlockPos(x, m.getY(), z))) return false;
-                }
-            }
             for (int x = m.getX() - SCAN; x <= m.getX() + SCAN; x++) {
                 for (int z = m.getZ() - SCAN; z <= m.getZ() + SCAN; z++) {
                     for (int y = m.getY() - 2; y <= m.getY() + 14; y++) {
@@ -78,6 +128,8 @@ public final class Gates {
                 }
             }
         }
+        // a fresh look: every gate starts down, whatever state it was saved in
+        for (Plane p : planes) if (p.open) set(level, p, false, false);
         h.gates = planes;
         return true;
     }
@@ -114,11 +166,12 @@ public final class Gates {
         boolean friend = false, foe = false;
         for (Entity e : level.getEntities((Entity) null, plane.area.inflate(HOLD_RANGE, 1, HOLD_RANGE))) {
             if (!(e instanceof LivingEntity le) || !le.isAlive()) continue;
-            if (e instanceof Player p && (p.isSpectator() || p.isCreative())) continue;
+            if (e instanceof Player p && p.isSpectator()) continue;
+            boolean creative = e instanceof Player p && p.isCreative();
             double d = distance(plane.area, e);
             if (isFriend(mgr, h, e)) {
                 if (d <= OPEN_RANGE) friend = true;
-            } else if (isFoe(h, e)) {
+            } else if (!creative && isFoe(h, e)) {
                 foe = true;
             }
         }
@@ -130,16 +183,21 @@ public final class Gates {
             return;
         }
         plane.holdTicks = 3;
-        plane.open = want;
+        set(level, plane, want, true);
+    }
+
+    private static void set(ServerLevel level, Plane plane, boolean open, boolean sound) {
+        plane.open = open;
         for (BlockPos p : plane.blocks) {
             BlockState s = level.getBlockState(p);
-            if (s.is(ModBlocks.PORTCULLIS.get()) && s.getValue(PortcullisBlock.OPEN) != want) {
-                level.setBlock(p, s.setValue(PortcullisBlock.OPEN, want), 3);
+            if (s.is(ModBlocks.PORTCULLIS.get()) && s.getValue(PortcullisBlock.OPEN) != open) {
+                level.setBlock(p, s.setValue(PortcullisBlock.OPEN, open), 3);
             }
         }
+        if (!sound) return;
         BlockPos c = BlockPos.containing(plane.area.getCenter());
-        level.playSound(null, c, want ? SoundEvents.CHAIN_BREAK : SoundEvents.CHAIN_PLACE, SoundSource.BLOCKS, 1.5F, want ? 0.6F : 0.5F);
-        level.playSound(null, c, want ? SoundEvents.IRON_DOOR_OPEN : SoundEvents.IRON_DOOR_CLOSE, SoundSource.BLOCKS, 1.0F, 0.5F);
+        level.playSound(null, c, open ? SoundEvents.CHAIN_BREAK : SoundEvents.CHAIN_PLACE, SoundSource.BLOCKS, 1.5F, open ? 0.6F : 0.5F);
+        level.playSound(null, c, open ? SoundEvents.IRON_DOOR_OPEN : SoundEvents.IRON_DOOR_CLOSE, SoundSource.BLOCKS, 1.0F, 0.5F);
     }
 
     /** Raiders with a ram: every portcullis of the castle comes down in splinters. */
