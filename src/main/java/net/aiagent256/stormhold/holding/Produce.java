@@ -210,7 +210,7 @@ public final class Produce {
     }
 
     /** What a miner gets out of a block. */
-    private static void yield(BlockState s, Map<String, Integer> made) {
+    private static void takings(BlockState s, Map<String, Integer> made) {
         String item = null;
         int n = 1;
         if (s.is(BlockTags.COAL_ORES) || s.is(Blocks.COAL_BLOCK)) item = "coal";
@@ -260,7 +260,7 @@ public final class Produce {
                 BlockPos p = c.above(y);
                 BlockState s = level.getBlockState(p);
                 if (s.isAir()) continue;
-                yield(s, made);
+                takings(s, made);
                 level.destroyBlock(p, false);
             }
             BlockPos floor = c.below();
@@ -276,7 +276,7 @@ public final class Produce {
                     BlockPos p = post.above(y);
                     BlockState s = level.getBlockState(p);
                     if (s.isAir() || diggable(s)) {
-                        if (!s.isAir()) yield(s, made);
+                        if (!s.isAir()) takings(s, made);
                         level.setBlock(p, Blocks.SPRUCE_LOG.defaultBlockState(), 2);
                     }
                 }
