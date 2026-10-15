@@ -9,6 +9,7 @@ import net.aiagent256.stormhold.holding.Campaigns;
 import net.aiagent256.stormhold.holding.Company;
 import net.aiagent256.stormhold.holding.Economy;
 import net.aiagent256.stormhold.holding.Holding;
+import net.aiagent256.stormhold.holding.HoldingEvents;
 import net.aiagent256.stormhold.holding.HoldingManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -35,7 +36,7 @@ public final class Net {
             () -> VERSION, VERSION::equals, VERSION::equals);
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
-            MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13;
+            MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -84,7 +85,10 @@ public final class Net {
                     if (c.kind == Campaign.Kind.RAID && h.id.equals(c.target)) status.append("Under attack by ").append(c.total()).append(" men. ");
                     if (c.kind == Campaign.Kind.PARTY && h.id.equals(c.origin)) status.append("War party out: ").append(c.total()).append(" men, ")
                             .append(c.stage.name().toLowerCase()).append(". ");
+                    if (c.kind == Campaign.Kind.COLUMN && h.id.equals(c.origin)) status.append("Column of ").append(c.total())
+                            .append(" riding to you, ").append(net.aiagent256.stormhold.holding.Columns.eta(c)).append(" out. ");
                 }
+                if (h.reinforceKeep > 0) status.append("Supply line: keeps ").append(h.reinforceKeep).append(" men with you. ");
                 if (h.nextRaid > 0) {
                     long days = Math.max(0, (h.nextRaid - level.getGameTime()) / 24000);
                     status.append(h.raidWarned ? "Raid expected within a day." : "Next raid in about " + days + " days.");
@@ -151,6 +155,24 @@ public final class Net {
                 case MUSTER_ARCHERS -> Company.muster(level, mgr, player, h, Role.ARCHER, Math.max(1, Math.min(40, a.amount())));
                 case MUSTER_CROSSBOWMEN -> Company.muster(level, mgr, player, h, Role.CROSSBOWMAN, Math.max(1, Math.min(40, a.amount())));
                 case DISMISS -> Company.dismiss(level, mgr, player, h);
+                case SEND_COLUMN -> {
+                    if (net.aiagent256.stormhold.holding.Columns.active(mgr, h)) {
+                        player.sendSystemMessage(Component.literal("A column from " + h.name + " is already on the road."));
+                    } else {
+                        var want = new java.util.EnumMap<Role, Integer>(Role.class);
+                        want.put(Role.KNIGHT, Math.max(0, Math.min(60, a.pos().getX())));
+                        want.put(Role.ARCHER, Math.max(0, Math.min(60, a.pos().getY())));
+                        want.put(Role.CROSSBOWMAN, Math.max(0, Math.min(60, a.pos().getZ())));
+                        net.aiagent256.stormhold.holding.Columns.send(level, mgr, player, h, want);
+                    }
+                }
+                case KEEP_WITH_ME -> {
+                    h.reinforceKeep = Math.max(0, Math.min(80, a.amount()));
+                    h.nextColumn = 0;
+                    player.sendSystemMessage(h.reinforceKeep > 0
+                            ? HoldingEvents.gold(h.name + " will keep " + h.reinforceKeep + " men with you, sending a column whenever you run short.")
+                            : Component.literal("Supply line from " + h.name + " cancelled."));
+                }
                 case ARM -> {
                     var kit = net.aiagent256.stormhold.holding.Armoury.Kit.byTier(a.amount());
                     if (kit != null) net.aiagent256.stormhold.holding.Armoury.arm(level, mgr, player, h, kit, a.pos().getX() != 0);

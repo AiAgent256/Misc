@@ -97,7 +97,9 @@ public class Holding {
     @Nullable public BlockPos attackTarget;
     @Nullable public BlockPos supplyTarget;
     public final Map<ResourceLocation, Integer> stock = new HashMap<>();
-    public long nextProduce, nextRaid, nextReplenish, nextCampaign;
+    public long nextProduce, nextRaid, nextReplenish, nextCampaign, nextColumn;
+    /** Supply line: keep this many men with the owner, sending columns to top up. 0 = off. */
+    public int reinforceKeep;
     public boolean raidWarned;
     public boolean villagersSpawned;
     public boolean bannersDirty = true;
@@ -257,6 +259,8 @@ public class Holding {
         t.putLong("NextRaid", nextRaid);
         t.putLong("NextReplenish", nextReplenish);
         t.putLong("NextCampaign", nextCampaign);
+        t.putLong("NextColumn", nextColumn);
+        t.putInt("ReinforceKeep", reinforceKeep);
         t.putBoolean("RaidWarned", raidWarned);
         t.putBoolean("Villagers", villagersSpawned);
         t.putBoolean("BannersDirty", bannersDirty);
@@ -326,6 +330,8 @@ public class Holding {
         h.nextRaid = t.getLong("NextRaid");
         h.nextReplenish = t.getLong("NextReplenish");
         h.nextCampaign = t.getLong("NextCampaign");
+        h.nextColumn = t.getLong("NextColumn");
+        h.reinforceKeep = t.getInt("ReinforceKeep");
         h.raidWarned = t.getBoolean("RaidWarned");
         h.villagersSpawned = t.getBoolean("Villagers");
         h.bannersDirty = t.getBoolean("BannersDirty");

@@ -39,6 +39,7 @@ public final class HoldingTicker {
     private static void tickHolding(ServerLevel level, HoldingManager mgr, Holding h, long now) {
         Economy.tickHolding(level, mgr, h, now);
         Campaigns.scheduleRaids(level, mgr, h, now);
+        Columns.tickSupply(level, mgr, h, now);
         City.tickPostings(level, mgr, h, now);
         if (h.isPlayerOwned() && h.mode == Holding.Mode.ATTACK && h.attackTarget != null && now >= h.nextCampaign) {
             h.nextCampaign = now + 6000;

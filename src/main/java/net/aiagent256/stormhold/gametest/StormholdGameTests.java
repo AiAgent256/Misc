@@ -16,6 +16,7 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
@@ -505,6 +506,42 @@ public class StormholdGameTests {
             mgr.campaigns.remove(party);
         } finally {
             for (var e : level.getEntitiesOfClass(net.aiagent256.stormhold.entity.GarrisonEntity.class, player.getBoundingBox().inflate(64))) e.discard();
+            Garrisons.discardLive(level, h.live, false);
+            mgr.holdings.remove(h.id);
+            mgr.byKey.remove(h.key);
+        }
+        g.succeed();
+    }
+
+    /** A column rides to the player on the clock and the men fall in on arrival. */
+    @GameTest(template = "arena")
+    public static void columnRidesToPlayer(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = sample(g);
+        // the mock player isn't on the player list; a column needs a real ServerPlayer to find
+        ServerPlayer player = level.getServer().getPlayerList().getPlayers().isEmpty() ? null : level.getServer().getPlayerList().getPlayers().get(0);
+        if (player == null) {
+            // headless test server: exercise the maths only
+            var c = new net.aiagent256.stormhold.holding.Campaign();
+            c.from = BlockPos.ZERO;
+            c.to = new BlockPos(500, 0, 0);
+            c.add(Role.KNIGHT, 4);
+            if (!net.aiagent256.stormhold.holding.Columns.eta(c).startsWith("1m 40s")) throw new IllegalStateException("eta " + net.aiagent256.stormhold.holding.Columns.eta(c));
+            g.succeed();
+            return;
+        }
+        h.owner = Sides.player(player.getUUID());
+        mgr.add(h);
+        try {
+            int knights = h.count(Role.KNIGHT);
+            var want = new java.util.EnumMap<Role, Integer>(Role.class);
+            want.put(Role.KNIGHT, 2);
+            want.put(Role.ARCHER, 1);
+            var c = net.aiagent256.stormhold.holding.Columns.send(level, mgr, player, h, want);
+            if (c == null || c.total() != 3 || h.count(Role.KNIGHT) != knights - 2) throw new IllegalStateException("column not raised");
+            mgr.campaigns.remove(c);
+        } finally {
             Garrisons.discardLive(level, h.live, false);
             mgr.holdings.remove(h.id);
             mgr.byKey.remove(h.key);

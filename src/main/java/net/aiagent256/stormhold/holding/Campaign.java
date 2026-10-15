@@ -13,7 +13,7 @@ import java.util.UUID;
 
 /** An army on the move: a house raid against a player's castle, or a player's war party. */
 public class Campaign {
-    public enum Kind {RAID, PARTY, CAMP}
+    public enum Kind {RAID, PARTY, CAMP, COLUMN}
 
     public enum Stage {MARCH, SIEGE, RETURN, DONE}
 
@@ -23,6 +23,8 @@ public class Campaign {
     public String side = "";
     @Nullable public UUID origin;
     @Nullable public UUID target;
+    /** COLUMN: the player the men are riding to join. */
+    @Nullable public UUID player;
     public BlockPos from = BlockPos.ZERO;
     public BlockPos to = BlockPos.ZERO;
     public double progress;
@@ -73,6 +75,7 @@ public class Campaign {
         t.putString("Side", side);
         if (origin != null) t.putUUID("Origin", origin);
         if (target != null) t.putUUID("Target", target);
+        if (player != null) t.putUUID("Player", player);
         t.put("From", NbtUtils.writeBlockPos(from));
         t.put("To", NbtUtils.writeBlockPos(to));
         t.putDouble("Progress", progress);
@@ -94,6 +97,7 @@ public class Campaign {
         c.side = t.getString("Side");
         if (t.hasUUID("Origin")) c.origin = t.getUUID("Origin");
         if (t.hasUUID("Target")) c.target = t.getUUID("Target");
+        if (t.hasUUID("Player")) c.player = t.getUUID("Player");
         c.from = NbtUtils.readBlockPos(t.getCompound("From"));
         c.to = NbtUtils.readBlockPos(t.getCompound("To"));
         c.progress = t.getDouble("Progress");

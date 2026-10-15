@@ -40,7 +40,7 @@ public final class Company {
     public static int muster(ServerLevel level, HoldingManager mgr, Player player, Holding h, Role role, int n) {
         if (!inRange(player, h)) {
             player.sendSystemMessage(Component.literal("Your men at " + h.name + " are too far away to hear you. Ride within "
-                    + CALL_RANGE + " blocks to gather them.").withStyle(ChatFormatting.RED));
+                    + CALL_RANGE + " blocks to gather them, or use Send to have a column ride to you.").withStyle(ChatFormatting.RED));
             return 0;
         }
         int done = 0;
@@ -82,6 +82,12 @@ public final class Company {
         }
         mgr.setDirty();
         return done;
+    }
+
+    /** A man from {@code h} joins the player's company at their side (a column arriving, say). */
+    public static boolean arrive(ServerLevel level, HoldingManager mgr, Player player, Holding h, Role role) {
+        if (RecruitsCompat.loaded()) return RecruitsCompat.muster(level, player, role);
+        return spawnFollower(level, mgr, player, h, role) != null;
     }
 
     private static GarrisonEntity spawnFollower(ServerLevel level, HoldingManager mgr, Player player, Holding h, Role role) {

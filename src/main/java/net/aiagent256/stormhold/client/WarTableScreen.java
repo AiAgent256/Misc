@@ -134,12 +134,31 @@ public class WarTableScreen extends Screen {
         muster.active = near && (want[0] + want[1] + want[2]) > 0;
         this.addRenderableWidget(muster);
         y += 24;
-        Button dismiss = Button.builder(Component.literal("Dismiss my men here into " + trim(h.name(), 14)),
-                b -> Net.sendAction(h.id(), Net.DISMISS, BlockPos.ZERO, 0)).bounds(rx, y, 230, 18).build();
+        Button dismiss = Button.builder(Component.literal("Dismiss here"), b -> Net.sendAction(h.id(), Net.DISMISS, BlockPos.ZERO, 0))
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Every man of yours within 24 blocks joins the garrison of "
+                        + h.name() + ". You must be within " + net.aiagent256.stormhold.holding.Company.CALL_RANGE + " blocks of it.")))
+                .bounds(rx, y, 84, 18).build();
         dismiss.active = near;
         this.addRenderableWidget(dismiss);
+        Button send = Button.builder(Component.literal("Send to me"), b -> Net.sendAction(h.id(), Net.SEND_COLUMN,
+                new BlockPos(want[0], want[1], want[2]), 0))
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("The chosen men leave " + h.name()
+                        + " now as a column and ride to you on the clock, " + (int) net.aiagent256.stormhold.holding.Columns.SPEED
+                        + " blocks a second (about " + etaFrom(h) + " from here). They join your company when they arrive. "
+                        + "A castle of a house that hates you near the road will take a bite out of them.")))
+                .bounds(rx + 88, y, 72, 18).build();
+        send.active = (want[0] + want[1] + want[2]) > 0;
+        this.addRenderableWidget(send);
+        boolean supply = h.status().contains("Supply line");
+        this.addRenderableWidget(Button.builder(Component.literal(supply ? "Supply: on" : "Supply line"), b -> Net.sendAction(h.id(), Net.KEEP_WITH_ME,
+                BlockPos.ZERO, supply ? 0 : Math.max(1, want[0] + want[1] + want[2])))
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(supply
+                        ? "Click to cancel the standing order."
+                        : "Standing order: keep " + Math.max(1, want[0] + want[1] + want[2]) + " men (the counts above) with you. "
+                        + "Whenever your company runs short, " + h.name() + " sends a column, at most one every five minutes.")))
+                .bounds(rx + 164, y, 70, 18).build());
         this.addRenderableWidget(Button.builder(Component.literal("Refresh"), b -> Net.sendAction(h.id(), Net.REFRESH, BlockPos.ZERO, 0))
-                .bounds(rx + 236, y, 54, 18).build());
+                .bounds(rx + 238, y, 52, 18).build());
         // ---- armoury: kit for the men around you
         y += 32;
         String[] kits = {"Iron", "Diamond", "Netherite"};
@@ -165,6 +184,14 @@ public class WarTableScreen extends Screen {
 
     /** How many of each (knights, archers, crossbowmen) the player wants to take; kept between refreshes. */
     private final int[] want = {4, 2, 0};
+
+    private static String etaFrom(HoldingInfo h) {
+        var p = Minecraft.getInstance().player;
+        if (p == null) return "?";
+        double dx = p.getX() - h.pos().getX(), dz = p.getZ() - h.pos().getZ();
+        int secs = (int) (Math.sqrt(dx * dx + dz * dz) / net.aiagent256.stormhold.holding.Columns.SPEED);
+        return secs >= 60 ? (secs / 60) + " min " + (secs % 60) + " s" : secs + " s";
+    }
 
     private static boolean inCallRange(HoldingInfo h) {
         var p = Minecraft.getInstance().player;
