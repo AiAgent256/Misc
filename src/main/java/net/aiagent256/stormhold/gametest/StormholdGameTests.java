@@ -180,8 +180,17 @@ public class StormholdGameTests {
             if (!level.getBlockState(h.lordPos).canBeReplaced() || level.getBlockState(h.lordPos.below()).canBeReplaced())
                 throw new IllegalStateException(id + " lord's spot is blocked or floating at " + h.lordPos);
             // every castle has a gate, and a lost gate goes back up
+            for (int dx = -2; dx <= 2; dx++)
+                for (int dz = -2; dz <= 2; dz++) level.getChunk((h.gatePos.getX() >> 4) + dx, (h.gatePos.getZ() >> 4) + dz);
             net.aiagent256.stormhold.holding.Gates.tick(level, mgr, h);
-            if (h.gates == null || h.gates.isEmpty()) throw new IllegalStateException(id + " has no gate");
+            if (h.gates == null) throw new IllegalStateException(id + " gate scan found its chunks unloaded");
+            if (h.gates.isEmpty()) {
+                int pc = 0;
+                for (BlockPos q : BlockPos.betweenClosed(h.box.minX(), h.box.minY(), h.box.minZ(), h.box.maxX(), h.box.maxY(), h.box.maxZ()))
+                    if (level.getBlockState(q).is(net.aiagent256.stormhold.registry.ModBlocks.PORTCULLIS.get())) pc++;
+                throw new IllegalStateException(id + " has no gate near " + h.gatePos + "; portcullis blocks in the castle: " + pc
+                        + ", layout planes: " + lay.gatePlanes.size() + ", restore would place " + net.aiagent256.stormhold.holding.Gates.restore(level, mgr, h));
+            }
             for (var plane : h.gates) {
                 if (plane.blocks.isEmpty()) throw new IllegalStateException(id + " has an empty gate plane");
             }
