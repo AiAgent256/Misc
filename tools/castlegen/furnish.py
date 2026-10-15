@@ -1,0 +1,561 @@
+"""Lived-in interiors.
+
+Finds every roofed, enclosed room in a layout (any floor, any tower), works out what it is for from
+what's already in it (beds, a hearth, an anvil, the lord's seat, treasury chests, pews) or failing
+that from its size, and dresses it: beds and footlockers in barracks, trestle tables and banners in
+halls, stacked barrels and hay in stores, racks of weapon chests in armouries, a bed, books and a
+strongbox in a chamber. Stairs, doorways, posts and anything already placed are left alone.
+"""
+import numpy as np
+from scipy import ndimage
+
+from grid import FACING_VEC
+
+AIR = "minecraft:air"
+LOOT = "stormhold:chests/"
+MIN_ROOM, MAX_ROOM = 9, 1400
+
+# ---------------------------------------------------------------- block classes
+
+
+def _classes(g):
+    pal = g.palette
+    n = len(pal)
+    air = np.zeros(n, bool)
+    solid = np.zeros(n, bool)
+    stairs = np.zeros(n, bool)
+    openish = np.zeros(n, bool)     # fences, panes, bars, walls: you can see through, can't walk through
+    for i, s in enumerate(pal):
+        name = s.split("[")[0]
+        if s in ("<void>", AIR) or "water" in name or "lava" in name:
+            air[i] = s == AIR
+            continue
+        solid[i] = True
+        if name.endswith("_stairs"):
+            stairs[i] = True
+        if any(k in name for k in ("fence", "glass_pane", "iron_bars", "_wall", "chain", "lantern", "candle")):
+            openish[i] = True
+    return air, solid, stairs, openish
+
+
+# ---------------------------------------------------------------- rooms
+
+
+class Room:
+    def __init__(self, y, cells, g):
+        self.y = y
+        self.cells = cells                       # set of (x, z)
+        xs = [c[0] for c in cells]
+        zs = [c[1] for c in cells]
+        self.x0, self.x1, self.z0, self.z1 = min(xs), max(xs), min(zs), max(zs)
+        self.kind = None
+        self.doorways = set()                    # cells inside the room next to an opening
+        self.height = 3
+        self.g = g
+
+    def size(self):
+        return len(self.cells)
+
+    def w(self):
+        return self.x1 - self.x0 + 1
+
+    def d(self):
+        return self.z1 - self.z0 + 1
+
+
+def find_rooms(g, GL, protected):
+    air, solid, stairs, openish = _classes(g)
+    A = g.a
+    rooms = []
+    for y in range(GL, g.Y - 3):
+        here = air[A[:, :, y]] & air[A[:, :, y + 1]]
+        below = A[:, :, y - 1]
+        floor = solid[below] & ~stairs[below] & ~openish[below]
+        roofed = np.zeros_like(here)
+        for h in range(2, 9):
+            if y + h < g.Y:
+                roofed |= solid[A[:, :, y + h]]
+        mask = here & floor & roofed
+        if not mask.any():
+            continue
+        lab, n = ndimage.label(mask)
+        if n == 0:
+            continue
+        sizes = ndimage.sum(mask, lab, range(1, n + 1))
+        for i, sz in enumerate(sizes, start=1):
+            if sz < MIN_ROOM or sz > MAX_ROOM:
+                continue
+            cells = set(zip(*[c.tolist() for c in (lab == i).nonzero()]))
+            room = Room(y, cells, g)
+            if min(room.w(), room.d()) <= 2:
+                continue  # a corridor or gallery
+            # must be mostly walled in: count what surrounds it at this height
+            open_edges = 0
+            edges = 0
+            doorways = set()
+            for (x, z) in cells:
+                for (dx, dz) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, nz = x + dx, z + dz
+                    if (nx, nz) in cells:
+                        continue
+                    edges += 1
+                    if not g.inb(nx, y, nz):
+                        open_edges += 1
+                        continue
+                    pid = A[nx, nz, y]
+                    if air[pid] or openish[pid]:
+                        open_edges += 1
+                        if air[pid]:
+                            doorways.add((x, z))
+            if edges == 0 or open_edges / edges > 0.30:
+                continue
+            # the gate passage is not a room
+            if _near_portcullis(g, room):
+                continue
+            room.doorways = doorways
+            room.height = _height(g, room, solid)
+            rooms.append(room)
+    return rooms
+
+
+def _near_portcullis(g, room):
+    pc = g.index.get("stormhold:portcullis")
+    if pc is None:
+        return False
+    sub = g.a[max(0, room.x0 - 2):room.x1 + 3, max(0, room.z0 - 2):room.z1 + 3, room.y:room.y + 4]
+    return bool((sub == pc).any())
+
+
+def _height(g, room, solid):
+    hs = []
+    for (x, z) in list(room.cells)[:40]:
+        for h in range(2, 12):
+            if room.y + h >= g.Y or solid[g.a[x, z, room.y + h]]:
+                hs.append(h)
+                break
+    return int(np.median(hs)) if hs else 3
+
+
+# ---------------------------------------------------------------- what is this room?
+
+
+def classify(g, room, GL):
+    y = room.y
+    names = {}
+    loot = {}
+    # look at the room's free floor and the cells touching it: the beds and hearths that say what a
+    # room is for are exactly the cells that aren't free, but a walled-off vault next door is not ours
+    scan = set(room.cells)
+    for (x, z) in room.cells:
+        for (dx, dz) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            scan.add((x + dx, z + dz))
+    for (x, z) in scan:
+        if True:
+            for yy in (y, y + 1):
+                s = g.get(x, yy, z).split("[")[0]
+                names[s] = names.get(s, 0) + 1
+                nb = g.block_nbt.get((x, yy, z))
+                if nb and "LootTable" in nb:
+                    k = nb["LootTable"].rsplit("/", 1)[-1]
+                    loot[k] = loot.get(k, 0) + 1
+    markers = set()
+    for role, pts in g.markers.items():
+        for (mx, my, mz) in pts:
+            if my == y and (mx, mz) in room.cells:
+                markers.add(role)
+    beds = sum(v for k, v in names.items() if k.endswith("_bed")) // 2
+    if "lord" in markers or "war_table" in markers:
+        return "hall" if room.size() > 60 else "chamber"
+    if "banner_stand" in markers:
+        return None
+    if any(k in names for k in ("minecraft:smoker", "minecraft:water_cauldron")) or "castle_kitchen" in loot:
+        return "kitchen"
+    if "minecraft:anvil" in names or "castle_smithy" in loot:
+        return "smithy"
+    if any("treasury" in k for k in loot):
+        return "treasury"
+    if beds >= 3:
+        return "barracks"
+    if beds >= 1:
+        return "chamber"
+    if names.get("minecraft:candle", 0) + sum(v for k, v in names.items() if "stained_glass" in k and "gray" not in k) >= 5:
+        return "chapel"
+    if names.get("minecraft:hay_block", 0) >= 3 and room.size() > 40:
+        return "stable"
+    if "notice_board" in markers or "inn" in markers or "smithy" in markers or "house" in markers:
+        return None
+    # empty: by size and position
+    s = room.size()
+    if s < 36:
+        return "store" if g.rng.random() < 0.55 else "guardroom"
+    if s < 140:
+        return g.rng.choice(["quarters", "armoury", "mess", "store"], p=[0.4, 0.25, 0.2, 0.15])
+    return "hall"
+
+
+# ---------------------------------------------------------------- placement helpers
+
+
+class Dresser:
+    def __init__(self, g, room, protected):
+        self.g = g
+        self.room = room
+        self.y = room.y
+        self.rng = g.rng
+        self.used = set()
+        air, solid, stairs, openish = _classes(g)
+        self.solid, self.stairs, self.openish = solid, stairs, openish
+        self.clear = set()
+        for (x, z) in room.doorways:
+            for dx in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    self.clear.add((x + dx, z + dz))
+        for (x, z) in room.cells:
+            # next to a stair, a drop, or a post: keep the way clear
+            for (dx, dz) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, nz = x + dx, z + dz
+                if not g.inb(nx, self.y, nz):
+                    continue
+                b = g.a[nx, nz, self.y - 1]
+                if not solid[b] or stairs[b] or stairs[g.a[nx, nz, self.y]]:
+                    self.clear.add((x, z))
+            if (x, self.y, z) in protected or (x, self.y + 1, z) in protected:
+                self.clear.add((x, z))
+        self.wall = {}   # cell -> facing (into the room) for cells against a solid wall
+        for (x, z) in room.cells:
+            if (x, z) in self.clear:
+                continue
+            for (dx, dz) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, nz = x + dx, z + dz
+                if (nx, nz) in room.cells or not g.inb(nx, self.y, nz):
+                    continue
+                b = g.a[nx, nz, self.y]
+                if solid[b] and not openish[b] and not stairs[b]:
+                    self.wall[(x, z)] = (-dx, -dz)   # facing away from the wall
+                    break
+        self.inner = [c for c in room.cells if c not in self.clear and c not in self.wall
+                      and all((c[0] + dx, c[1] + dz) in room.cells for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)))]
+
+    # -- queries
+    def free(self, x, z, tall=1):
+        if (x, z) in self.used or (x, z) in self.clear or (x, z) not in self.room.cells:
+            return False
+        for h in range(tall):
+            if self.g.get(x, self.y + h, z) != AIR:
+                return False
+        return True
+
+    def wall_cells(self, shuffle=True):
+        cells = list(self.wall.items())
+        if shuffle:
+            self.rng.shuffle(cells)
+        return cells
+
+    def take(self, x, z):
+        self.used.add((x, z))
+
+    # -- primitives
+    def put(self, x, z, block, dy=0, nbt=None):
+        self.g.set(x, self.y + dy, z, block, nbt)
+        self.take(x, z)
+
+    def facing(self, f):
+        dx, dz = f
+        return "east" if dx > 0 else "west" if dx < 0 else "south" if dz > 0 else "north"
+
+    def chest(self, x, z, f, loot):
+        self.g.chest(x, self.y, z, self.facing(f), LOOT + loot)
+        self.take(x, z)
+
+    def barrel(self, x, z, loot, dy=0, f=None):
+        self.g.barrel(x, self.y + dy, z, LOOT + loot, facing=self.facing(f) if f else "up")
+        self.take(x, z)
+
+    def bed(self, x, z, f, color):
+        """Foot against the wall at (x, z), head one cell into the room."""
+        hx, hz = x + f[0], z + f[1]
+        if not self.free(x, z) or not self.free(hx, hz):
+            return False
+        self.g.bed(x, self.y, z, self.facing(f), color)
+        self.take(x, z)
+        self.take(hx, hz)
+        return True
+
+    def table(self, x, z, length, axis, chairs=True, top="minecraft:spruce_slab[type=top]", leg="minecraft:dark_oak_fence"):
+        """A 2-tall trestle table of `length` along axis, with stair chairs either side."""
+        cells = [(x + i, z) if axis == "x" else (x, z + i) for i in range(length)]
+        for (cx, cz) in cells:
+            if not self.free(cx, cz, 2):
+                return False
+        for (cx, cz) in cells:
+            self.put(cx, cz, leg)
+            self.g.set(cx, self.y + 1, cz, top)
+        for (cx, cz) in cells[::2]:
+            self.g.set(cx, self.y + 2, cz, self.rng.choice(["minecraft:candle[candles=2,lit=true]", "minecraft:candle[candles=1,lit=true]",
+                                                            "minecraft:lantern[hanging=false]", AIR, AIR]))
+        if chairs:
+            for (cx, cz) in cells:
+                for (dx, dz) in (((0, 1), (0, -1)) if axis == "x" else ((1, 0), (-1, 0))):
+                    sx, sz = cx + dx, cz + dz
+                    if self.free(sx, sz) and self.rng.random() < 0.75:
+                        self.g.stair(sx, self.y, sz, "minecraft:dark_oak_stairs", self.facing((-dx, -dz)))
+                        self.take(sx, sz)
+        return True
+
+    def lanterns(self, every=5):
+        """Hang lanterns from the ceiling if the room has none."""
+        r = self.room
+        for (x, z) in r.cells:
+            for h in range(2, r.height + 1):
+                if self.g.get(x, self.y + h, z).startswith("minecraft:lantern"):
+                    return
+        h = r.height - 1
+        if h < 2:
+            return
+        if self.y + h + 1 >= self.g.Y:
+            return
+        for x in range(r.x0 + 2, r.x1 - 1, every):
+            for z in range(r.z0 + 2, r.z1 - 1, every):
+                if (x, z) in r.cells and self.g.get(x, self.y + h, z) == AIR and self.solid[self.g.a[x, z, self.y + h + 1]]:
+                    self.g.lantern(x, self.y + h, z)
+
+    def carpet(self, color, p=0.5):
+        for (x, z) in self.inner:
+            if self.free(x, z) and self.rng.random() < p:
+                self.g.set(x, self.y, z, f"minecraft:{color}_carpet")
+                self.take(x, z)
+
+    def fill_wall(self, items, limit=None):
+        """Place a cycle of wall items along free wall cells. items: list of callables (x, z, f) -> None."""
+        n = 0
+        for (x, z), f in self.wall_cells():
+            if limit is not None and n >= limit:
+                break
+            if not self.free(x, z):
+                continue
+            items[n % len(items)](x, z, f)
+            n += 1
+        return n
+
+
+# ---------------------------------------------------------------- the rooms
+
+
+def dress_barracks(d, room):
+    colors = ["brown", "gray", "light_gray", "white"]
+    beds = 0
+    chests = 0
+    for (x, z), f in d.wall_cells(shuffle=False):
+        if beds >= 6 or beds * 2 + 2 > room.size() // 3:
+            break
+        # bed every third wall cell, footlocker beside it
+        if (x + z) % 3 == 0 and d.bed(x, z, f, colors[(x * 7 + z) % 4]):
+            beds += 1
+        elif (x + z) % 3 == 1 and d.free(x, z) and chests < beds:
+            d.chest(x, z, f, "castle_barracks")
+            chests += 1
+    d.fill_wall([lambda x, z, f: d.barrel(x, z, "castle_barracks", f=f),
+                 lambda x, z, f: d.put(x, z, "minecraft:crafting_table"),
+                 lambda x, z, f: d.barrel(x, z, "castle_armory", f=f)], limit=3)
+    if room.size() > 40:
+        cx, cz = (room.x0 + room.x1) // 2, (room.z0 + room.z1) // 2
+        axis = "x" if room.w() >= room.d() else "z"
+        d.table(cx - 2 if axis == "x" else cx, cz if axis == "x" else cz - 2, 5, axis)
+    d.lanterns()
+
+
+def dress_quarters(d, room):
+    dress_barracks(d, room)
+    d.carpet(d.rng.choice(["gray", "light_gray", "brown"]), p=0.25)
+
+
+def dress_chamber(d, room):
+    has_bed = any("_bed[" in d.g.get(x, d.y, z) for (x, z) in room.cells)
+    if not has_bed:
+        for (x, z), f in d.wall_cells():
+            if d.bed(x, z, f, "red"):
+                break
+    d.fill_wall([lambda x, z, f: d.chest(x, z, f, "castle_solar"),
+                 lambda x, z, f: d.put(x, z, "minecraft:bookshelf"),
+                 lambda x, z, f: d.put(x, z, f"minecraft:lectern[facing={d.facing(f)}]"),
+                 lambda x, z, f: d.put(x, z, "minecraft:bookshelf"),
+                 lambda x, z, f: d.put(x, z, "minecraft:potted_azalea_bush" if d.rng.random() < 0.5 else "minecraft:flower_pot"),
+                 lambda x, z, f: d.put(x, z, "minecraft:cartography_table"),
+                 lambda x, z, f: d.barrel(x, z, "castle_solar", f=f)], limit=max(3, room.size() // 8))
+    # a bookshelf wall two high where there's room
+    for (x, z), f in d.wall_cells():
+        if d.g.get(x, d.y, z) == "minecraft:bookshelf" and d.g.get(x, d.y + 1, z) == AIR:
+            d.g.set(x, d.y + 1, z, "minecraft:bookshelf")
+    d.carpet("red", p=0.6)
+    d.lanterns(every=4)
+
+
+def dress_hall(d, room):
+    axis = "x" if room.w() >= room.d() else "z"
+    long_ = room.w() if axis == "x" else room.d()
+    short = room.d() if axis == "x" else room.w()
+    cx, cz = (room.x0 + room.x1) // 2, (room.z0 + room.z1) // 2
+    tlen = max(4, min(14, long_ - 6))
+    rows = [0] if short < 9 else [-2, 2] if short < 15 else [-3, 0, 3]
+    for off in rows:
+        for shift in (0, -3, 3, -5, 5):
+            if axis == "x":
+                ok = d.table(cx - tlen // 2, cz + off + shift, tlen, "x")
+            else:
+                ok = d.table(cx + off + shift, cz - tlen // 2, tlen, "z")
+            if ok:
+                break
+    # banners on the walls at head height
+    for (x, z), f in d.wall_cells(shuffle=False):
+        if (x * 3 + z * 5) % 7 == 0 and d.g.get(x, d.y + 2, z) == AIR:
+            wx, wz = x - f[0], z - f[1]
+            if d.solid[d.g.a[wx, wz, d.y + 2]]:
+                d.g.wall_banner(x, d.y + 2, z, d.facing(f))
+    d.fill_wall([lambda x, z, f: d.barrel(x, z, "castle_kitchen", f=f),
+                 lambda x, z, f: d.put(x, z, "minecraft:cake"),
+                 lambda x, z, f: d.chest(x, z, f, "castle_kitchen"),
+                 lambda x, z, f: d.put(x, z, "minecraft:lantern[hanging=false]")], limit=max(4, room.size() // 25))
+    d.carpet("red", p=0.12)
+    d.lanterns(every=6)
+
+
+def dress_mess(d, room):
+    dress_hall(d, room)
+
+
+def dress_kitchen(d, room):
+    d.fill_wall([lambda x, z, f: d.barrel(x, z, "castle_kitchen", f=f),
+                 lambda x, z, f: (d.barrel(x, z, "castle_granary", f=f), d.g.barrel(x, d.y + 1, z, LOOT + "castle_granary", facing=d.facing(f))),
+                 lambda x, z, f: d.put(x, z, f"minecraft:smoker[facing={d.facing(f)},lit=false]"),
+                 lambda x, z, f: d.put(x, z, "minecraft:water_cauldron[level=3]"),
+                 lambda x, z, f: d.put(x, z, "minecraft:hay_block[axis=y]"),
+                 lambda x, z, f: d.put(x, z, "minecraft:crafting_table"),
+                 lambda x, z, f: d.put(x, z, f"minecraft:furnace[facing={d.facing(f)},lit=false]"),
+                 lambda x, z, f: d.put(x, z, "minecraft:composter[level=3]"),
+                 lambda x, z, f: d.chest(x, z, f, "castle_kitchen"),
+                 lambda x, z, f: d.put(x, z, "minecraft:pumpkin"),
+                 lambda x, z, f: d.put(x, z, "minecraft:honey_block" if d.rng.random() < 0.3 else "minecraft:melon")],
+                limit=max(6, int(room.size() * 0.3)))
+    if room.size() > 30:
+        cx, cz = (room.x0 + room.x1) // 2, (room.z0 + room.z1) // 2
+        axis = "x" if room.w() >= room.d() else "z"
+        d.table(cx - 1 if axis == "x" else cx, cz if axis == "x" else cz - 1, 3, axis, chairs=False,
+                top="minecraft:dark_oak_slab[type=top]")
+    d.lanterns(every=4)
+
+
+def dress_store(d, room):
+    def stack(x, z, f, loot):
+        d.barrel(x, z, loot, f=f)
+        if d.g.get(x, d.y + 1, z) == AIR:
+            d.g.barrel(x, d.y + 1, z, LOOT + loot, facing=d.facing(f))
+    d.fill_wall([lambda x, z, f: stack(x, z, f, "castle_granary"),
+                 lambda x, z, f: stack(x, z, f, "castle_cellar"),
+                 lambda x, z, f: d.put(x, z, "minecraft:hay_block[axis=y]"),
+                 lambda x, z, f: d.chest(x, z, f, "castle_store"),
+                 lambda x, z, f: stack(x, z, f, "castle_granary"),
+                 lambda x, z, f: d.put(x, z, "minecraft:hay_block[axis=x]"),
+                 lambda x, z, f: d.chest(x, z, f, "castle_cellar")],
+                limit=max(6, int(room.size() * 0.35)))
+    # a corner of cobwebs and a few crates on the floor
+    for (x, z) in d.inner:
+        if d.free(x, z) and d.rng.random() < 0.12:
+            d.put(x, z, "minecraft:barrel[facing=up]", nbt={"id": "minecraft:barrel", "LootTable": LOOT + "castle_granary"})
+    for (x, z), f in d.wall_cells():
+        if d.g.get(x, d.y + 2, z) == AIR and d.rng.random() < 0.3:
+            d.g.set(x, d.y + 2, z, "minecraft:cobweb")
+            break
+    d.lanterns(every=6)
+
+
+def dress_armoury(d, room):
+    d.fill_wall([lambda x, z, f: d.chest(x, z, f, "castle_armory"),
+                 lambda x, z, f: d.barrel(x, z, "castle_armory", f=f),
+                 lambda x, z, f: d.put(x, z, f"minecraft:grindstone[face=floor,facing={d.facing(f)}]"),
+                 lambda x, z, f: d.chest(x, z, f, "castle_armory"),
+                 lambda x, z, f: d.put(x, z, f"minecraft:anvil[facing={d.facing(f)}]"),
+                 lambda x, z, f: d.put(x, z, "minecraft:smithing_table"),
+                 lambda x, z, f: d.put(x, z, "minecraft:target"),
+                 lambda x, z, f: d.barrel(x, z, "castle_armory", f=f)],
+                limit=max(5, int(room.size() * 0.22)))
+    d.lanterns(every=4)
+    d.carpet("gray", p=0.1)
+
+
+def dress_guardroom(d, room):
+    cx, cz = (room.x0 + room.x1) // 2, (room.z0 + room.z1) // 2
+    d.table(cx - 1, cz, 3, "x") or d.table(cx, cz - 1, 3, "z")
+    d.fill_wall([lambda x, z, f: d.chest(x, z, f, "castle_barracks"),
+                 lambda x, z, f: d.barrel(x, z, "castle_armory", f=f),
+                 lambda x, z, f: d.put(x, z, "minecraft:lantern[hanging=false]"),
+                 lambda x, z, f: d.put(x, z, "minecraft:target"),
+                 lambda x, z, f: d.barrel(x, z, "castle_kitchen", f=f)], limit=max(3, room.size() // 6))
+    d.lanterns(every=5)
+
+
+def dress_smithy(d, room):
+    d.fill_wall([lambda x, z, f: d.chest(x, z, f, "castle_smithy"),
+                 lambda x, z, f: d.barrel(x, z, "castle_armory", f=f),
+                 lambda x, z, f: d.put(x, z, "minecraft:iron_block" if d.rng.random() < 0.3 else "minecraft:coal_block"),
+                 lambda x, z, f: d.put(x, z, f"minecraft:blast_furnace[facing={d.facing(f)},lit=false]"),
+                 lambda x, z, f: d.put(x, z, "minecraft:water_cauldron[level=3]"),
+                 lambda x, z, f: d.put(x, z, f"minecraft:grindstone[face=floor,facing={d.facing(f)}]")],
+                limit=max(4, room.size() // 5))
+    d.lanterns(every=4)
+
+
+def dress_treasury(d, room):
+    d.fill_wall([lambda x, z, f: d.chest(x, z, f, "castle_treasury"),
+                 lambda x, z, f: d.put(x, z, "minecraft:gold_block"),
+                 lambda x, z, f: d.chest(x, z, f, "castle_treasury"),
+                 lambda x, z, f: d.barrel(x, z, "castle_treasury", f=f)], limit=max(4, room.size() // 4))
+    d.carpet("purple", p=0.3)
+    d.lanterns(every=4)
+
+
+def dress_chapel(d, room):
+    for (x, z), f in d.wall_cells(shuffle=False):
+        if (x + z) % 2 == 0 and d.free(x, z):
+            d.put(x, z, f"minecraft:candle[candles={1 + (x * z) % 4},lit=true]")
+    d.lanterns(every=5)
+
+
+def dress_stable(d, room):
+    d.fill_wall([lambda x, z, f: d.chest(x, z, f, "castle_stables"),
+                 lambda x, z, f: d.put(x, z, "minecraft:hay_block[axis=y]"),
+                 lambda x, z, f: d.put(x, z, "minecraft:water_cauldron[level=3]"),
+                 lambda x, z, f: d.barrel(x, z, "castle_stables", f=f),
+                 lambda x, z, f: d.put(x, z, "minecraft:hay_block[axis=z]")], limit=max(4, room.size() // 8))
+    d.lanterns(every=6)
+
+
+DRESSERS = {
+    "barracks": dress_barracks, "quarters": dress_quarters, "chamber": dress_chamber, "hall": dress_hall,
+    "mess": dress_mess, "kitchen": dress_kitchen, "store": dress_store, "armoury": dress_armoury,
+    "guardroom": dress_guardroom, "smithy": dress_smithy, "treasury": dress_treasury, "chapel": dress_chapel,
+    "stable": dress_stable,
+}
+
+
+def furnish(g, GL, report=None):
+    """Dress every room. Returns {kind: count}."""
+    protected = set()
+    for role, pts in g.markers.items():
+        for (x, y, z) in pts:
+            for dx in (-1, 0, 1):
+                for dz in (-1, 0, 1):
+                    protected.add((x + dx, y, z + dz))
+                    protected.add((x + dx, y + 1, z + dz))
+    rooms = find_rooms(g, GL, protected)
+    counts = {}
+    for room in rooms:
+        kind = classify(g, room, GL)
+        if kind is None:
+            continue
+        room.kind = kind
+        d = Dresser(g, room, protected)
+        DRESSERS[kind](d, room)
+        counts[kind] = counts.get(kind, 0) + 1
+        if report is not None:
+            report.append((kind, room.y, room.x0, room.z0, room.w(), room.d(), room.size()))
+    return counts

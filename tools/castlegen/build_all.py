@@ -12,6 +12,7 @@ import castle
 import castle2
 import city
 import export
+import furnish
 import render
 import themes
 import worldgen
@@ -41,7 +42,9 @@ def main():
         t = time.time()
         g, meta = fn()
         name = meta["name"]
-        print(f"{name}: built in {time.time() - t:.1f}s, palette {len(g.palette)}")
+        rooms = furnish.furnish(g, meta["GL"])
+        print(f"{name}: built in {time.time() - t:.1f}s, palette {len(g.palette)}, rooms " +
+              ", ".join(f"{k}={v}" for k, v in sorted(rooms.items())))
         if not args.no_export:
             tiles = export.write_tiles(g, os.path.join(STRUCT_DIR, name), name)
             layout = export.write_layout(g, meta, tiles, os.path.join(LAYOUT_DIR, f"{name}.json"))
