@@ -117,6 +117,14 @@ public class Holding {
     public record FiefBuilding(String piece, BoundingBox box) {
     }
 
+    /** The Master Builder and his current job. The queue is rebuilt from the plans when needed. */
+    public String work = Builder.NONE;
+    public int fortify;
+    public int workDone;
+    public String builderName = "";
+    @Nullable public UUID builder;
+    @Nullable public java.util.ArrayDeque<Builder.Job> workQueue;
+
     public int fiefLevel() {
         int cottages = 0;
         for (FiefBuilding b : fief) if (b.piece().startsWith("cottage")) cottages++;
@@ -158,8 +166,11 @@ public class Holding {
         return Math.max(role == Role.KNIGHT ? 2 : 0, (int) Math.round(base * Config.GARRISON_SCALE.get()));
     }
 
+    /** Capacity for this castle: the tier's, plus 15% per stage of fortification. */
     public int capacity(Role role) {
-        return capacity(tier, role);
+        int base = capacity(tier, role);
+        if (role == Role.CAPTAIN || fortify <= 0) return base;
+        return (int) Math.round(base * (1 + 0.15 * fortify));
     }
 
     public int count(Role role) {
@@ -306,6 +317,11 @@ public class Holding {
         }
         t.put("Fief", fb);
         t.putInt("FiefTries", fiefTries);
+        t.putString("Work", work);
+        t.putInt("Fortify", fortify);
+        t.putInt("WorkDone", workDone);
+        t.putString("BuilderName", builderName);
+        if (builder != null) t.putUUID("Builder", builder);
         t.putString("FiefReport", fiefReport);
         t.putInt("FiefPop", fiefPop);
         t.putInt("FiefHerd", fiefHerd);
@@ -393,6 +409,11 @@ public class Holding {
             if (fb2.length == 6) h.fief.add(new FiefBuilding(bt.getString("Piece"), new BoundingBox(fb2[0], fb2[1], fb2[2], fb2[3], fb2[4], fb2[5])));
         }
         h.fiefTries = t.getInt("FiefTries");
+        if (t.contains("Work")) h.work = t.getString("Work");
+        h.fortify = t.getInt("Fortify");
+        h.workDone = t.getInt("WorkDone");
+        h.builderName = t.getString("BuilderName");
+        if (t.hasUUID("Builder")) h.builder = t.getUUID("Builder");
         h.fiefReport = t.getString("FiefReport");
         h.fiefPop = t.getInt("FiefPop");
         h.fiefHerd = t.getInt("FiefHerd");

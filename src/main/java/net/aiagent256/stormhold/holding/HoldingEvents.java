@@ -300,6 +300,7 @@ public final class HoldingEvents {
         }
         if (Sides.isPlayer(newSide)) {
             h.lordAlive = false;
+            h.work = Builder.NONE;
             h.fillGarrison(peaceful ? 0.8 : 0.5);
             h.mode = Holding.Mode.DEFEND;
             h.nextRaid = now + raidDelay(level);

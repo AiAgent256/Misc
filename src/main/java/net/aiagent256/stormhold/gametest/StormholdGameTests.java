@@ -179,6 +179,43 @@ public class StormholdGameTests {
                 throw new IllegalStateException(id + " war table spot is blocked or floating at " + h.warTablePos);
             if (!level.getBlockState(h.lordPos).canBeReplaced() || level.getBlockState(h.lordPos.below()).canBeReplaced())
                 throw new IllegalStateException(id + " lord's spot is blocked or floating at " + h.lordPos);
+            if (i == 0) {
+                // knock holes in the walls, then have the Master Builder put them back
+                List<BlockPos> holes = new ArrayList<>();
+                for (int x = bb.minX(); x <= bb.maxX() && holes.size() < 12; x++) {
+                    BlockPos p = new BlockPos(x, bb.minY() + 2, center.getZ());
+                    if (!level.getBlockState(p).isAir() && !level.getBlockState(p).is(net.minecraft.world.level.block.Blocks.CHEST)) {
+                        holes.add(p);
+                        level.setBlock(p, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+                    }
+                }
+                if (holes.size() < 6) throw new IllegalStateException("could not knock holes in " + id);
+                h.owner = Sides.player(g.makeMockPlayer().getUUID());
+                h.work = net.aiagent256.stormhold.holding.Builder.REPAIR;
+                h.addStock(new net.minecraft.resources.ResourceLocation("minecraft:cobblestone"), 64);
+                for (int k = 0; k < 40 && !h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE); k++)
+                    net.aiagent256.stormhold.holding.Builder.tick(level, mgr, h);
+                if (!h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE)) throw new IllegalStateException("repair never finished");
+                for (BlockPos p : holes) if (level.getBlockState(p).isAir()) throw new IllegalStateException("hole not repaired at " + p);
+                if (h.stock(new net.minecraft.resources.ResourceLocation("minecraft:cobblestone")) >= 64) throw new IllegalStateException("repair cost no stone");
+                // and fortify: the palisade goes up and the garrison cap rises
+                int cap = h.capacity(Role.ARCHER);
+                h.addStock(new net.minecraft.resources.ResourceLocation("minecraft:cobblestone"), 100);
+                h.addStock(new net.minecraft.resources.ResourceLocation("minecraft:iron_ingot"), 20);
+                net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.FORTIFY, g.makeMockPlayer());
+                for (int k = 0; k < 400 && !h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE); k++)
+                    net.aiagent256.stormhold.holding.Builder.tick(level, mgr, h);
+                if (h.fortify != 1) throw new IllegalStateException("fortify stage " + h.fortify + ", work " + h.work);
+                if (h.capacity(Role.ARCHER) <= cap) throw new IllegalStateException("fortifying did not raise capacity");
+                int stakes = 0;
+                for (int x = h.box.minX() - 7; x <= h.box.maxX() + 7; x++) {
+                    int z = h.box.minZ() - 7;
+                    int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+                    var st = level.getBlockState(new BlockPos(x, y, z));
+                    if (st.is(net.minecraft.world.level.block.Blocks.SPRUCE_FENCE) || st.is(net.minecraft.world.level.block.Blocks.POINTED_DRIPSTONE)) stakes++;
+                }
+                if (stakes < 4) throw new IllegalStateException("palisade has " + stakes + " stakes along the north side");
+            }
             mgr.holdings.remove(h.id);
             mgr.byKey.remove(h.key);
             i++;

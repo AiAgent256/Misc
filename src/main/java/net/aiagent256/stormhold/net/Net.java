@@ -36,7 +36,7 @@ public final class Net {
             () -> VERSION, VERSION::equals, VERSION::equals);
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
-            MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16;
+            MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -87,6 +87,14 @@ public final class Net {
                             .append(c.stage.name().toLowerCase()).append(". ");
                     if (c.kind == Campaign.Kind.COLUMN && h.id.equals(c.origin)) status.append("Column of ").append(c.total())
                             .append(" riding to you, ").append(net.aiagent256.stormhold.holding.Columns.eta(c)).append(" out. ");
+                }
+                if (!h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE)) {
+                    int left = h.workQueue == null ? -1 : h.workQueue.size();
+                    status.append("Builder ").append(h.work.equals(net.aiagent256.stormhold.holding.Builder.REPAIR) ? "repairing"
+                            : "building " + net.aiagent256.stormhold.holding.Builder.stageName(h.fortify + 1))
+                            .append(left < 0 ? ", surveying. " : ": " + left + " blocks to go. ");
+                } else if (h.fortify > 0) {
+                    status.append("Fortified, stage ").append(h.fortify).append(". ");
                 }
                 if (h.reinforceKeep > 0) status.append("Supply line: keeps ").append(h.reinforceKeep).append(" men with you. ");
                 if (h.nextRaid > 0) {
@@ -188,6 +196,8 @@ public final class Net {
                         player.sendSystemMessage(HoldingEvents.gold("The people of " + h.name + " will raise a " + next.replace('_', ' ') + "."));
                     }
                 }
+                case REPAIR -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.REPAIR, player);
+                case FORTIFY -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.FORTIFY, player);
                 case KEEP_WITH_ME -> {
                     h.reinforceKeep = Math.max(0, Math.min(80, a.amount()));
                     h.nextColumn = 0;

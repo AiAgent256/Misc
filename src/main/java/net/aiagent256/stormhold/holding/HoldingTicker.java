@@ -67,6 +67,8 @@ public final class HoldingTicker {
             if (h.fiefPlan == null) Fief.plan(h);
             if (!h.fiefPlan.isEmpty() && now % 40 == 0) Fief.buildNext(level, mgr, h);
         }
+        Builder.tick(level, mgr, h);
+        if (now % 200 == 0) Builder.ensureBuilder(level, h);
         greet(level, mgr, h);
         if (!h.villagersSpawned) Garrisons.spawnVillagers(level, h);
         HoldingEvents.contest(level, mgr, h);

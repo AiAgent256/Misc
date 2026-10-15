@@ -15,7 +15,7 @@ import java.util.List;
 
 /** Command every castle you hold: stance, march orders, supply lines, mustering. */
 public class WarTableScreen extends Screen {
-    private static final int W = 430, H = 324;
+    private static final int W = 430, H = 348;
     private Net.WarTableData data;
     private int selected;
     private int page;
@@ -182,6 +182,31 @@ public class WarTableScreen extends Screen {
         }).tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Protection and Sharpness/Power II-IV by metal, Unbreaking III; "
                 + "fire and piercing on netherite. " + net.aiagent256.stormhold.holding.Armoury.ENCHANT_LEVELS + " experience levels per man.")))
                 .bounds(rx + 246, y, 56, 18).build());
+        // ---- works: the master builder (below the armoury notes)
+        y = y0 + 322;
+        boolean busy = h.status().contains("Builder ");
+        Button repair = Button.builder(Component.literal("Repair walls"), b -> Net.sendAction(h.id(), Net.REPAIR, BlockPos.ZERO, 0))
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("The Master Builder puts back every block of the castle's "
+                        + "plans that's missing: walls, gate, portcullis, roofs. A stone from the stores per block keeps the pace; without stone it's slow. "
+                        + "Your own additions are left alone.")))
+                .bounds(rx + 52, y, 90, 18).build();
+        repair.active = !busy;
+        this.addRenderableWidget(repair);
+        int stage = Math.min(3, fortifyStage(h) + 1);
+        int[] cost = net.aiagent256.stormhold.holding.Builder.fortifyCost(stage);
+        Button fort = Button.builder(Component.literal(fortifyStage(h) >= 3 ? "Fortified" : "Fortify " + "I".repeat(stage)),
+                b -> Net.sendAction(h.id(), Net.FORTIFY, BlockPos.ZERO, 0))
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Stage " + stage + ": "
+                        + net.aiagent256.stormhold.holding.Builder.stageName(stage) + ". Costs " + cost[0] + " stone and " + cost[1]
+                        + " iron from the stores. Each stage lets the castle hold 15% more men.")))
+                .bounds(rx + 146, y, 90, 18).build();
+        fort.active = !busy && fortifyStage(h) < 3;
+        this.addRenderableWidget(fort);
+    }
+
+    private static int fortifyStage(HoldingInfo h) {
+        var m = java.util.regex.Pattern.compile("Fortified, stage (\\d)").matcher(h.status());
+        return m.find() ? Integer.parseInt(m.group(1)) : 0;
     }
 
     private boolean enchant;
@@ -295,6 +320,7 @@ public class WarTableScreen extends Screen {
             g.drawString(this.font, "Each: 26 iron | 26 diamond | 26 diamond + 5 netherite", rx, y0 + 290, 0x9C8C6C, false);
             g.drawString(this.font, "Pack: " + iron + " iron, " + dia + " diamond, " + neth + " netherite, " + lvl + " lvl", rx, y0 + 300, 0x9C8C6C, false);
             g.drawString(this.font, h.supply() == null ? "No supply line." : "Couriers take surplus to " + h.supply().toShortString() + " daily.", rx, y0 + 310, 0x9C8C6C, false);
+            g.drawString(this.font, "Works", rx, y0 + 327, 0xF0D8A0, false);
         }
         super.render(g, mouseX, mouseY, partial);
     }
