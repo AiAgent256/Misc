@@ -42,6 +42,7 @@ public class HoldingManager extends SavedData {
     public final Map<String, Integer> relations = new HashMap<>();
     public final List<net.aiagent256.stormhold.house.Politics.Contract> contracts = new ArrayList<>();
     public final List<Events.Matter> matters = new ArrayList<>();
+    public final List<Dragons.Sighting> dragons = new ArrayList<>();
     public long lastDawn = -1, lastPolitics, lastMend;
 
     public static HoldingManager get(ServerLevel level) {
@@ -153,6 +154,7 @@ public class HoldingManager extends SavedData {
         for (var c : contracts) ct.add(c.save());
         tag.put("Contracts", ct);
         tag.put("Matters", Events.save(matters));
+        tag.put("Dragons", Dragons.save(dragons));
         tag.putLong("LastDawn", lastDawn);
         tag.putLong("LastPolitics", lastPolitics);
         tag.putLong("LastMend", lastMend);
@@ -204,6 +206,7 @@ public class HoldingManager extends SavedData {
         ListTag ct = tag.getList("Contracts", Tag.TAG_COMPOUND);
         for (int i = 0; i < ct.size(); i++) m.contracts.add(net.aiagent256.stormhold.house.Politics.Contract.load(ct.getCompound(i)));
         Events.load(tag.getList("Matters", Tag.TAG_COMPOUND), m.matters);
+        Dragons.load(tag.getList("Dragons", Tag.TAG_COMPOUND), m.dragons);
         m.lastDawn = tag.contains("LastDawn") ? tag.getLong("LastDawn") : -1;
         m.lastPolitics = tag.getLong("LastPolitics");
         m.lastMend = tag.getLong("LastMend");

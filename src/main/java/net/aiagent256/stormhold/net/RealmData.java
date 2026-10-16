@@ -23,7 +23,7 @@ import java.util.UUID;
 
 /** Everything the Realm page shows: the map of known castles, the houses, your holdings, the record. */
 public record RealmData(long day, int px, int pz, List<Castle> castles, List<HouseMark> houses, List<Own> own,
-                        List<Line> lines, List<Note> notes) {
+                        List<Line> lines, List<Note> notes, List<Beast> beasts) {
 
     /** A castle on the map. attitude: 0 yours, 1 friendly house, 2 wary, 3 hostile, 4 brigands/other. */
     public record Castle(UUID id, String name, int tier, int x, int z, int color, int attitude, boolean lordAlive, int renown,
@@ -39,6 +39,10 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
 
     /** An army on the march: from (x1,z1) to (x2,z2), in a house's colour. */
     public record Line(int x1, int z1, int x2, int z2, int color, boolean raid) {
+    }
+
+    /** A dragon someone's garrison has seen: where, how long ago (in days), and whether a house pays for its head. */
+    public record Beast(String kind, int x, int z, int daysAgo, boolean dead, int bounty) {
     }
 
     /** A line of the record or an open offer; kind as in {@link Chronicle}. */
@@ -103,6 +107,15 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
             b.writeVarInt(n.kind);
             b.writeUtf(n.text);
         }
+        b.writeVarInt(beasts.size());
+        for (Beast d : beasts) {
+            b.writeUtf(d.kind);
+            b.writeVarInt(d.x);
+            b.writeVarInt(d.z);
+            b.writeVarInt(d.daysAgo);
+            b.writeBoolean(d.dead);
+            b.writeVarInt(d.bounty);
+        }
     }
 
     public static RealmData read(FriendlyByteBuf b) {
@@ -133,7 +146,10 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
         n = b.readVarInt();
         List<Note> notes = new ArrayList<>(n);
         for (int i = 0; i < n; i++) notes.add(new Note(b.readVarLong(), b.readVarInt(), b.readUtf()));
-        return new RealmData(day, px, pz, castles, houses, own, lines, notes);
+        n = b.readVarInt();
+        List<Beast> beasts = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) beasts.add(new Beast(b.readUtf(), b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readBoolean(), b.readVarInt()));
+        return new RealmData(day, px, pz, castles, houses, own, lines, notes, beasts);
     }
 
     /** What this player knows: every castle he's come within sight of, every house he's heard of, his own holdings. */
@@ -205,10 +221,24 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
         List<Note> notes = new ArrayList<>();
         for (Politics.Contract c : mgr.contracts) {
             if (c.done || c.expiresAt < now) continue;
+            if (c.isBounty()) {
+                notes.add(new Note(-1, Chronicle.HOUSES, mgr.house(c.houseId).title() + " pays " + c.reward + " emeralds for the head of the "
+                        + c.beast + " seen near " + c.x + ", " + c.z + ", " + Math.max(1, (c.expiresAt - now) / 24000) + " days left."));
+                continue;
+            }
             Holding t = mgr.holdings.get(c.target);
             if (t == null) continue;
             notes.add(new Note(-1, Chronicle.HOUSES, mgr.house(c.houseId).title() + " pays " + c.reward + " emeralds for " + t.name
                     + ", " + Math.max(1, (c.expiresAt - now) / 24000) + " days left."));
+        }
+        // dragons seen from castles the player knows, the last ten days
+        List<Beast> beasts = new ArrayList<>();
+        for (net.aiagent256.stormhold.holding.Dragons.Sighting s : mgr.dragons) {
+            if (now - s.when > 24000L * 10) continue;
+            if (s.holding == null || !known.contains(s.holding)) continue;
+            int bounty = 0;
+            for (Politics.Contract c : mgr.contracts) if (!c.done && c.isBounty() && c.expiresAt >= now && s.dragon.equals(c.target)) bounty = c.reward;
+            beasts.add(new Beast(s.kind, s.x, s.z, (int) ((now - s.when) / 24000L), s.dead, bounty));
         }
         for (Chronicle.Entry e : Chronicle.forPlayer(mgr, me, 40)) notes.add(new Note(e.day(), e.kind(), e.text()));
         // a matter waiting on the player's word goes last, so the page shows it first
@@ -217,7 +247,7 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
             var card = net.aiagent256.stormhold.holding.Events.card(mgr, open);
             notes.add(new Note(-2, Chronicle.NEWS, card.text() + " Answer in chat: /stormhold matters"));
         }
-        return new RealmData(Chronicle.day(level), at.getX(), at.getZ(), castles, houses, own, lines, notes);
+        return new RealmData(Chronicle.day(level), at.getX(), at.getZ(), castles, houses, own, lines, notes, beasts);
     }
 
     public static int rgb(int dye) {

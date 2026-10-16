@@ -6,6 +6,7 @@ import net.aiagent256.stormhold.entity.Role;
 import net.aiagent256.stormhold.holding.Campaign;
 import net.aiagent256.stormhold.holding.Campaigns;
 import net.aiagent256.stormhold.holding.Chronicle;
+import net.aiagent256.stormhold.holding.Dragons;
 import net.aiagent256.stormhold.holding.Fief;
 import net.aiagent256.stormhold.holding.Growth;
 import net.aiagent256.stormhold.holding.Holding;
@@ -48,12 +49,25 @@ public final class Politics {
         public int reward;
         public long expiresAt;
         public boolean done;
+        /** "castle": take the target castle. "dragon": slay the dragon, whose sighting is the target. */
+        public String kind = "castle";
+        /** For a dragon bounty: what it is and where it was seen. */
+        public String beast = "";
+        public int x, z;
+
+        public boolean isBounty() {
+            return kind.equals("dragon");
+        }
 
         public CompoundTag save() {
             CompoundTag t = new CompoundTag();
             t.putUUID("Id", id);
             t.putString("House", houseId);
             if (target != null) t.putUUID("Target", target);
+            t.putString("Kind", kind);
+            t.putString("Beast", beast);
+            t.putInt("X", x);
+            t.putInt("Z", z);
             t.putInt("Reward", reward);
             t.putLong("Expires", expiresAt);
             t.putBoolean("Done", done);
@@ -65,6 +79,10 @@ public final class Politics {
             if (t.hasUUID("Id")) c.id = t.getUUID("Id");
             c.houseId = t.getString("House");
             c.target = t.hasUUID("Target") ? t.getUUID("Target") : null;
+            c.kind = t.contains("Kind") ? t.getString("Kind") : "castle";
+            c.beast = t.getString("Beast");
+            c.x = t.getInt("X");
+            c.z = t.getInt("Z");
             c.reward = t.getInt("Reward");
             c.expiresAt = t.getLong("Expires");
             c.done = t.getBoolean("Done");
@@ -123,6 +141,10 @@ public final class Politics {
         for (Contract c : mgr.contracts) {
             if (!c.done && c.expiresAt < now) {
                 c.done = true;
+                if (c.isBounty()) {
+                    Chronicle.log(level, mgr, Chronicle.HOUSES, mgr.house(c.houseId).title() + " withdraws its bounty on the " + c.beast + ".");
+                    continue;
+                }
                 Holding t = mgr.holdings.get(c.target);
                 if (t != null) Chronicle.log(level, mgr, Chronicle.HOUSES, mgr.house(c.houseId).title() + " withdraws its offer for " + t.name + ".");
             }
@@ -185,6 +207,8 @@ public final class Politics {
             war(level, mgr, house, ours, target, now);
         } else if (target != null && roll < 0.65 && offer(level, mgr, house, target, now)) {
             return;
+        } else if (roll < 0.85 && bounty(level, mgr, house, ours, now)) {
+            return;
         } else {
             grow(level, mgr, house, ours);
         }
@@ -242,7 +266,7 @@ public final class Politics {
 
     /** An envoy to every lord this house likes: emeralds for a rival's castle. */
     private static boolean offer(ServerLevel level, HoldingManager mgr, House house, Holding target, long now) {
-        for (Contract c : mgr.contracts) if (!c.done && c.houseId.equals(house.id)) return false;
+        for (Contract c : mgr.contracts) if (!c.done && !c.isBounty() && c.houseId.equals(house.id)) return false;
         List<UUID> lords = new ArrayList<>();
         for (ServerPlayer p : level.players()) {
             if (!mgr.ownedBy(p.getUUID()).isEmpty() && Standing.friendly(mgr, house.id, p.getUUID())) lords.add(p.getUUID());
@@ -261,6 +285,66 @@ public final class Politics {
         for (UUID p : lords) HoldingEvents.tell(level, p, Component.literal(text).withStyle(ChatFormatting.AQUA));
         mgr.setDirty();
         return true;
+    }
+
+    /** How far from a house's castle a dragon is the house's problem. */
+    public static final int BOUNTY_REACH = 800;
+
+    /**
+     * A house with a dragon loose near its lands puts a price on its head: so many emeralds to the lord who
+     * slays it within ten days. Paid when it dies, to whoever killed it.
+     */
+    public static boolean bounty(ServerLevel level, HoldingManager mgr, House house, List<Holding> ours, long now) {
+        List<UUID> lords = new ArrayList<>();
+        for (ServerPlayer p : level.players()) {
+            if (!mgr.ownedBy(p.getUUID()).isEmpty() && !Standing.hostile(mgr, house.id, p.getUUID())) lords.add(p.getUUID());
+        }
+        return bounty(level, mgr, house, ours, now, lords);
+    }
+
+    public static boolean bounty(ServerLevel level, HoldingManager mgr, House house, List<Holding> ours, long now, List<UUID> lords) {
+        if (lords.isEmpty()) return false;
+        for (Holding h : ours) {
+            for (Dragons.Sighting s : Dragons.seenNear(mgr, h.center(), BOUNTY_REACH, now, 24000L * 6)) {
+                boolean posted = false;
+                for (Contract c : mgr.contracts) if (!c.done && c.isBounty() && s.dragon.equals(c.target)) posted = true;
+                if (posted) continue;
+                Contract c = new Contract();
+                c.kind = "dragon";
+                c.houseId = house.id;
+                c.target = s.dragon;
+                c.beast = s.kind;
+                c.x = s.x;
+                c.z = s.z;
+                c.reward = 60 + 15 * h.renown + 10 * h.tier;
+                c.expiresAt = now + 24000L * 10;
+                mgr.contracts.add(c);
+                String text = house.title() + " puts " + c.reward + " emeralds on the head of the " + s.kind + " seen near " + h.name + ".";
+                Chronicle.log(level, mgr, Chronicle.HOUSES, text);
+                for (UUID p : lords) HoldingEvents.tell(level, p, Component.literal(text).withStyle(ChatFormatting.AQUA));
+                mgr.setDirty();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** A player killed a dragon: every open bounty on it (or on a dragon seen close by) pays out. */
+    public static void dragonSlain(ServerLevel level, HoldingManager mgr, UUID player, UUID dragon, BlockPos at, String kind) {
+        long now = level.getGameTime();
+        for (Contract c : mgr.contracts) {
+            if (c.done || !c.isBounty() || c.expiresAt < now) continue;
+            long dx = c.x - at.getX(), dz = c.z - at.getZ();
+            boolean same = dragon.equals(c.target) || (c.beast.equals(kind) && dx * dx + dz * dz <= 400L * 400L);
+            if (!same) continue;
+            c.done = true;
+            pay(level, mgr, player, c.reward);
+            Standing.change(level, mgr, c.houseId, player, 20, "you slew the " + kind);
+            String text = mgr.house(c.houseId).title() + " pays " + c.reward + " emeralds for the head of the " + kind + ".";
+            Chronicle.log(level, mgr, Chronicle.HOUSES, text, player);
+            HoldingEvents.tell(level, player, Component.literal(text).withStyle(ChatFormatting.AQUA));
+        }
+        mgr.setDirty();
     }
 
     // ------------------------------------------------------------ what a change of hands means
@@ -287,7 +371,7 @@ public final class Politics {
                 }
             }
             for (Contract c : mgr.contracts) {
-                if (c.done || c.expiresAt < level.getGameTime() || !h.id.equals(c.target)) continue;
+                if (c.done || c.isBounty() || c.expiresAt < level.getGameTime() || !h.id.equals(c.target)) continue;
                 c.done = true;
                 pay(level, mgr, player, c.reward);
                 Standing.change(level, mgr, c.houseId, player, 15, "you took " + h.name + " for them");

@@ -1140,6 +1140,79 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** A beast seen from a house's walls gets a price on its head; the record and the map know it; the slayer is paid. */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void dragonBountiesPay(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        UUID me = player.getUUID();
+        Holding mine = sample(g);
+        mine.name = "Slayerhold";
+        mine.owner = Sides.player(me);
+        mine.key = "gametest-slayer@" + mine.box.minX() + "," + mine.box.minZ();
+        Holding theirs = sample(g);
+        theirs.name = "Wyrmwatch";
+        theirs.houseId = "housed";
+        theirs.owner = Sides.house("housed");
+        theirs.renown = 3;
+        theirs.key = "gametest-wyrm@" + theirs.box.minX() + "," + theirs.box.minZ();
+        theirs.box = new BoundingBox(mine.box.minX() + 2000, mine.box.minY(), mine.box.minZ(), mine.box.minX() + 2015, mine.box.maxY(), mine.box.maxZ());
+        theirs.greeted.add(me);
+        mgr.add(mine);
+        mgr.add(theirs);
+        // a stand-in for the dragon: any beast the walls can see
+        var beast = net.minecraft.world.entity.EntityType.COW.create(level);
+        BlockPos seenAt = theirs.box.getCenter().offset(300, 0, 0);
+        beast.moveTo(seenAt.getX(), seenAt.getY(), seenAt.getZ(), 0, 0);
+        long now = level.getGameTime();
+        var emerald = new net.minecraft.resources.ResourceLocation("minecraft", "emerald");
+        try {
+            var s = net.aiagent256.stormhold.holding.Dragons.note(mgr, beast, theirs, now);
+            if (net.aiagent256.stormhold.holding.Dragons.sighting(mgr, beast.getUUID()) != s) throw new IllegalStateException("the sighting was not kept");
+            if (net.aiagent256.stormhold.holding.Dragons.note(mgr, beast, theirs, now + 10) != s) throw new IllegalStateException("one beast, two entries");
+            if (net.aiagent256.stormhold.holding.Dragons.seenNear(mgr, theirs.center(), net.aiagent256.stormhold.house.Politics.BOUNTY_REACH, now, 24000L).size() != 1)
+                throw new IllegalStateException("the sighting is not near the castle");
+            var house = mgr.house("housed");
+            int lines = mgr.chronicle.size();
+            if (!net.aiagent256.stormhold.house.Politics.bounty(level, mgr, house, java.util.List.of(theirs), now, java.util.List.of(me)))
+                throw new IllegalStateException("no bounty was posted");
+            if (net.aiagent256.stormhold.house.Politics.bounty(level, mgr, house, java.util.List.of(theirs), now, java.util.List.of(me)))
+                throw new IllegalStateException("the same beast was posted twice");
+            var c = mgr.contracts.stream().filter(x -> x.isBounty() && beast.getUUID().equals(x.target)).findFirst().orElseThrow();
+            if (c.reward != 60 + 15 * 3 + 10 * theirs.tier) throw new IllegalStateException("odd reward " + c.reward);
+            if (mgr.chronicle.size() != lines + 1) throw new IllegalStateException("the record did not note the bounty");
+            // the page shows the beast with its price
+            var data = net.aiagent256.stormhold.net.RealmData.build(level, me, player.blockPosition());
+            if (data.beasts().size() != 1 || data.beasts().get(0).bounty() != c.reward || data.beasts().get(0).dead())
+                throw new IllegalStateException("the page does not show the beast: " + data.beasts());
+            var buf = new net.minecraft.network.FriendlyByteBuf(io.netty.buffer.Unpooled.buffer());
+            data.write(buf);
+            if (net.aiagent256.stormhold.net.RealmData.read(buf).beasts().size() != 1) throw new IllegalStateException("beasts did not round-trip");
+            // the slayer is paid (a mock player isn't on the list, so into the stores) and the house is grateful
+            int before = mine.stock(emerald), standing = net.aiagent256.stormhold.house.Standing.get(mgr, "housed", me);
+            net.aiagent256.stormhold.house.Politics.dragonSlain(level, mgr, me, beast.getUUID(), seenAt, "cow");
+            if (!c.done) throw new IllegalStateException("the bounty was not honoured");
+            if (mine.stock(emerald) != before + c.reward) throw new IllegalStateException("the slayer was not paid: " + mine.stock(emerald));
+            if (net.aiagent256.stormhold.house.Standing.get(mgr, "housed", me) < standing + 20) throw new IllegalStateException("the house was not grateful");
+            s.dead = true;
+            data = net.aiagent256.stormhold.net.RealmData.build(level, me, player.blockPosition());
+            if (!data.beasts().get(0).dead()) throw new IllegalStateException("the page still shows the beast alive");
+            // nobody pays for a dead beast
+            if (net.aiagent256.stormhold.house.Politics.bounty(level, mgr, house, java.util.List.of(theirs), now, java.util.List.of(me)))
+                throw new IllegalStateException("a bounty was posted on a dead beast");
+        } finally {
+            mgr.holdings.remove(mine.id);
+            mgr.holdings.remove(theirs.id);
+            mgr.byKey.remove(mine.key);
+            mgr.byKey.remove(theirs.key);
+            mgr.contracts.removeIf(x -> x.isBounty() && beast.getUUID().equals(x.target));
+            mgr.dragons.removeIf(x -> x.dragon.equals(beast.getUUID()));
+            mgr.standing.getOrDefault("housed", new java.util.HashMap<>()).remove(me);
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

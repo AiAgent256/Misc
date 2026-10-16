@@ -125,6 +125,11 @@ public final class Chronicle {
         // open contracts
         for (Politics.Contract c : mgr.contracts) {
             if (c.done || c.expiresAt < now) continue;
+            if (c.isBounty()) {
+                out.add(Component.literal(mgr.house(c.houseId).title() + " still pays " + c.reward + " emeralds for the head of the " + c.beast
+                        + " seen near " + c.x + ", " + c.z + " (" + Math.max(1, (c.expiresAt - now) / 24000) + " days left).").withStyle(ChatFormatting.AQUA));
+                continue;
+            }
             Holding t = mgr.holdings.get(c.target);
             if (t == null) continue;
             out.add(Component.literal(mgr.house(c.houseId).title() + " still pays " + c.reward + " emeralds for " + t.name + " ("

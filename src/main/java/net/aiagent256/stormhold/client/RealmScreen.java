@@ -129,6 +129,18 @@ public class RealmScreen extends Screen {
             if (c.tier() >= 3) g.drawString(this.font, c.name(), px + r + 3, pz - 4, 0xFFE8D0A0, false);
             if (mouseX >= px - r - 2 && mouseX <= px + r + 3 && mouseY >= pz - r - 2 && mouseY <= pz + r + 3) hover = c;
         }
+        // dragons: a red diamond, dim once dead, with the bounty beside it
+        RealmData.Beast beast = null;
+        for (RealmData.Beast d : data.beasts()) {
+            int px = mx(d.x()), pz = mz(d.z());
+            int c = d.dead() ? 0xFF604040 : 0xFFFF3030;
+            for (int i = -3; i <= 3; i++) {
+                int w = 3 - Math.abs(i);
+                g.fill(px - w, pz + i, px + w + 1, pz + i + 1, c);
+            }
+            if (!d.dead() && d.bounty() > 0) g.drawString(this.font, d.bounty() + "e", px + 5, pz - 4, 0xFF80D0FF, false);
+            if (mouseX >= px - 4 && mouseX <= px + 4 && mouseY >= pz - 4 && mouseY <= pz + 4) beast = d;
+        }
         // you
         int ppx = mx(data.px()), ppz = mz(data.pz());
         g.fill(ppx - 1, ppz - 3, ppx + 2, ppz + 4, 0xFFFFFFFF);
@@ -161,7 +173,19 @@ public class RealmScreen extends Screen {
             int dx = hover.x() - data.px(), dz = hover.z() - data.pz();
             tip.add(Component.literal((int) Math.sqrt(dx * dx + dz * dz) + " blocks away, at " + hover.x() + ", " + hover.z()));
             g.renderComponentTooltip(this.font, tip, mouseX, mouseY);
+        } else if (beast != null) {
+            List<Component> tip = new ArrayList<>();
+            tip.add(Component.literal(cap(beast.kind()) + (beast.dead() ? ", slain" : "")));
+            tip.add(Component.literal(beast.daysAgo() == 0 ? "Seen today" : beast.daysAgo() == 1 ? "Seen yesterday" : "Seen " + beast.daysAgo() + " days ago"));
+            if (!beast.dead() && beast.bounty() > 0) tip.add(Component.literal(beast.bounty() + " emeralds on its head"));
+            int dx = beast.x() - data.px(), dz = beast.z() - data.pz();
+            tip.add(Component.literal((int) Math.sqrt(dx * dx + dz * dz) + " blocks away, at " + beast.x() + ", " + beast.z()));
+            g.renderComponentTooltip(this.font, tip, mouseX, mouseY);
         }
+    }
+
+    private static String cap(String s) {
+        return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     private int maxScroll;
