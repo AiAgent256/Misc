@@ -30,6 +30,26 @@ public final class NameGen {
         };
     }
 
+    private static final String[] COMMON_FIRST = {"Tom", "Wat", "Hob", "Dickon", "Jankin", "Piers", "Gib", "Hodge", "Will",
+            "Rob", "Alys", "Maud", "Joan", "Cecily", "Agnes", "Edith", "Mabel", "Ysolde", "Hawise", "Tilda", "Osric", "Wymond"};
+    private static final java.util.Map<String, String[]> BYNAMES = java.util.Map.of(
+            "farmer", new String[]{"Plowman", "Hayward", "Thresher", "Ackerman", "Sower"},
+            "shepherd", new String[]{"Shepherd", "Fleece", "Hurdle", "Wether"},
+            "butcher", new String[]{"Butcher", "Flesher", "Slaughter", "Lamb"},
+            "fletcher", new String[]{"Fletcher", "Bowyer", "Arrowsmith", "Stringer"},
+            "toolsmith", new String[]{"Smith", "Pick", "Delver", "Collier"},
+            "mason", new String[]{"Mason", "Hewer", "Sawyer", "Wright"},
+            "cleric", new String[]{"Priest", "Clerk", "Sexton", "Chaplain"},
+            "leatherworker", new String[]{"Tanner", "Skinner", "Currier", "Glover"},
+            "fisherman", new String[]{"Fisher", "Netter", "Boatwright", "Eeler"},
+            "none", new String[]{"Cotter", "Carter", "Tiler", "Thatcher", "Miller", "Webster", "Dyer", "Cooper", "Chandler"});
+
+    /** A commoner's name: a plain first name and a byname from the trade. */
+    public static String commoner(RandomSource r, String profession) {
+        String[] by = BYNAMES.getOrDefault(profession, BYNAMES.get("none"));
+        return COMMON_FIRST[r.nextInt(COMMON_FIRST.length)] + " " + by[r.nextInt(by.length)];
+    }
+
     public static String first(RandomSource r) {
         return FIRST[r.nextInt(FIRST.length)];
     }

@@ -333,6 +333,7 @@ public final class Garrisons {
             VillagerProfession prof = TRADES[level.random.nextInt(TRADES.length)];
             v.setVillagerData(v.getVillagerData().setProfession(prof).setLevel(2));
             v.setVillagerXp(10);
+            Fief.name(level, v);
             v.setPersistenceRequired();
             level.addFreshEntity(v);
         }

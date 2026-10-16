@@ -322,13 +322,25 @@ public final class Roads {
         return true;
     }
 
-    /** A timber barn seven wide and six deep, open to the field, hay inside. */
+    /** A timber barn seven wide and six deep, open to the field, hay inside, a composter at the door, and the two
+     *  farmers who work the field (the composter is their job block, so they tend the crops by day). */
     private static void barn(ServerLevel level, int x0, int z0, int y, RandomSource rnd) {
+        if (!barnShell(level, x0, z0, y, rnd)) return;
+        BlockPos comp = new BlockPos(x0 + 3, y, z0 + 1);
+        level.setBlock(comp, Blocks.COMPOSTER.defaultBlockState(), 3);
+        var farmer = net.minecraftforge.registries.ForgeRegistries.VILLAGER_PROFESSIONS.getValue(new net.minecraft.resources.ResourceLocation("minecraft", "farmer"));
+        for (int i = 0; i < 2; i++) {
+            BlockPos at = new BlockPos(x0 + 1 + i * 3, y, z0 - 1);
+            if (level.getBlockState(at).isAir()) Fief.spawnVillager(level, at, farmer);
+        }
+    }
+
+    private static boolean barnShell(ServerLevel level, int x0, int z0, int y, RandomSource rnd) {
         int w = 6, d = 5;
         for (int x = 0; x <= w; x++) {
             for (int z = 0; z <= d; z++) {
                 int gy = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x0 + x, z0 + z);
-                if (Math.abs(gy - y) > 3 || !level.getFluidState(new BlockPos(x0 + x, gy - 1, z0 + z)).isEmpty()) return;
+                if (Math.abs(gy - y) > 3 || !level.getFluidState(new BlockPos(x0 + x, gy - 1, z0 + z)).isEmpty()) return false;
             }
         }
         BlockState plank = Blocks.SPRUCE_PLANKS.defaultBlockState(), log = Blocks.SPRUCE_LOG.defaultBlockState(), cobble = Blocks.COBBLESTONE.defaultBlockState();
@@ -370,6 +382,7 @@ public final class Roads {
                 }
             }
         }
+        return true;
     }
 
     private static void tree(ServerLevel level, BlockPos base, RandomSource rnd) {

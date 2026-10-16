@@ -92,6 +92,8 @@ Private Forge 1.20.1 mod for the Dungeons and Homestead pack. Castles held by ri
 
 **Fields the size of fields.** Outside the walls the fiefs farm lots 24 to 32 long and 16 to 22 across, cut into terraces four rows deep that step down the slope behind cobbled retaining walls, a water channel every few rows, a fence round the lot and a timber barn at the gate; one in three is an orchard. Inside, a castle sleeps its men: the generator counts the beds and refuses a layout with fewer bunks than the garrison it's rated for, and a castle's capacity is capped by its beds.
 
+**The people have names.** Every soul in a fief or a castle has a name and a byname from the trade (Wat Plowman, Maud Fletcher, Hob Smith) that shows when you look at them. They keep villagers' hours: at their job block by day, in bed at night. Each field's barn has a composter and two farmers who work that field. Births and deaths go in the Chronicle by name, with who did it.
+
 **Lived-in world.** Villagers work inside the walls, fields and orchards appear outside, and a road is laid from the gate to the nearest village as the chunks load. Castles are sited on high, dry ground and keep clear of villages and towns from any mod (anything in `#minecraft:village`, plus a few extras in `#stormhold:castle_avoid`); a watchtower or holdfast never lands inside a great castle.
 
 ## Commands

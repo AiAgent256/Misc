@@ -78,16 +78,36 @@ public final class CommonEvents {
         to.getServer().execute(() -> net.aiagent256.stormhold.holding.Company.followThrough(from, to, sp, left));
     }
 
+    /** A child born in a fief gets a name and a line in the record. */
+    @SubscribeEvent
+    public static void born(net.minecraftforge.event.entity.living.BabyEntitySpawnEvent e) {
+        if (!(e.getChild() instanceof net.minecraft.world.entity.npc.Villager child) || !(e.getParentA().level() instanceof ServerLevel level)) return;
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = net.aiagent256.stormhold.holding.Fief.peopleOf(mgr, e.getParentA().blockPosition());
+        if (h == null) return;
+        net.aiagent256.stormhold.holding.Fief.name(level, child);
+        String parent = e.getParentA() instanceof net.minecraft.world.entity.npc.Villager pv ? net.aiagent256.stormhold.holding.Fief.nameOf(pv) : "one of the people";
+        net.aiagent256.stormhold.holding.Chronicle.log(level, mgr, net.aiagent256.stormhold.holding.Chronicle.GROWTH,
+                "A child is born at " + h.name + " to " + parent + ": " + net.aiagent256.stormhold.holding.Fief.nameOf(child) + ".", h.ownerPlayer());
+    }
+
     @SubscribeEvent
     public static void death(LivingDeathEvent e) {
         if (e.getEntity() instanceof GarrisonEntity g && !g.level().isClientSide) HoldingEvents.onDeath(g);
         if (e.getEntity().level() instanceof ServerLevel dl && net.aiagent256.stormhold.holding.Dragons.isDragon(e.getEntity()))
             net.aiagent256.stormhold.holding.Dragons.onDeath(dl, e.getEntity(), e.getSource().getEntity());
-        if (e.getEntity() instanceof net.minecraft.world.entity.npc.Villager v && v.level() instanceof ServerLevel level
-                && e.getSource().getEntity() instanceof Player killer && !killer.isCreative()) {
+        if (e.getEntity() instanceof net.minecraft.world.entity.npc.Villager v && v.level() instanceof ServerLevel level) {
             HoldingManager mgr = HoldingManager.get(level);
-            Holding h = net.aiagent256.stormhold.holding.Fief.fiefAt(mgr, v.blockPosition());
-            if (h != null) net.aiagent256.stormhold.house.Standing.change(level, mgr, h.houseId, killer.getUUID(), -6, "you killed one of their people");
+            Holding h = net.aiagent256.stormhold.holding.Fief.peopleOf(mgr, v.blockPosition());
+            if (h != null) {
+                if (h.isHouseOwned() && e.getSource().getEntity() instanceof Player killer && !killer.isCreative()) {
+                    net.aiagent256.stormhold.house.Standing.change(level, mgr, h.houseId, killer.getUUID(), -6, "you killed one of their people");
+                }
+                String by = e.getSource().getEntity() instanceof Player p ? p.getName().getString()
+                        : e.getSource().getEntity() != null ? "a " + e.getSource().getEntity().getName().getString().toLowerCase() : e.getSource().getMsgId();
+                net.aiagent256.stormhold.holding.Chronicle.log(level, mgr, net.aiagent256.stormhold.holding.Chronicle.NEWS,
+                        net.aiagent256.stormhold.holding.Fief.nameOf(v) + " of " + h.name + " is dead, killed by " + by + ".", h.ownerPlayer());
+            }
         }
         // killing monsters at a house's gates earns a little goodwill
         if (!(e.getEntity() instanceof GarrisonEntity) && e.getEntity() instanceof net.minecraft.world.entity.monster.Enemy

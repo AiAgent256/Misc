@@ -263,17 +263,33 @@ public final class Fief {
         return origin.offset(StructureTemplate.calculateRelativePosition(settings, local));
     }
 
-    private static void spawnVillager(ServerLevel level, BlockPos at, @Nullable VillagerProfession prof) {
+    /** One of the fief's people, with a name and a trade. They keep vanilla hours: work at their job block by day, bed at night. */
+    public static Villager spawnVillager(ServerLevel level, BlockPos at, @Nullable VillagerProfession prof) {
         Villager v = EntityType.VILLAGER.create(level);
-        if (v == null) return;
+        if (v == null) return null;
         v.moveTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, level.random.nextFloat() * 360F, 0);
         v.finalizeSpawn(level, level.getCurrentDifficultyAt(at), MobSpawnType.STRUCTURE, null, null);
         if (prof != null) {
             v.setVillagerData(v.getVillagerData().setProfession(prof).setLevel(1 + level.random.nextInt(2)));
             v.setVillagerXp(10);
         }
+        name(level, v);
         v.setPersistenceRequired();
         level.addFreshEntity(v);
+        return v;
+    }
+
+    /** Give one of the people a name if they have none. */
+    public static void name(ServerLevel level, Villager v) {
+        if (v.hasCustomName()) return;
+        ResourceLocation id = ForgeRegistries.VILLAGER_PROFESSIONS.getKey(v.getVillagerData().getProfession());
+        String job = id == null ? "none" : id.getPath();
+        v.setCustomName(net.minecraft.network.chat.Component.literal(net.aiagent256.stormhold.house.NameGen.commoner(level.random, job)));
+        v.setCustomNameVisible(false);
+    }
+
+    public static String nameOf(Villager v) {
+        return v.hasCustomName() ? v.getCustomName().getString() : "one of the people";
     }
 
     /** Level a pad for the building: fill under it, clear trees and grass above it. The dock's water end is left alone. */
@@ -402,6 +418,15 @@ public final class Fief {
 
     /** A house holding whose fief this spot lies in, if any. */
     @Nullable
+    /** The holding whose people live here, whoever holds it. */
+    @Nullable
+    public static Holding peopleOf(HoldingManager mgr, BlockPos pos) {
+        for (Holding h : mgr.holdings.values()) {
+            if (h.box.inflatedBy(REACH).isInside(pos)) return h;
+        }
+        return null;
+    }
+
     public static Holding fiefAt(HoldingManager mgr, BlockPos pos) {
         for (Holding h : mgr.holdings.values()) {
             if (h.fief.isEmpty() || !h.isHouseOwned()) continue;
