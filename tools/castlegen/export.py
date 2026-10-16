@@ -40,6 +40,17 @@ def to_tag(v):
     raise TypeError(v)
 
 
+BLOCK_ENTITY_BLOCKS = ("chest", "barrel", "sign", "lectern", "decorated_pot", "skull", "head", "campfire", "brewing_stand",
+                       "chiseled_bookshelf", "beehive", "smoker", "furnace", "hopper", "dispenser", "dropper", "banner",
+                       "shulker_box", "jukebox", "bell", "bed", "enchanting_table", "beacon", "spawner")
+
+
+def has_block_entity(state):
+    """A fill over a chest leaves its loot tag behind; only blocks that keep a block entity get nbt written."""
+    name = state.split("[")[0].split(":")[-1]
+    return any(name == k or name.endswith("_" + k) or name.endswith(k) for k in BLOCK_ENTITY_BLOCKS)
+
+
 def write_tiles(g, out_dir, name):
     os.makedirs(out_dir, exist_ok=True)
     X, Z, Y = g.a.shape
@@ -60,7 +71,7 @@ def write_tiles(g, out_dir, name):
                 c = Compound({"pos": List[Int]([Int(int(x)), Int(int(y)), Int(int(z))]),
                               "state": Int(local[pid])})
                 key = (int(x) + tx, int(y), int(z) + tz)
-                if key in g.block_nbt:
+                if key in g.block_nbt and has_block_entity(g.palette[pid]):
                     c["nbt"] = to_tag(g.block_nbt[key])
                 blocks.append(c)
             root = Compound({
