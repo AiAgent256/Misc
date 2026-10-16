@@ -941,6 +941,7 @@ public class StormholdGameTests {
         b.key = "gametest-b@" + b.box.minX() + "," + b.box.minZ();
         b.garrison.clear();
         b.add(Role.KNIGHT, 1);
+        b.lordAlive = false;
         // far from any player so the war is settled by numbers
         BlockPos far = new BlockPos(a.box.minX() + 4000, a.box.minY(), a.box.minZ() + 4000);
         b.box = new BoundingBox(far.getX(), far.getY(), far.getZ(), far.getX() + 15, far.getY() + 7, far.getZ() + 15);
@@ -967,6 +968,7 @@ public class StormholdGameTests {
         if (!b.owner.equals(Sides.house("housea")) || !b.houseId.equals("housea"))
             throw new IllegalStateException("Weakwall should have fallen to house A: owner " + b.owner + " house " + b.houseId);
         if (!b.lordAlive || b.lordName.isEmpty()) throw new IllegalStateException("the new lord was not installed");
+        if (c.total() < 10) throw new IllegalStateException("a house should march with a real army, not " + c.total());
         if (mgr.chronicle.size() <= before) throw new IllegalStateException("the record did not note the fall");
         if (net.aiagent256.stormhold.house.Politics.relation(mgr, "housea", "houseb") > -80) throw new IllegalStateException("relations did not sour");
         // an envoy's offer pays when a player takes the castle

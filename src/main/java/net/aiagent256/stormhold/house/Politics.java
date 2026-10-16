@@ -202,10 +202,13 @@ public final class Politics {
         c.renown = from.renown;
         c.from = from.gatePos.equals(BlockPos.ZERO) ? from.center() : from.gatePos;
         c.to = target.bannerPos.equals(BlockPos.ZERO) ? target.center() : target.bannerPos;
+        // an army that can take the place: about twice the defenders' strength, lord and walls counted
+        double want = target.strength() * 2.2;
+        int knights = (int) Math.max(6, Math.min(40, Math.ceil(want * 0.7 / Role.KNIGHT.strength())));
         c.add(Role.CAPTAIN, 1);
-        c.add(Role.KNIGHT, Math.max(4, (int) Math.ceil(target.count(Role.KNIGHT) * 0.9) + from.tier));
-        c.add(Role.CROSSBOWMAN, Math.max(1, (int) Math.ceil(target.count(Role.CROSSBOWMAN) * 0.6)));
-        c.add(Role.ARCHER, (int) Math.ceil(target.count(Role.ARCHER) * 0.4));
+        c.add(Role.KNIGHT, knights);
+        c.add(Role.CROSSBOWMAN, Math.max(2, (int) Math.ceil(want * 0.15 / Role.CROSSBOWMAN.strength())));
+        c.add(Role.ARCHER, Math.max(2, (int) Math.ceil(want * 0.15 / Role.ARCHER.strength())));
         mgr.campaigns.add(c);
         target.lastRaidAt = now;
         shift(mgr, house.id, target.houseId, -15);
