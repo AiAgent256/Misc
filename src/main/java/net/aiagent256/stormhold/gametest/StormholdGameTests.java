@@ -694,15 +694,16 @@ public class StormholdGameTests {
         HoldingManager mgr = HoldingManager.get(level);
         int cx = -6000 - (int) (Math.floorMod(g.absolutePos(BlockPos.ZERO).asLong(), 7L)) * 300, cz = 6000;
         int cc = cx >> 4, ccz = cz >> 4;
-        for (int dx = -7; dx <= 7; dx++) {
-            for (int dz = -7; dz <= 7; dz++) {
+        for (int dx = -9; dx <= 9; dx++) {
+            for (int dz = -9; dz <= 9; dz++) {
                 level.setChunkForced(cc + dx, ccz + dz, true);
                 level.getChunk(cc + dx, ccz + dz);
             }
         }
         int y = 80;
-        for (int x = cx - 95; x <= cx + 95; x++) {
-            for (int z = cz - 95; z <= cz + 95; z++) {
+        // wide enough that a mine at the far edge of the fief still has rock to tunnel into
+        for (int x = cx - 135; x <= cx + 135; x++) {
+            for (int z = cz - 135; z <= cz + 135; z++) {
                 for (int yy = y - 24; yy < y - 3; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(), 2);
                 for (int yy = y - 3; yy < y - 1; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), 2);
                 level.setBlock(new BlockPos(x, y - 1, z), net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(), 2);
@@ -712,8 +713,8 @@ public class StormholdGameTests {
             }
         }
         // a seam of iron for the miners to find
-        for (int x = cx - 95; x <= cx + 95; x++) {
-            for (int z = cz - 95; z <= cz + 95; z++) {
+        for (int x = cx - 135; x <= cx + 135; x++) {
+            for (int z = cz - 135; z <= cz + 135; z++) {
                 if ((x + z) % 3 != 0) continue;
                 for (int yy = y - 14; yy <= y - 10; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.IRON_ORE.defaultBlockState(), 2);
             }
@@ -774,7 +775,7 @@ public class StormholdGameTests {
             Garrisons.discardLive(level, h.live, false);
             mgr.holdings.remove(h.id);
             mgr.byKey.remove(h.key);
-            for (int dx = -7; dx <= 7; dx++) for (int dz = -7; dz <= 7; dz++) level.setChunkForced(cc + dx, ccz + dz, false);
+            for (int dx = -9; dx <= 9; dx++) for (int dz = -9; dz <= 9; dz++) level.setChunkForced(cc + dx, ccz + dz, false);
         }
         g.succeed();
     }

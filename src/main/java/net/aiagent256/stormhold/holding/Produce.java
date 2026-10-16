@@ -245,13 +245,13 @@ public final class Produce {
         for (BlockPos c : cols) {
             if (!level.isLoaded(c)) return false;
             BlockState roof = level.getBlockState(c.above(3));
-            if (roof.isAir() || !roof.getFluidState().isEmpty()) return turn(d);
+            if (roof.isAir() || !roof.getFluidState().isEmpty()) return turn(d, true);
             for (int y = 0; y < 3; y++) {
                 BlockPos p = c.above(y);
                 BlockState s = level.getBlockState(p);
-                if (!s.getFluidState().isEmpty() || !diggable(s)) return turn(d);
+                if (!s.getFluidState().isEmpty() || !diggable(s)) return turn(d, true);
                 for (BlockPos n : new BlockPos[]{p.north(), p.south(), p.east(), p.west(), p.above()}) {
-                    if (!level.getBlockState(n).getFluidState().isEmpty()) return turn(d);
+                    if (!level.getBlockState(n).getFluidState().isEmpty()) return turn(d, true);
                 }
             }
         }
@@ -301,16 +301,21 @@ public final class Produce {
         d.next = base.offset(d.dx, step ? -1 : 0, d.dz);
         d.dug++;
         d.fails = 0;
-        if (++d.run >= RUN) turn(d);
+        if (++d.run >= RUN) turn(d, false);
         return true;
     }
 
-    /** Turn the tunnel a quarter, alternating sides so it snakes onward instead of circling back. */
-    private static boolean turn(Dig d) {
+    /**
+     * Turn the tunnel a quarter. A turn at the end of a run alternates sides so the tunnel snakes onward
+     * instead of circling back; a turn forced by rock the men can't cut (open air, water, something built)
+     * always goes the same way round, so four of them try every heading before the mine gives up.
+     */
+    private static boolean turn(Dig d, boolean blocked) {
         BlockPos last = d.next.offset(-d.dx, 0, -d.dz);
+        boolean right = blocked || d.turns % 2 == 0;
         int ndx, ndz;
         BlockPos next;
-        if (d.turns % 2 == 0) {
+        if (right) {
             ndx = d.sx;
             ndz = d.sz;
             next = last.offset(2 * d.sx, 0, 2 * d.sz);
@@ -327,7 +332,7 @@ public final class Produce {
         d.next = next;
         d.run = 0;
         d.turns++;
-        if (++d.fails >= 4) d.done = true;
+        if (blocked && ++d.fails >= 4) d.done = true;
         return false;
     }
 
