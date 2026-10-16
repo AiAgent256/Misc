@@ -119,7 +119,7 @@ public final class Net {
                         : h.fief.isEmpty() ? "No fief." : h.fiefName() + " of " + h.fief.size() + " buildings; census at dawn.")
                         : h.fiefReport;
                 if (h.fiefPlan != null && !h.fiefPlan.isEmpty() && !h.fiefReport.isEmpty()) fief += " Building: " + h.fiefPlan.get(0).replace('_', ' ') + ".";
-                out.add(new HoldingInfo(h.id, h.name, h.tier, h.mode.name(), counts, cap, Economy.stockSummary(h), h.center(),
+                out.add(new HoldingInfo(h.id, h.name, h.isTown() ? 0 : h.tier, h.mode.name(), counts, cap, Economy.stockSummary(h), h.center(),
                         h.attackTarget, h.supplyTarget, status.toString(), fief, Economy.realmSummary(mgr, h, player.getUUID())));
             }
         }

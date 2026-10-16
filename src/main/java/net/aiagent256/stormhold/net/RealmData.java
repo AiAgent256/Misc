@@ -170,7 +170,7 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
                 color = mgr.colorOf(h.owner).getId();
             }
             House house = h.isHouseOwned() ? mgr.house(h.houseId) : null;
-            castles.add(new Castle(h.id, h.name, h.tier, h.center().getX(), h.center().getZ(), color, attitude, h.lordAlive, h.renown,
+            castles.add(new Castle(h.id, h.name, h.isTown() ? 0 : h.tier, h.center().getX(), h.center().getZ(), color, attitude, h.lordAlive, h.renown,
                     HoldingEvents.ownerName(level, mgr, h.owner), attacked, house != null && h.id.equals(house.capital)));
             if (mine) {
                 int troops = h.troops(), cap = 0;
@@ -178,7 +178,7 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
                 String builder = h.work.equals(Builder.NONE) ? (h.fortify > 0 ? "fortified " + h.fortify : "idle")
                         : h.work.equals(Builder.REPAIR) ? "repairing" : "building " + Builder.stageName(h.fortify + 1);
                 int raidDays = h.nextRaid > 0 && !Standing.friendly(mgr, h.houseId, me) ? (int) Math.max(0, (h.nextRaid - now + 23999) / 24000) : -1;
-                own.add(new Own(h.id, h.name, h.tier, troops, cap, h.fiefPop, builder, raidDays, h.mode.name().toLowerCase(),
+                own.add(new Own(h.id, h.name, h.isTown() ? 0 : h.tier, troops, cap, h.fiefPop, builder, raidDays, h.mode.name().toLowerCase(),
                         Economy.stockSummary(h), attacked));
             }
         }

@@ -52,6 +52,12 @@ public final class Economy {
         if (now >= h.nextProduce) {
             // the castle's own stores: the full ration only where there's no fief to feed it
             double own = h.fief.isEmpty() ? 1.0 : 0.3;
+            if (h.isTown()) {
+                // the market pays its tithe to whoever holds it, whatever the stance
+                h.addStock(new ResourceLocation("minecraft", "emerald"), 2 + h.renown / 2);
+                h.addStock(BREAD, 12);
+                h.addStock(new ResourceLocation("minecraft", "wheat"), 8);
+            }
             if (h.mode == Holding.Mode.PRODUCE) {
                 for (String g : GOODS[Math.max(1, Math.min(Holding.MAX_TIER, h.tier)) - 1]) {
                     String[] kv = g.split(":");

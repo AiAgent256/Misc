@@ -34,7 +34,7 @@ import java.util.UUID;
 public class StormholdGameTests {
     private static final String[] LAYOUTS = {"great_castle_a", "great_castle_b", "great_castle_c", "holdfast_a",
             "holdfast_b", "watchtower_a", "watchtower_b", "great_castle_a2", "great_castle_b2", "great_castle_c2",
-            "holdfast_a2", "holdfast_b2", "watchtower_a2", "watchtower_b2"};
+            "holdfast_a2", "holdfast_b2", "watchtower_a2", "watchtower_b2", "town_walled", "town_cross", "town_green"};
 
     @GameTest(template = "arena")
     public static void castleDataLoads(GameTestHelper g) {

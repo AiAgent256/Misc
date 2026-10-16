@@ -134,7 +134,7 @@ public final class Detector {
         h.houseId = house.id;
         h.owner = Sides.house(house.id);
         h.name = NameGen.place(rnd, h.tier);
-        h.lordName = Holding.lordTitle(h.tier) + NameGen.first(rnd) + " " + house.name;
+        h.lordName = h.lordTitle() + NameGen.first(rnd) + " " + house.name;
         if (h.tier >= 4) {
             // the capital: the house's seat, and friendly to strangers unless the house is already an enemy
             house.capital = h.id;

@@ -316,7 +316,7 @@ public final class HoldingEvents {
             placeWarTable(level, h, Sides.playerId(newSide));
         } else {
             h.lordAlive = true;
-            h.lordName = Holding.lordTitle(h.tier) + NameGen.first(level.random)
+            h.lordName = h.lordTitle() + NameGen.first(level.random)
                     + " " + ownerName(level, mgr, newSide).replace("House ", "");
             h.fillGarrison(0.6);
         }

@@ -1,0 +1,31 @@
+{
+ "type": "stormhold:castle",
+ "biomes": "#stormhold:has_castle/riverlands",
+ "step": "surface_structures",
+ "terrain_adaptation": "beard_box",
+ "spawn_overrides": {},
+ "theme": "riverlands",
+ "layouts": [
+  {
+   "name": "town_walled",
+   "size_x": 100,
+   "size_z": 100,
+   "ground": 5,
+   "weight": 1
+  },
+  {
+   "name": "town_cross",
+   "size_x": 104,
+   "size_z": 88,
+   "ground": 5,
+   "weight": 1
+  },
+  {
+   "name": "town_green",
+   "size_x": 96,
+   "size_z": 96,
+   "ground": 5,
+   "weight": 1
+  }
+ ]
+}

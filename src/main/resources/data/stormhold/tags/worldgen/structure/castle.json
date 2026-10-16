@@ -20,6 +20,11 @@
   "stormhold:watchtower_riverlands",
   "stormhold:watchtower_reach",
   "stormhold:watchtower_dorne",
-  "stormhold:watchtower_stormlands"
+  "stormhold:watchtower_stormlands",
+  "stormhold:town_north",
+  "stormhold:town_riverlands",
+  "stormhold:town_reach",
+  "stormhold:town_dorne",
+  "stormhold:town_stormlands"
  ]
 }

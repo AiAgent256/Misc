@@ -51,7 +51,7 @@ public final class Fief {
 
     public static void plan(Holding h) {
         if (h.fiefPlan != null) return;
-        h.fiefPlan = new ArrayList<>(h.tier >= 4 ? List.of() : h.tier == 3 ? TOWN : h.tier == 2 ? VILLAGE : HAMLET);
+        h.fiefPlan = new ArrayList<>(h.tier >= 4 || h.isTown() ? List.of() : h.tier == 3 ? TOWN : h.tier == 2 ? VILLAGE : HAMLET);
     }
 
     /** What a growing fief would add next, past its plan. */

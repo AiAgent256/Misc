@@ -93,7 +93,7 @@ public final class HoldingTicker {
             String wealth = h.renown >= 5 ? "Its treasury is the stuff of songs." : h.renown == 4 ? "Its armoury is famed."
                     : h.renown == 3 ? "It does well for itself." : h.renown == 2 ? "A modest place." : "A poor, hard place.";
             p.sendSystemMessage(net.minecraft.network.chat.Component.literal(h.name + ", " + Holding.renownName(h.renown) + " "
-                    + Holding.tierName(h.tier).toLowerCase() + " of " + owner + ". " + wealth).withStyle(net.minecraft.ChatFormatting.GRAY, net.minecraft.ChatFormatting.ITALIC));
+                    + h.kindName().toLowerCase() + " of " + owner + ". " + wealth).withStyle(net.minecraft.ChatFormatting.GRAY, net.minecraft.ChatFormatting.ITALIC));
         }
     }
 

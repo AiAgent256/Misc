@@ -36,8 +36,22 @@ public class Holding {
     };
     public static final int MAX_TIER = 4;
 
+    /** A market town: a settlement between the castles, held by a reeve, with a town watch for a garrison. */
+    public boolean isTown() {
+        return layout != null && layout.startsWith("town_");
+    }
+
+    public String kindName() {
+        return isTown() ? "Market town" : tierName(tier);
+    }
+
+    public String lordTitle() {
+        return isTown() ? "Reeve " : lordTitle(tier);
+    }
+
     public static String tierName(int tier) {
         return switch (tier) {
+            case 0 -> "Market town";
             case 1 -> "Watchtower";
             case 2 -> "Holdfast";
             case 3 -> "Great castle";

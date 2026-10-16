@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 import castle
 import castle2
 import city
+import market_town
 import export
 import fixup
 import parts
@@ -27,7 +28,8 @@ LAYOUT_DIR = os.path.join(ROOT, "src/main/resources/data/stormhold/castle_layout
 
 
 LAYOUTS = (castle.great_castle_a, castle2.great_castle_b, castle2.great_castle_c,
-           castle.holdfast_a, castle2.holdfast_b, castle.watchtower_a, castle2.watchtower_b, city.great_city)
+           castle.holdfast_a, castle2.holdfast_b, castle.watchtower_a, castle2.watchtower_b, city.great_city,
+           market_town.town_walled, market_town.town_cross, market_town.town_green)
 # A second build of each castle with a different seed, roof style and temper, so two castles of the same
 # plan don't read as copies. The city is one of a kind.
 VARIANTS = {"great_castle_a": ("hoard", 2), "great_castle_b": ("spire", 3), "great_castle_c": ("low", 1),
