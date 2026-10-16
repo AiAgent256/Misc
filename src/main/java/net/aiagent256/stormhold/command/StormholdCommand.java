@@ -31,6 +31,23 @@ public final class StormholdCommand {
                 .then(Commands.literal("nearest").executes(StormholdCommand::nearest))
                 .then(Commands.literal("info").executes(StormholdCommand::info))
                 .then(Commands.literal("houses").executes(StormholdCommand::houses))
+                .then(Commands.literal("realm").executes(c -> {
+                    net.aiagent256.stormhold.net.Net.openRealm(c.getSource().getPlayerOrException());
+                    return 1;
+                }))
+                .then(Commands.literal("chronicle").executes(c -> {
+                    var p = c.getSource().getPlayerOrException();
+                    var mgr = net.aiagent256.stormhold.holding.HoldingManager.get(p.serverLevel());
+                    var mine = mgr.ownedBy(p.getUUID());
+                    if (mine.isEmpty()) {
+                        for (var e : net.aiagent256.stormhold.holding.Chronicle.forPlayer(mgr, p.getUUID(), 12))
+                            p.sendSystemMessage(net.minecraft.network.chat.Component.literal("Day " + e.day() + ": " + e.text()));
+                        return 1;
+                    }
+                    for (var line : net.aiagent256.stormhold.holding.Chronicle.account(p.serverLevel(), mgr, p.getUUID(), mine,
+                            net.aiagent256.stormhold.holding.Chronicle.day(p.serverLevel()))) p.sendSystemMessage(line);
+                    return 1;
+                }))
                 .then(Commands.literal("accept").then(Commands.argument("holding", com.mojang.brigadier.arguments.StringArgumentType.word())
                         .then(Commands.argument("posting", com.mojang.brigadier.arguments.StringArgumentType.word()).executes(StormholdCommand::accept))))
                 .then(Commands.literal("befriend").requires(s -> s.hasPermission(2)).executes(StormholdCommand::befriend))

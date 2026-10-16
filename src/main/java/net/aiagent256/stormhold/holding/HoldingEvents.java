@@ -320,6 +320,7 @@ public final class HoldingEvents {
                     + " " + ownerName(level, mgr, newSide).replace("House ", "");
             h.fillGarrison(0.6);
         }
+        net.aiagent256.stormhold.house.Politics.onTransfer(level, mgr, h, oldSide, newSide);
         h.bannersDirty = true;
         Garrisons.recolorBanners(level, mgr, h);
         level.playSound(null, h.bannerPos, SoundEvents.RAID_HORN.value(), SoundSource.HOSTILE, 8.0F, 0.8F);

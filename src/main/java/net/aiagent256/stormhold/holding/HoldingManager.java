@@ -37,6 +37,11 @@ public class HoldingManager extends SavedData {
     /** house id -> player -> personal standing delta. */
     public final Map<String, Map<UUID, Integer>> standing = new HashMap<>();
     public long lastStandingDrift;
+    /** The realm's record, relations between houses, envoys' offers, and the clocks that drive them. */
+    public final List<Chronicle.Entry> chronicle = new ArrayList<>();
+    public final Map<String, Integer> relations = new HashMap<>();
+    public final List<net.aiagent256.stormhold.house.Politics.Contract> contracts = new ArrayList<>();
+    public long lastDawn = -1, lastPolitics, lastMend;
 
     public static HoldingManager get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(HoldingManager::load, HoldingManager::new, NAME);
@@ -139,6 +144,16 @@ public class HoldingManager extends SavedData {
         });
         tag.put("Standing", st);
         tag.putLong("StandingDrift", lastStandingDrift);
+        tag.put("Chronicle", Chronicle.save(chronicle));
+        CompoundTag rel = new CompoundTag();
+        relations.forEach(rel::putInt);
+        tag.put("Relations", rel);
+        ListTag ct = new ListTag();
+        for (var c : contracts) ct.add(c.save());
+        tag.put("Contracts", ct);
+        tag.putLong("LastDawn", lastDawn);
+        tag.putLong("LastPolitics", lastPolitics);
+        tag.putLong("LastMend", lastMend);
         return tag;
     }
 
@@ -181,6 +196,14 @@ public class HoldingManager extends SavedData {
             m.standing.put(house, pmap);
         }
         m.lastStandingDrift = tag.getLong("StandingDrift");
+        Chronicle.load(tag.getList("Chronicle", Tag.TAG_COMPOUND), m.chronicle);
+        CompoundTag rel = tag.getCompound("Relations");
+        for (String k : rel.getAllKeys()) m.relations.put(k, rel.getInt(k));
+        ListTag ct = tag.getList("Contracts", Tag.TAG_COMPOUND);
+        for (int i = 0; i < ct.size(); i++) m.contracts.add(net.aiagent256.stormhold.house.Politics.Contract.load(ct.getCompound(i)));
+        m.lastDawn = tag.contains("LastDawn") ? tag.getLong("LastDawn") : -1;
+        m.lastPolitics = tag.getLong("LastPolitics");
+        m.lastMend = tag.getLong("LastMend");
         return m;
     }
 }

@@ -41,6 +41,7 @@ public final class Growth {
             h.fiefPlan.add(next);
             HoldingEvents.tell(level, owner, HoldingEvents.gold("The people of " + h.name + " are raising a " + next.replace('_', ' ')
                     + "; the " + h.fiefName().toLowerCase() + " grows."));
+            Chronicle.log(level, mgr, Chronicle.GROWTH, "The people of " + h.name + " are raising a " + next.replace('_', ' ') + ".", owner);
         }
         if (h.growth % FORTIFY_EVERY == 0 && h.fortify < Builder.MAX_FORTIFY && h.work.equals(Builder.NONE)) {
             int[] cost = Builder.fortifyCost(h.fortify + 1);

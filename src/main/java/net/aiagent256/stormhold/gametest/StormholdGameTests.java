@@ -8,6 +8,8 @@ import net.aiagent256.stormhold.entity.Role;
 import net.aiagent256.stormhold.holding.DataRegistries;
 import net.aiagent256.stormhold.holding.Garrisons;
 import net.aiagent256.stormhold.holding.Holding;
+import net.aiagent256.stormhold.holding.Campaign;
+import net.aiagent256.stormhold.holding.Campaigns;
 import net.aiagent256.stormhold.holding.HoldingEvents;
 import net.aiagent256.stormhold.holding.HoldingManager;
 import net.aiagent256.stormhold.worldgen.CastleTilePiece;
@@ -918,6 +920,87 @@ public class StormholdGameTests {
             mgr.holdings.remove(h.id);
             mgr.byKey.remove(h.key);
         }
+        g.succeed();
+    }
+
+    /** Two rival houses: one marches on the other, the castle changes hands by numbers, the record says so, and an envoy's
+     *  offer pays out when a player takes a castle. */
+    @GameTest(template = "arena", timeoutTicks = 400)
+    public static void housesActAndTheRecordKeeps(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding a = sample(g);
+        a.name = "Ravenhold";
+        a.houseId = "housea";
+        a.owner = Sides.house("housea");
+        a.key = "gametest-a@" + a.box.minX() + "," + a.box.minZ();
+        Holding b = sample(g);
+        b.name = "Weakwall";
+        b.houseId = "houseb";
+        b.owner = Sides.house("houseb");
+        b.key = "gametest-b@" + b.box.minX() + "," + b.box.minZ();
+        b.garrison.clear();
+        b.add(Role.KNIGHT, 1);
+        // far from any player so the war is settled by numbers
+        BlockPos far = new BlockPos(a.box.minX() + 4000, a.box.minY(), a.box.minZ() + 4000);
+        b.box = new BoundingBox(far.getX(), far.getY(), far.getZ(), far.getX() + 15, far.getY() + 7, far.getZ() + 15);
+        b.bannerPos = far.offset(8, 2, 8);
+        b.lordPos = far.offset(3, 2, 3);
+        a.box = new BoundingBox(far.getX() + 300, far.getY(), far.getZ(), far.getX() + 315, far.getY() + 7, far.getZ() + 15);
+        a.bannerPos = a.box.getCenter();
+        a.gatePos = a.box.getCenter();
+        mgr.add(a);
+        mgr.add(b);
+        var ha = mgr.house("housea");
+        var hb = mgr.house("houseb");
+        net.aiagent256.stormhold.house.Politics.shift(mgr, "housea", "houseb", -80);
+        if (!net.aiagent256.stormhold.house.Politics.rivals(mgr, "housea", "houseb")) throw new IllegalStateException("not rivals");
+        var c = net.aiagent256.stormhold.house.Politics.war(level, mgr, ha, java.util.List.of(a), b, level.getGameTime());
+        if (c.total() < 5) throw new IllegalStateException("war party too small: " + c.total());
+        if (mgr.chronicle.isEmpty() || !mgr.chronicle.get(mgr.chronicle.size() - 1).text().contains("marches on Weakwall"))
+            throw new IllegalStateException("the record did not note the march");
+        // march it to the gate and let the numbers decide
+        c.progress = 1.0;
+        int before = mgr.chronicle.size();
+        for (int i = 0; i < 5 && c.stage != Campaign.Stage.DONE; i++) Campaigns.tick(level, mgr, level.getGameTime());
+        if (c.stage != Campaign.Stage.DONE) throw new IllegalStateException("the war never resolved");
+        if (!b.owner.equals(Sides.house("housea")) || !b.houseId.equals("housea"))
+            throw new IllegalStateException("Weakwall should have fallen to house A: owner " + b.owner + " house " + b.houseId);
+        if (!b.lordAlive || b.lordName.isEmpty()) throw new IllegalStateException("the new lord was not installed");
+        if (mgr.chronicle.size() <= before) throw new IllegalStateException("the record did not note the fall");
+        if (net.aiagent256.stormhold.house.Politics.relation(mgr, "housea", "houseb") > -80) throw new IllegalStateException("relations did not sour");
+        // an envoy's offer pays when a player takes the castle
+        var player = g.makeMockPlayer();
+        var contract = new net.aiagent256.stormhold.house.Politics.Contract();
+        contract.houseId = "houseb";
+        contract.target = b.id;
+        contract.reward = 20;
+        contract.expiresAt = level.getGameTime() + 24000;
+        mgr.contracts.add(contract);
+        HoldingEvents.transfer(level, mgr, b, Sides.player(player.getUUID()));
+        if (!contract.done) throw new IllegalStateException("the contract was not honoured");
+        int emeralds = 0;
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            var st = player.getInventory().getItem(i);
+            if (st.is(net.minecraft.world.item.Items.EMERALD)) emeralds += st.getCount();
+        }
+        if (emeralds != 20) throw new IllegalStateException("expected 20 emeralds, got " + emeralds);
+        if (net.aiagent256.stormhold.house.Standing.get(mgr, "houseb", player.getUUID()) < hb.disposition + 15)
+            throw new IllegalStateException("standing with the paying house did not rise");
+        // the dawn account reads
+        var lines = net.aiagent256.stormhold.holding.Chronicle.account(level, mgr, player.getUUID(), mgr.ownedBy(player.getUUID()),
+                net.aiagent256.stormhold.holding.Chronicle.day(level));
+        if (lines.size() < 3 || !lines.get(0).getString().startsWith("Day ")) throw new IllegalStateException("no dawn account");
+        // and the realm page builds
+        var data = net.aiagent256.stormhold.net.RealmData.build(player);
+        if (data.own().size() != 1 || data.notes().isEmpty()) throw new IllegalStateException("realm page empty: own " + data.own().size());
+        var buf = new net.minecraft.network.FriendlyByteBuf(io.netty.buffer.Unpooled.buffer());
+        data.write(buf);
+        var back = net.aiagent256.stormhold.net.RealmData.read(buf);
+        if (back.castles().size() != data.castles().size() || back.notes().size() != data.notes().size())
+            throw new IllegalStateException("realm page did not round-trip");
+        mgr.holdings.remove(a.id);
+        mgr.holdings.remove(b.id);
         g.succeed();
     }
 

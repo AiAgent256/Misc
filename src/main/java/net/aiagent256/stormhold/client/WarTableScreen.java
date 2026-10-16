@@ -71,6 +71,9 @@ public class WarTableScreen extends Screen {
                 rebuildWidgets();
             }).bounds(x0 + 64, y0 + H - 26, 54, 20).build());
         }
+        this.addRenderableWidget(Button.builder(Component.literal("Realm"), b -> Net.sendAction(new java.util.UUID(0, 0), Net.OPEN_REALM, BlockPos.ZERO, 0))
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("The map of every castle you know, the houses and how they stand with you, and the realm's record.")))
+                .bounds(x0 + W - 60, y0 + 4, 54, 14).build());
         HoldingInfo h = current();
         if (h == null) return;
         int rx = x0 + 128;

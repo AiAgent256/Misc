@@ -278,6 +278,8 @@ public final class Campaigns {
         if (c.total() <= 0) {
             HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The raid on " + h.name + " is broken!")
                     .withStyle(ChatFormatting.GREEN));
+            Chronicle.log(level, mgr, Chronicle.WAR, HoldingEvents.ownerName(level, mgr, c.side) + "'s attack on " + h.name
+                    + " is broken at the walls.", h.ownerPlayer());
             c.stage = Campaign.Stage.DONE;
             return;
         }
@@ -325,8 +327,10 @@ public final class Campaigns {
                 losses -= l;
             }
             HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("Your garrison at " + h.name
-                    + " threw back a raid by " + mgr.house(h.houseId).title() + ". " + h.troops() + " soldiers remain.")
+                    + " threw back a raid by " + HoldingEvents.ownerName(level, mgr, c.side) + ". " + h.troops() + " soldiers remain.")
                     .withStyle(ChatFormatting.GREEN));
+            Chronicle.log(level, mgr, Chronicle.WAR, h.name + " threw back " + HoldingEvents.ownerName(level, mgr, c.side)
+                    + "; " + h.troops() + " of the garrison remain.", h.ownerPlayer());
         }
         c.stage = Campaign.Stage.DONE;
         mgr.setDirty();

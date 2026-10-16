@@ -36,13 +36,26 @@ public final class Net {
             () -> VERSION, VERSION::equals, VERSION::equals);
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
-            MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18;
+            MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
                 Optional.of(NetworkDirection.PLAY_TO_CLIENT));
         CHANNEL.registerMessage(1, WarTableAction.class, WarTableAction::write, WarTableAction::read, WarTableAction::handle,
                 Optional.of(NetworkDirection.PLAY_TO_SERVER));
+        CHANNEL.registerMessage(2, RealmData.class, RealmData::write, RealmData::read, Net::handleRealm,
+                Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+    }
+
+    private static void handleRealm(RealmData data, Supplier<NetworkEvent.Context> ctx) {
+        ctx.get().enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+                () -> () -> net.aiagent256.stormhold.client.ClientHooks.showRealm(data)));
+        ctx.get().setPacketHandled(true);
+    }
+
+    /** The Realm page: the map of what the player knows, his houses and his record. */
+    public static void openRealm(ServerPlayer player) {
+        CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), RealmData.build(player));
     }
 
     // ------------------------------------------------------------ server -> client
@@ -141,6 +154,14 @@ public final class Net {
     }
 
     private static void apply(ServerPlayer player, WarTableAction a) {
+        if (a.action() == OPEN_REALM) {
+            openRealm(player);
+            return;
+        }
+        if (a.action() == REFRESH && a.holding().equals(new UUID(0, 0))) {
+            openWarTable(player);
+            return;
+        }
         String me = Sides.player(player.getUUID());
         for (ServerLevel level : player.server.getAllLevels()) {
             HoldingManager mgr = HoldingManager.get(level);

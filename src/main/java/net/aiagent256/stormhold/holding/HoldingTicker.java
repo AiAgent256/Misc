@@ -29,6 +29,7 @@ public final class HoldingTicker {
         }
         Campaigns.tick(level, mgr, t);
         Economy.tickShipments(level, mgr);
+        net.aiagent256.stormhold.house.Politics.tick(level, mgr, t);
     }
 
     private static boolean near(ServerLevel level, Holding h) {

@@ -29,6 +29,8 @@ public class House {
     public int disposition;
     /** The holding that is this house's seat (its Great City), if one has been found. */
     @org.jetbrains.annotations.Nullable public java.util.UUID capital;
+    /** When the house next does something of its own (see {@link Politics}). */
+    public long nextMove;
 
     public House(String id, String name, DyeColor base, DyeColor accent, int emblem, boolean border) {
         this.id = id;
@@ -59,6 +61,7 @@ public class House {
         t.putBoolean("Border", border);
         t.putInt("Disposition", disposition);
         if (capital != null) t.putUUID("Capital", capital);
+        t.putLong("NextMove", nextMove);
         return t;
     }
 
@@ -67,6 +70,7 @@ public class House {
                 DyeColor.byId(t.getInt("Accent")), t.getInt("Emblem"), t.getBoolean("Border"));
         h.disposition = t.getInt("Disposition");
         if (t.hasUUID("Capital")) h.capital = t.getUUID("Capital");
+        h.nextMove = t.getLong("NextMove");
         return h;
     }
 
