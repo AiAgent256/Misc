@@ -31,6 +31,30 @@ CHARACTERS = {
 }
 
 
+# captain + knights + archers + crossbowmen the castle must sleep, by tier (mirrors Holding.CAPACITY)
+MEN = {1: 12, 2: 24, 3: 46, 4: 79}
+
+
+def beds_in(g, cells=None, y=None):
+    """Beds (foot blocks) in the whole grid, or in one room's cells at its level and the bunk above."""
+    n = 0
+    if cells is None:
+        for st in g.palette:
+            if st.endswith("part=foot]") and "_bed[" in st:
+                n += int((g.a == g.index[st]).sum())
+        return n
+    scan = set(cells)
+    for (x, z) in cells:
+        for (dx, dz) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            scan.add((x + dx, z + dz))
+    for (x, z) in scan:
+        for yy in (y, y + 1):
+            st = g.get(x, yy, z)
+            if "_bed[" in st and "part=foot" in st:
+                n += 1
+    return n
+
+
 def character_for(name, seed=0):
     """A stable temper per layout name; the second variant of a layout gets a different one."""
     order = ["martial", "rich", "grim", "rustic", "pious"]
@@ -130,7 +154,7 @@ def protected_of(g):
     return protected
 
 
-def plan(g, GL, character):
+def plan(g, GL, character, tier=2):
     """Assign a kind to every room. Returns [(room, kind)] for the ones to dress."""
     rooms = find_rooms(g, GL, set())
     gate = (g.markers.get("gate") or [None])[0]
@@ -162,6 +186,27 @@ def plan(g, GL, character):
         return min((s.dist(h) for h in hs), default=60)
 
     n_rooms = len(sites)
+    def sleep_the_men():
+        # barracks: enough to sleep the garrison. Bunks along the walls, two beds a bunk, one bunk per three wall cells.
+        men = MEN.get(tier, 24)
+        have_beds = sum(beds_in(g, s.room.cells, s.room.y) for s in sites if s.kind in ("barracks", "lodging", "chamber"))
+        while have_beds < men:
+            # a plain rectangular range first; a lodging the builder laid out with a few beds will do; a tower floor last
+            cands = [s for s in free() if 0 <= s.lvl <= 3 and s.room.size() >= 36 and s.usable >= 18 and not s.in_keep and s.rect and not s.tower]
+            if not cands:
+                cands = [s for s in sites if s.kind == "lodging" and s.usable >= 18] + \
+                        [s for s in free() if s.room.size() >= 30 and s.usable >= 14]
+            if not cands:
+                break
+            best = max(cands, key=lambda s: s.usable)
+            if best.kind == "lodging":
+                have_beds -= beds_in(g, best.room.cells, best.room.y)
+            best.kind = "barracks"
+            have_beds += min(48, (best.usable // 4) * 2)
+
+    # a small castle sleeps its men before it cooks for them
+    if n_rooms < 8:
+        sleep_the_men()
     # the kitchen: ground, by the hall, not at the gate
     if not have("kitchen"):
         pick("kitchen", lambda s: 0 <= s.lvl <= 3 and 28 <= s.room.size() <= 220 and s.gate_d > 14 and s.usable >= 16 and (not s.in_keep or n_rooms < 6),
@@ -181,9 +226,8 @@ def plan(g, GL, character):
     if n_rooms >= 5:
         pick("chapel", lambda s: s.lvl >= 1 and 24 <= s.room.size() <= 170 and s.usable >= 16,
              lambda s: s.lvl * 2 + (6 if s.tower else 0) + (4 if s.top else 0) + (4 if s.rect else 0))
-    # barracks and the armoury beside them
-    if not have("barracks") and n_rooms >= 6:
-        pick("barracks", lambda s: 0 <= s.lvl <= 3 and s.room.size() >= 56 and not s.in_keep, lambda s: s.room.size())
+    if n_rooms >= 8:
+        sleep_the_men()
     if n_rooms >= 5:
         pick("armoury", lambda s: 18 <= s.room.size() <= 140, lambda s: -nearest("barracks", s) - nearest("guardroom", s) / 3)
     # the library, in the keep if there is one
@@ -400,24 +444,85 @@ def dress_kitchen(d, room, ch):
     _finish(d, ch, every=5, sconce_every=5)
 
 
+def _doors_connected(d, room):
+    """Can you still walk between every doorway of the room? (Furniture may not cut the room in two.)"""
+    # doorways, and every cell the dresser keeps clear (stair heads, passages): all must stay joined
+    doors = list(room.doorways) + [c for c in d.clear if c in room.cells]
+    if len(doors) < 2:
+        return True
+    g = d.g
+
+    def open_(x, z):
+        a, b = g.get(x, d.y, z), g.get(x, d.y + 1, z)
+        return (a == AIR or "carpet" in a) and b == AIR
+
+    start = doors[0]
+    seen = {start}
+    stack = [start]
+    while stack:
+        x, z = stack.pop()
+        for (dx, dz) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            n = (x + dx, z + dz)
+            if n in seen or n not in room.cells:
+                continue
+            if n in room.doorways or open_(*n):
+                seen.add(n)
+                stack.append(n)
+    return all(dr in seen or not open_(*dr) for dr in doors)
+
+
+def _unbed(d, x, z, f):
+    for (cx, cz) in ((x, z), (x + f[0], z + f[1])):
+        for yy in (d.y, d.y + 1):
+            d.g.set(cx, yy, cz, AIR)
+        d.used.discard((cx, cz))
+
+
 def dress_barracks(d, room, ch, bunks=True):
     colors = ["brown", "gray", "light_gray", "white"]
     beds = chests = 0
+    cap = 24 if bunks else 6
     for (x, z), f in d.wall_cells(shuffle=False):
-        if beds >= 8 or beds * 2 + 2 > room.size() // 3:
+        if beds >= cap or beds * 2 + 2 > room.size() // (2 if bunks else 3):
             break
         if (x + z) % 3 == 0:
             ok = d.bunk(x, z, f, colors[(x * 7 + z) % 4]) if bunks else d.bed(x, z, f, colors[(x * 7 + z) % 4])
+            if ok and not _doors_connected(d, room):
+                _unbed(d, x, z, f)
+                ok = False
             if ok:
                 beds += 1
         elif (x + z) % 3 == 1 and d.free(x, z) and chests < beds:
             d.chest(x, z, f, "castle_barracks")
             chests += 1
+    # a big barracks sleeps its men in rows down the middle too, an aisle between every pair of rows;
+    # a row that would cut the way between the room's doors is taken out again
+    if bunks and len(d.inner) >= 40:
+        axis = "x" if room.w() >= room.d() else "z"
+        inner = sorted(d.inner, key=lambda c: (c[1], c[0]) if axis == "x" else (c[0], c[1]))
+        rows = {}
+        for (x, z) in inner:
+            row = (z - room.z0) if axis == "x" else (x - room.x0)
+            if row % 3 == 1 and ((x - room.x0) if axis == "x" else (z - room.z0)) % 3 == 0:
+                rows.setdefault(row, []).append((x, z))
+        f = (1, 0) if axis == "x" else (0, 1)
+        for row in sorted(rows):
+            if beds >= 30:
+                break
+            placed = []
+            for (x, z) in rows[row]:
+                if d.bunk(x, z, f, colors[(x * 7 + z) % 4]):
+                    placed.append((x, z))
+                    beds += 1
+            if placed and not _doors_connected(d, room):
+                for (x, z) in placed:
+                    _unbed(d, x, z, f)
+                    beds -= 1
     d.fill_wall([lambda x, z, f: d.barrel(x, z, "castle_barracks", f=f),
                  lambda x, z, f: d.put(x, z, "minecraft:crafting_table"),
                  lambda x, z, f: d.put(x, z, f"minecraft:grindstone[face=floor,facing={d.facing(f)}]"),
                  lambda x, z, f: d.barrel(x, z, "castle_armory", f=f)], limit=3)
-    if room.size() > 40:
+    if room.size() > 40 and beds < 12:
         cx, cz = (room.x0 + room.x1) // 2, (room.z0 + room.z1) // 2
         axis = "x" if room.w() >= room.d() else "z"
         d.table(cx - 2 if axis == "x" else cx, cz if axis == "x" else cz - 2, 5, axis)
@@ -927,8 +1032,8 @@ DRESSERS = {
 }
 
 
-def furnish(g, GL, character="martial", report=None):
-    """Plan and dress every room. Returns {kind: count}."""
+def furnish(g, GL, character="martial", report=None, tier=2):
+    """Plan and dress every room. Returns {kind: count}, plus "beds" and "men"."""
     protected = set()
     for role, pts in g.markers.items():
         for (x, y, z) in pts:
@@ -938,7 +1043,7 @@ def furnish(g, GL, character="martial", report=None):
                     protected.add((x + dx, y + 1, z + dz))
     ch = CHARACTERS[character]
     counts = {}
-    for room, kind in plan(g, GL, character):
+    for room, kind in plan(g, GL, character, tier):
         if len(room.cells) < 12 or (len(room.cells) <= 16 and len(room.doorways) >= 2):
             continue                                  # a stair head or a tower passage, not a room
         room.kind = kind
@@ -949,4 +1054,6 @@ def furnish(g, GL, character="martial", report=None):
         counts[kind] = counts.get(kind, 0) + 1
         if report is not None:
             report.append((kind, room.y, room.x0, room.z0, room.w(), room.d(), room.size()))
+    counts["beds"] = beds_in(g)
+    counts["men"] = MEN.get(tier, 24)
     return counts

@@ -174,10 +174,17 @@ public class Holding {
         return Math.max(role == Role.KNIGHT ? 2 : 0, (int) Math.round(base * Config.GARRISON_SCALE.get()));
     }
 
-    /** Capacity for this castle: the tier's, plus 15% per stage of fortification. */
+    /** Capacity for this castle: the tier's, no more men than it has beds, plus 15% per stage of fortification. */
     public int capacity(Role role) {
         int base = capacity(tier, role);
-        if (role == Role.CAPTAIN || fortify <= 0) return base;
+        if (role == Role.CAPTAIN) return base;
+        Layout l = layout != null ? DataRegistries.layout(layout) : null;
+        if (l != null && l.beds > 0) {
+            int total = 0;
+            for (Role r : Role.TROOPS) total += capacity(tier, r);
+            if (l.beds < total) base = Math.max(role == Role.KNIGHT ? 2 : 0, (int) Math.round(base * (double) l.beds / total));
+        }
+        if (fortify <= 0) return base;
         return (int) Math.round(base * (1 + 0.15 * fortify));
     }
 

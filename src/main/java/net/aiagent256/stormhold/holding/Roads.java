@@ -182,96 +182,194 @@ public final class Roads {
 
     // ------------------------------------------------------------ fields and orchards
 
-    /** Farmland plots, an orchard and haystacks on flat ground outside the walls. */
+    /**
+     * Fields outside the walls, sized like fields: 24 to 32 long and 16 to 22 across, cut into terraces
+     * four rows deep that step down the slope behind cobbled retaining walls, a water channel every
+     * five rows, a fence round the lot and a timber barn at the gate. One in three is an orchard.
+     */
     public static void paintFields(ServerLevel level, Holding h) {
         RandomSource rnd = RandomSource.create(h.id.getMostSignificantBits());
         BlockPos c = h.center();
         int rx = h.box.getXSpan() / 2, rz = h.box.getZSpan() / 2;
-        int plots = 2 + h.tier;
+        int plots = 1 + h.tier;
         int placed = 0;
-        for (int attempt = 0; attempt < 24 && placed < plots; attempt++) {
+        for (int attempt = 0; attempt < 40 && placed < plots; attempt++) {
             double ang = rnd.nextDouble() * Math.PI * 2;
-            double dist = 1.0 + rnd.nextDouble() * 0.5;
-            int px = c.getX() + (int) (Math.cos(ang) * (rx + 12) * dist);
-            int pz = c.getZ() + (int) (Math.sin(ang) * (rz + 12) * dist);
-            if (h.box.inflatedBy(6).isInside(new BlockPos(px, h.box.minY() + 5, pz))) continue;
-            boolean orchard = placed == plots - 1 && rnd.nextBoolean();
-            int w = 9 + rnd.nextInt(4), d = 7 + rnd.nextInt(4);
-            if (plot(level, h, px, pz, w, d, orchard, rnd)) {
+            double dist = 1.0 + rnd.nextDouble() * 0.6;
+            int w = 24 + rnd.nextInt(9), d = 16 + rnd.nextInt(7);
+            if (rnd.nextBoolean()) {
+                int t = w; w = d; d = t;
+            }
+            int px = c.getX() + (int) (Math.cos(ang) * (rx + 16 + w / 2) * dist) - w / 2;
+            int pz = c.getZ() + (int) (Math.sin(ang) * (rz + 16 + d / 2) * dist) - d / 2;
+            if (h.box.inflatedBy(8).intersects(px, pz, px + w, pz + d)) continue;
+            boolean overlap = false;
+            for (Holding.FiefBuilding fb : h.fief) {
+                if (fb.box().intersects(px - 3, pz - 3, px + w + 3, pz + d + 3)) { overlap = true; break; }
+            }
+            if (overlap) continue;
+            boolean orchard = placed > 0 && rnd.nextInt(3) == 0;
+            int[] ys = new int[2];
+            if (plot(level, h, px, pz, w, d, orchard, rnd, ys)) {
                 placed++;
-                int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, px, pz);
-                h.fief.add(new Holding.FiefBuilding(orchard ? "orchard" : "field", new BoundingBox(px - 2, y - 2, pz - 2, px + w + 2, y + 6, pz + d + 2)));
+                h.fief.add(new Holding.FiefBuilding(orchard ? "orchard" : "field", new BoundingBox(px - 2, ys[0] - 2, pz - 2, px + w + 2, ys[1] + 6, pz + d + 2)));
             }
         }
     }
 
-    private static boolean plot(ServerLevel level, Holding h, int x0, int z0, int w, int d, boolean orchard, RandomSource rnd) {
-        int[] hs = new int[4];
-        int k = 0;
-        for (int[] o : new int[][]{{0, 0}, {w, 0}, {0, d}, {w, d}}) {
-            BlockPos p = new BlockPos(x0 + o[0], 0, z0 + o[1]);
-            if (!level.isLoaded(p)) return false;
-            hs[k++] = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p.getX(), p.getZ());
+    private static final int STRIP = 4;
+
+    private static boolean plot(ServerLevel level, Holding h, int x0, int z0, int w, int d, boolean orchard, RandomSource rnd, int[] yOut) {
+        // the ground: heights across the lot, and which way it falls
+        int[][] top = new int[w + 1][d + 1];
+        int min = Integer.MAX_VALUE, max = Integer.MIN_VALUE, wet = 0;
+        for (int x = 0; x <= w; x++) {
+            for (int z = 0; z <= d; z++) {
+                BlockPos p = new BlockPos(x0 + x, 0, z0 + z);
+                if (!level.isLoaded(p)) return false;
+                int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p.getX(), p.getZ());
+                top[x][z] = y;
+                BlockState g = level.getBlockState(new BlockPos(p.getX(), y - 1, p.getZ()));
+                if (!g.getFluidState().isEmpty()) wet++;
+                min = Math.min(min, y);
+                max = Math.max(max, y);
+            }
         }
-        int min = Math.min(Math.min(hs[0], hs[1]), Math.min(hs[2], hs[3]));
-        int max = Math.max(Math.max(hs[0], hs[1]), Math.max(hs[2], hs[3]));
-        if (max - min > 2) return false;
+        if (wet > (w * d) / 20 || max - min > 12) return false;
+        // terraces run across the slope: strips along the axis with the smaller fall
+        int fallX = 0, fallZ = 0;
+        for (int z = 0; z <= d; z++) fallX += Math.abs(top[w][z] - top[0][z]);
+        for (int x = 0; x <= w; x++) fallZ += Math.abs(top[x][d] - top[x][0]);
+        boolean stripsAlongX = fallZ >= fallX;          // the ground falls along z: strips are rows of constant z
+        int strips = (stripsAlongX ? d : w) / STRIP + 1;
+        int[] lvl = new int[strips];
+        for (int s = 0; s < strips; s++) {
+            java.util.List<Integer> hs = new java.util.ArrayList<>();
+            for (int a = 0; a <= (stripsAlongX ? w : d); a++) {
+                for (int b = s * STRIP; b < Math.min((s + 1) * STRIP, (stripsAlongX ? d : w) + 1); b++) {
+                    hs.add(stripsAlongX ? top[a][b] : top[b][a]);
+                }
+            }
+            java.util.Collections.sort(hs);
+            lvl[s] = hs.get(hs.size() / 2);
+        }
+        for (int s = 1; s < strips; s++) lvl[s] = Math.max(lvl[s - 1] - 3, Math.min(lvl[s - 1] + 3, lvl[s]));   // steps of three at most
         Block crop = switch (rnd.nextInt(4)) {
             case 0 -> Blocks.CARROTS;
             case 1 -> Blocks.POTATOES;
             case 2 -> Blocks.BEETROOTS;
             default -> Blocks.WHEAT;
         };
-        int y = min - 1;
-        for (int x = x0; x <= x0 + w; x++) {
-            for (int z = z0; z <= z0 + d; z++) {
-                BlockPos g = new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1, z);
-                BlockState s = level.getBlockState(g);
-                if (s.canBeReplaced() && !s.getFluidState().isEmpty()) return true;
-                if (s.canBeReplaced()) {
-                    level.setBlock(g, Blocks.AIR.defaultBlockState(), 2);
-                    g = g.below();
-                    s = level.getBlockState(g);
+        BlockState wall = Blocks.COBBLESTONE.defaultBlockState();
+        int skipped = 0;
+        int ymin = Integer.MAX_VALUE, ymax = Integer.MIN_VALUE;
+        for (int x = 0; x <= w; x++) {
+            for (int z = 0; z <= d; z++) {
+                int s = (stripsAlongX ? z : x) / STRIP;
+                int y = lvl[s];                                   // standing level of this terrace
+                ymin = Math.min(ymin, y);
+                ymax = Math.max(ymax, y);
+                int t = top[x][z];
+                if (t - y > 5 || y - t > 4) { skipped++; continue; }
+                BlockPos ground = new BlockPos(x0 + x, y - 1, z0 + z);
+                // cut
+                for (int yy = y; yy <= t + 1; yy++) {
+                    BlockPos p = new BlockPos(x0 + x, yy, z0 + z);
+                    if (!level.getBlockState(p).isAir()) level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
                 }
-                if (!s.is(BlockTags.DIRT) && !s.is(BlockTags.SAND)) continue;
-                boolean edge = x == x0 || x == x0 + w || z == z0 || z == z0 + d;
+                // fill: dirt inside, a cobbled face where the terrace steps down
+                boolean face = false;
+                int sNext = stripsAlongX ? (z + 1) / STRIP : (x + 1) / STRIP, sPrev = stripsAlongX ? Math.max(0, z - 1) / STRIP : Math.max(0, x - 1) / STRIP;
+                if ((sNext < strips && lvl[sNext] < y && ((stripsAlongX ? z : x) % STRIP == STRIP - 1))
+                        || (lvl[sPrev] < y && ((stripsAlongX ? z : x) % STRIP == 0))) face = true;
+                for (int yy = t - 1; yy <= y - 1; yy++) {
+                    BlockPos p = new BlockPos(x0 + x, yy, z0 + z);
+                    if (yy == y - 1) continue;
+                    level.setBlock(p, face ? wall : Blocks.DIRT.defaultBlockState(), 2);
+                }
+                boolean edge = x == 0 || x == w || z == 0 || z == d;
                 if (edge) {
-                    boolean gap = z == z0 + d && x == x0 + w / 2;
-                    if (!gap && level.getBlockState(g.above()).isAir()) {
-                        level.setBlock(g.above(), Blocks.OAK_FENCE.defaultBlockState(), 3);
-                    }
+                    level.setBlock(ground, face ? wall : Blocks.GRASS_BLOCK.defaultBlockState(), 2);
+                    boolean gap = z == d && x >= w / 2 - 1 && x <= w / 2 + 1;
+                    if (!gap) level.setBlock(ground.above(), Blocks.OAK_FENCE.defaultBlockState(), 3);
+                    continue;
+                }
+                if (face) {
+                    level.setBlock(ground, wall, 2);
                     continue;
                 }
                 if (orchard) {
-                    level.setBlock(g, Blocks.GRASS_BLOCK.defaultBlockState(), 2);
-                    if ((x - x0) % 4 == 2 && (z - z0) % 4 == 2) tree(level, g.above(), rnd);
+                    level.setBlock(ground, Blocks.GRASS_BLOCK.defaultBlockState(), 2);
+                    if (x % 5 == 2 && z % 5 == 2) tree(level, ground.above(), rnd);
                     continue;
                 }
-                if ((x - x0) % 5 == 0) {
-                    level.setBlock(g, Blocks.WATER.defaultBlockState(), 3);
+                int along = stripsAlongX ? x : z;
+                if (along % 6 == 3) {
+                    level.setBlock(ground, Blocks.WATER.defaultBlockState(), 3);
                     continue;
                 }
-                level.setBlock(g, Blocks.FARMLAND.defaultBlockState().setValue(net.minecraft.world.level.block.FarmBlock.MOISTURE, 7), 2);
+                level.setBlock(ground, Blocks.FARMLAND.defaultBlockState().setValue(net.minecraft.world.level.block.FarmBlock.MOISTURE, 7), 2);
                 if (crop instanceof CropBlock cb) {
-                    level.setBlock(g.above(), cb.getStateForAge(rnd.nextInt(cb.getMaxAge() + 1)), 2);
+                    level.setBlock(ground.above(), cb.getStateForAge(rnd.nextInt(cb.getMaxAge() + 1)), 2);
                 }
             }
         }
-        // a haystack and a scarecrow
-        BlockPos hay = new BlockPos(x0 - 2, y + 1, z0 + 1);
-        if (level.getBlockState(hay).isAir() && level.getBlockState(hay.below()).isSolidRender(level, hay.below())) {
-            level.setBlock(hay, Blocks.HAY_BLOCK.defaultBlockState(), 3);
-            if (level.getBlockState(hay.above()).isAir()) level.setBlock(hay.above(), Blocks.HAY_BLOCK.defaultBlockState(), 3);
-        }
-        if (!orchard) {
-            BlockPos sc = new BlockPos(x0 + w / 2, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x0 + w / 2, z0 + d / 2), z0 + d / 2);
-            if (level.getBlockState(sc).isAir() || level.getBlockState(sc).getBlock() instanceof CropBlock) {
-                level.setBlock(sc, Blocks.OAK_FENCE.defaultBlockState(), 3);
-                level.setBlock(sc.above(), Blocks.HAY_BLOCK.defaultBlockState(), 3);
-                level.setBlock(sc.above(2), Blocks.CARVED_PUMPKIN.defaultBlockState(), 3);
+        if (skipped > (w * d) / 4) return false;
+        yOut[0] = ymin;
+        yOut[1] = ymax;
+        // the barn, outside the gate
+        barn(level, x0 + w / 2 - 3, z0 + d + 3, lvl[stripsAlongX ? strips - 1 : strips / 2], rnd);
+        return true;
+    }
+
+    /** A timber barn seven wide and six deep, open to the field, hay inside. */
+    private static void barn(ServerLevel level, int x0, int z0, int y, RandomSource rnd) {
+        int w = 6, d = 5;
+        for (int x = 0; x <= w; x++) {
+            for (int z = 0; z <= d; z++) {
+                int gy = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x0 + x, z0 + z);
+                if (Math.abs(gy - y) > 3 || !level.getFluidState(new BlockPos(x0 + x, gy - 1, z0 + z)).isEmpty()) return;
             }
         }
-        return true;
+        BlockState plank = Blocks.SPRUCE_PLANKS.defaultBlockState(), log = Blocks.SPRUCE_LOG.defaultBlockState(), cobble = Blocks.COBBLESTONE.defaultBlockState();
+        for (int x = 0; x <= w; x++) {
+            for (int z = 0; z <= d; z++) {
+                for (int yy = y - 3; yy <= y + 7; yy++) {
+                    BlockPos p = new BlockPos(x0 + x, yy, z0 + z);
+                    if (yy < y - 1) { if (level.getBlockState(p).canBeReplaced()) level.setBlock(p, Blocks.DIRT.defaultBlockState(), 2); continue; }
+                    if (yy == y - 1) { level.setBlock(p, cobble, 2); continue; }
+                    boolean corner = (x == 0 || x == w) && (z == 0 || z == d);
+                    boolean wallX = x == 0 || x == w, wallZ = z == d;      // open toward the field (z0 side)
+                    if (yy <= y + 2) {
+                        if (corner) level.setBlock(p, log, 2);
+                        else if (wallX || wallZ) level.setBlock(p, (yy == y + 1 && (x + z) % 3 == 0) ? Blocks.OAK_FENCE.defaultBlockState() : plank, 2);
+                        else if (yy == y && (x + z) % 2 == 0 && z > 1) level.setBlock(p, Blocks.HAY_BLOCK.defaultBlockState(), 2);
+                        else level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                    } else {
+                        level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                    }
+                }
+            }
+        }
+        // a gable roof over it, ridge along z
+        for (int k = 0; k <= w / 2 + 1; k++) {
+            int yy = y + 3 + k;
+            for (int z = -1; z <= d + 1; z++) {
+                int xl = x0 - 1 + k, xr = x0 + w + 1 - k;
+                if (xl < xr) {
+                    level.setBlock(new BlockPos(xl, yy, z0 + z), Blocks.SPRUCE_STAIRS.defaultBlockState().setValue(net.minecraft.world.level.block.StairBlock.FACING, net.minecraft.core.Direction.EAST), 2);
+                    level.setBlock(new BlockPos(xr, yy, z0 + z), Blocks.SPRUCE_STAIRS.defaultBlockState().setValue(net.minecraft.world.level.block.StairBlock.FACING, net.minecraft.core.Direction.WEST), 2);
+                    if (z == -1 || z == d + 1) continue;
+                    for (int x = xl + 1; x < xr; x++) {
+                        BlockPos p = new BlockPos(x, yy, z0 + z);
+                        if (z == 0 || z == d) level.setBlock(p, plank, 2);
+                        else level.setBlock(p, Blocks.AIR.defaultBlockState(), 2);
+                    }
+                } else if (xl == xr) {
+                    level.setBlock(new BlockPos(xl, yy, z0 + z), Blocks.SPRUCE_SLAB.defaultBlockState(), 2);
+                }
+            }
+        }
     }
 
     private static void tree(ServerLevel level, BlockPos base, RandomSource rnd) {

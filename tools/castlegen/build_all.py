@@ -62,7 +62,8 @@ def main():
         meta["name"] = name
         character = meta.get("character") or rooms.character_for(name, seed_shift or 0)
         meta["character"] = character
-        kinds = rooms.furnish(g, meta["GL"], character)
+        kinds = rooms.furnish(g, meta["GL"], character, tier=meta.get("tier", 2))
+        meta["beds"] = kinds["beds"]
         opened = fixup.clear_blocked_doorways(g, meta["GL"], tuple(meta.get("levels", ())))
         dropped = fixup.drop_buried_markers(g)
         bad, checked = walk.audit(g, meta)
@@ -74,6 +75,8 @@ def main():
             for k, v in bad.items():
                 print(f"    {k}: {v[:6]}")
             raise SystemExit(f"{name}: {unreachable} posts cannot be walked to from the gate")
+        if kinds["beds"] < kinds["men"]:
+            raise SystemExit(f"{name}: {kinds['beds']} beds for {kinds['men']} men")
         if not args.no_export:
             tiles = export.write_tiles(g, os.path.join(STRUCT_DIR, name), name)
             layout = export.write_layout(g, meta, tiles, os.path.join(LAYOUT_DIR, f"{name}.json"))

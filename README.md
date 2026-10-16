@@ -88,6 +88,8 @@ Private Forge 1.20.1 mod for the Dungeons and Homestead pack. Castles held by ri
 
 **No two castles alike.** Every castle has a temper that colours the dressing: a *martial* house hangs racks and targets, a *rich* one carpets, tapestries and gold, a *pious* one candles, a second chapel and a scriptorium, a *grim* one soul-fire, skulls, chains and two dungeons, a *rustic* one hay, casks, kennels and a brewhouse. Each castle plan is built twice, with a different seed, temper and roof style: slate cones, tall spires, squat hats, timber hoardings (a covered fighting gallery round the tower top, with a ladder up to it), stepped pyramids on square towers, or open crenellated platforms. With five regional palettes on top, that's about 150 distinct looks for the three great-castle plans alone.
 
+**Fields the size of fields.** Outside the walls the fiefs farm lots 24 to 32 long and 16 to 22 across, cut into terraces four rows deep that step down the slope behind cobbled retaining walls, a water channel every few rows, a fence round the lot and a timber barn at the gate; one in three is an orchard. Inside, a castle sleeps its men: the generator counts the beds and refuses a layout with fewer bunks than the garrison it's rated for, and a castle's capacity is capped by its beds.
+
 **Lived-in world.** Villagers work inside the walls, fields and orchards appear outside, and a road is laid from the gate to the nearest village as the chunks load. Castles are sited on high, dry ground and keep clear of villages and towns from any mod (anything in `#minecraft:village`, plus a few extras in `#stormhold:castle_avoid`); a watchtower or holdfast never lands inside a great castle.
 
 ## Commands

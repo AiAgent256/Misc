@@ -16,6 +16,8 @@ public class Layout {
     public final String name;
     public final int tier;
     public final int sizeX, sizeY, sizeZ, ground;
+    /** Beds in the castle: the garrison it can sleep. 0 for layouts without the count. */
+    public final int beds;
     public final BlockPos lord, bannerStand, warTable, gate, rally;
     public final EnumMap<Role, List<BlockPos>> posts = new EnumMap<>(Role.class);
     public final List<BlockPos> banners = new ArrayList<>();
@@ -32,6 +34,7 @@ public class Layout {
         sizeY = size.get(1).getAsInt();
         sizeZ = size.get(2).getAsInt();
         ground = o.get("ground").getAsInt();
+        beds = o.has("beds") ? o.get("beds").getAsInt() : 0;
         lord = pos(o.get("lord"));
         bannerStand = pos(o.get("banner_stand"));
         warTable = pos(o.get("war_table"));
