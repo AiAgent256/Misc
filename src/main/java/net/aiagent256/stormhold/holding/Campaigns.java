@@ -206,6 +206,13 @@ public final class Campaigns {
         if (mgr.campaigns.removeIf(c -> c.stage == Campaign.Stage.DONE)) mgr.setDirty();
     }
 
+    /** Tick one campaign on its own (tests). */
+    public static void tickOne(ServerLevel level, HoldingManager mgr, Campaign c) {
+        if (c.stage == Campaign.Stage.DONE) return;
+        Garrisons.pruneLive(level, c.live);
+        if (c.kind == Campaign.Kind.RAID) tickRaid(level, mgr, c);
+    }
+
     private static boolean playerNear(ServerLevel level, BlockPos p, int radius) {
         for (ServerPlayer sp : level.players()) {
             if (!sp.isSpectator() && sp.blockPosition().distSqr(new BlockPos(p.getX(), sp.getBlockY(), p.getZ())) < (double) radius * radius) {

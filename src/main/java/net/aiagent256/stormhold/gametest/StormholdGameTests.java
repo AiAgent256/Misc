@@ -952,6 +952,18 @@ public class StormholdGameTests {
         a.gatePos = a.box.getCenter();
         mgr.add(a);
         mgr.add(b);
+        try {
+            housesActBody(g, level, mgr, a, b);
+        } finally {
+            mgr.holdings.remove(a.id);
+            mgr.holdings.remove(b.id);
+            mgr.campaigns.removeIf(c -> a.id.equals(c.origin) || b.id.equals(c.target));
+            mgr.contracts.removeIf(c -> b.id.equals(c.target));
+        }
+        g.succeed();
+    }
+
+    private static void housesActBody(GameTestHelper g, ServerLevel level, HoldingManager mgr, Holding a, Holding b) {
         var ha = mgr.house("housea");
         var hb = mgr.house("houseb");
         net.aiagent256.stormhold.house.Politics.shift(mgr, "housea", "houseb", -80);
@@ -963,7 +975,7 @@ public class StormholdGameTests {
         // march it to the gate and let the numbers decide
         c.progress = 1.0;
         int before = mgr.chronicle.size();
-        for (int i = 0; i < 5 && c.stage != Campaign.Stage.DONE; i++) Campaigns.tick(level, mgr, level.getGameTime());
+        for (int i = 0; i < 5 && c.stage != Campaign.Stage.DONE; i++) Campaigns.tickOne(level, mgr, c);
         if (c.stage != Campaign.Stage.DONE) throw new IllegalStateException("the war never resolved");
         if (!b.owner.equals(Sides.house("housea")) || !b.houseId.equals("housea"))
             throw new IllegalStateException("Weakwall should have fallen to house A: owner " + b.owner + " house " + b.houseId);
@@ -981,7 +993,8 @@ public class StormholdGameTests {
         mgr.contracts.add(contract);
         HoldingEvents.transfer(level, mgr, b, Sides.player(player.getUUID()));
         if (!contract.done) throw new IllegalStateException("the contract was not honoured");
-        int emeralds = 0;
+        // a mock player isn't on the player list, so the fee goes to the realm's stores
+        int emeralds = b.stock(new net.minecraft.resources.ResourceLocation("minecraft", "emerald"));
         for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
             var st = player.getInventory().getItem(i);
             if (st.is(net.minecraft.world.item.Items.EMERALD)) emeralds += st.getCount();
@@ -1001,9 +1014,6 @@ public class StormholdGameTests {
         var back = net.aiagent256.stormhold.net.RealmData.read(buf);
         if (back.castles().size() != data.castles().size() || back.notes().size() != data.notes().size())
             throw new IllegalStateException("realm page did not round-trip");
-        mgr.holdings.remove(a.id);
-        mgr.holdings.remove(b.id);
-        g.succeed();
     }
 
     private static Holding sample(GameTestHelper g) {
