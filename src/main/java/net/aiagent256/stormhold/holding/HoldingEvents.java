@@ -233,6 +233,7 @@ public final class HoldingEvents {
                 h.contestProgress = 0;
             }
             h.contestProgress++;
+            waves(level, mgr, h);
             if (h.contestProgress >= Config.CAPTURE_SECONDS.get()) {
                 transfer(level, mgr, h, s);
                 return;
@@ -243,8 +244,32 @@ public final class HoldingEvents {
         updateBar(level, mgr, h);
     }
 
+    /**
+     * The bigger the castle, the harder it is to hold the stand alone. A watchtower has only its counterattack;
+     * a holdfast sends one more wave, a great castle three, the city five and the king's guard with the last.
+     */
+    private static void waves(ServerLevel level, HoldingManager mgr, Holding h) {
+        if (!h.isHouseOwned() || h.isTown()) return;
+        int total = h.tier >= 4 ? 5 : h.tier == 3 ? 3 : h.tier == 2 ? 1 : 0;
+        if (h.wavesSent >= total) return;
+        int cap = Config.CAPTURE_SECONDS.get();
+        int at = cap * (h.wavesSent + 1) / (total + 1);
+        if (h.contestProgress < at) return;
+        h.wavesSent++;
+        int n = h.tier >= 4 ? 16 : h.tier == 3 ? 12 : 8;
+        BlockPos spot = h.rallyPos.equals(BlockPos.ZERO) ? h.gatePos : h.rallyPos;
+        ServerPlayer claimant = h.claimant != null ? level.getServer().getPlayerList().getPlayer(h.claimant) : null;
+        Garrisons.reinforce(level, mgr, h, Role.KNIGHT, (int) Math.ceil(n * 0.7), spot, claimant);
+        Garrisons.reinforce(level, mgr, h, Role.CROSSBOWMAN, (int) Math.floor(n * 0.3), spot, claimant);
+        boolean last = h.wavesSent == total;
+        if (last && h.tier >= 4) Garrisons.reinforce(level, mgr, h, Role.CAPTAIN, 3, spot, claimant);
+        String what = last && h.tier >= 4 ? "The king's guard comes for the stand!" : "Another " + n + " of the garrison rally to the stand!";
+        announceNear(level, h.bannerPos, 96, Component.literal(what).withStyle(ChatFormatting.RED));
+    }
+
     private static void clearContest(Holding h) {
         h.contestProgress = 0;
+        h.wavesSent = 0;
         if (h.bar != null) {
             h.bar.removeAllPlayers();
             h.bar = null;
@@ -294,7 +319,10 @@ public final class HoldingEvents {
         h.contestSide = null;
         h.claimant = null;
         h.counterattackSpawned = false;
+        h.wavesSent = 0;
         long now = level.getGameTime();
+        UUID newPlayer = Sides.playerId(newSide);
+        int rankBefore = newPlayer != null ? Titles.rank(mgr, newPlayer) : 0;
         // armies fighting over this castle go home
         for (Campaign c : mgr.campaigns) {
             if (h.id.equals(c.target) && c.stage != Campaign.Stage.DONE && c.side.equals(newSide)) {
@@ -330,6 +358,7 @@ public final class HoldingEvents {
         if (p != null) {
             tell(level, p, Component.literal("The garrison swears to you. Use the War Table in the hall to give orders.")
                     .withStyle(ChatFormatting.GREEN));
+            Titles.check(level, mgr, p, rankBefore);
             House house = mgr.houseOf(oldSide);
             if (house != null && h.id.equals(house.capital)) {
                 // the crown has fallen: every leaderless castle of the house bends the knee

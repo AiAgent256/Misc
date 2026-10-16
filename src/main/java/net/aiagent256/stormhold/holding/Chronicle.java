@@ -78,6 +78,7 @@ public final class Chronicle {
         for (ServerPlayer p : level.players()) {
             List<Holding> mine = mgr.ownedBy(p.getUUID());
             if (mine.isEmpty()) continue;
+            tribute(level, mgr, p.getUUID(), mine);
             for (Component c : account(level, mgr, p.getUUID(), mine, day)) p.sendSystemMessage(c);
         }
     }
@@ -89,8 +90,9 @@ public final class Chronicle {
     /** The dawn account: five to eight lines, the rest is on the Realm page. */
     public static List<Component> account(ServerLevel level, HoldingManager mgr, UUID player, List<Holding> mine, long day) {
         List<Component> out = new ArrayList<>();
-        out.add(Component.literal("Day " + day + ". The realm: " + mine.size() + (mine.size() == 1 ? " castle, " : " castles, ")
-                + troops(mine) + " men under arms.").withStyle(ChatFormatting.GOLD));
+        String title = Titles.name(Titles.rank(mine));
+        out.add(Component.literal("Day " + day + ". " + (title.isEmpty() ? "The realm" : "The realm of the " + title) + ": " + mine.size()
+                + (mine.size() == 1 ? " castle, " : " castles, ") + troops(mine) + " men under arms.").withStyle(ChatFormatting.GOLD));
         Holding first = mine.get(0);
         out.add(Component.literal("Stores: bread " + Stores.realmStock(mgr, first, player, BREAD) + ", iron "
                 + Stores.realmStock(mgr, first, player, IRON) + ", stone " + Stores.realmStock(mgr, first, player, STONE)
@@ -129,6 +131,22 @@ public final class Chronicle {
         }
         out.add(Component.literal("The Realm page on the War Table has the rest.").withStyle(ChatFormatting.DARK_GRAY));
         return out;
+    }
+
+    /** A King takes two emeralds a day from every house that counts him a friend and still holds a castle. */
+    private static void tribute(ServerLevel level, HoldingManager mgr, UUID player, List<Holding> mine) {
+        if (Titles.rank(mine) < Titles.KING) return;
+        int paid = 0, houses = 0;
+        for (House house : mgr.houses.values()) {
+            if (house.id.equals("outlaws") || !Standing.friendly(mgr, house.id, player)) continue;
+            if (Politics.castlesOf(mgr, house.id).isEmpty()) continue;
+            houses++;
+            paid += 2;
+        }
+        if (paid > 0) {
+            mine.get(0).addStock(EMERALD, paid);
+            log(level, mgr, NEWS, houses + (houses == 1 ? " house pays" : " houses pay") + " the King " + paid + " emeralds in tribute.", player);
+        }
     }
 
     private static int troops(List<Holding> mine) {

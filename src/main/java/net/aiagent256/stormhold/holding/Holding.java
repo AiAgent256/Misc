@@ -166,6 +166,8 @@ public class Holding {
     public int contestDefenders;
     @Nullable public UUID claimant;
     public boolean counterattackSpawned;
+    /** Not saved: reinforcement waves sent against the stand during this contest. */
+    public int wavesSent;
 
     // runtime only
     public final Map<UUID, Role> live = new HashMap<>();

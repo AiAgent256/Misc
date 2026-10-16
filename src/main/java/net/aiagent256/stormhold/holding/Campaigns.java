@@ -43,6 +43,16 @@ public final class Campaigns {
             mgr.setDirty();
         }
         if (now >= h.nextRaid) {
+            // one threat at a time: while another of the owner's castles is under attack, this one waits a day
+            for (Campaign c : mgr.campaigns) {
+                if (c.kind != Campaign.Kind.RAID || c.stage == Campaign.Stage.DONE || c.target == null) continue;
+                Holding other = mgr.holdings.get(c.target);
+                if (other != null && other != h && other.owner.equals(h.owner)) {
+                    h.nextRaid = now + 24000;
+                    mgr.setDirty();
+                    return;
+                }
+            }
             launchRaid(level, mgr, h);
             h.nextRaid = now + HoldingEvents.raidDelay(level);
             h.raidWarned = false;

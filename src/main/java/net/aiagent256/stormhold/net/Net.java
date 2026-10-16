@@ -153,6 +153,13 @@ public final class Net {
         CHANNEL.sendToServer(new WarTableAction(holding, action, pos, amount));
     }
 
+    /** A Knight musters ten at a time, a Lord twenty, a Warden forty, a King eighty. */
+    private static int musterCap(HoldingManager mgr, ServerPlayer player) {
+        int cap = net.aiagent256.stormhold.holding.Titles.musterCap(net.aiagent256.stormhold.holding.Titles.rank(mgr, player.getUUID()));
+        if (cap > 40 && player.server.getPlayerList().getPlayer(player.getUUID()) == null) return 40;
+        return cap;
+    }
+
     private static void apply(ServerPlayer player, WarTableAction a) {
         if (a.action() == OPEN_REALM) {
             openRealm(player);
@@ -185,9 +192,9 @@ public final class Net {
                         player.sendSystemMessage(Component.literal("Not enough men to spare, or a war party is already out."));
                     }
                 }
-                case MUSTER, MUSTER_KNIGHTS -> Company.muster(level, mgr, player, h, Role.KNIGHT, Math.max(1, Math.min(40, a.amount())));
-                case MUSTER_ARCHERS -> Company.muster(level, mgr, player, h, Role.ARCHER, Math.max(1, Math.min(40, a.amount())));
-                case MUSTER_CROSSBOWMEN -> Company.muster(level, mgr, player, h, Role.CROSSBOWMAN, Math.max(1, Math.min(40, a.amount())));
+                case MUSTER, MUSTER_KNIGHTS -> Company.muster(level, mgr, player, h, Role.KNIGHT, Math.max(1, Math.min(musterCap(mgr, player), a.amount())));
+                case MUSTER_ARCHERS -> Company.muster(level, mgr, player, h, Role.ARCHER, Math.max(1, Math.min(musterCap(mgr, player), a.amount())));
+                case MUSTER_CROSSBOWMEN -> Company.muster(level, mgr, player, h, Role.CROSSBOWMAN, Math.max(1, Math.min(musterCap(mgr, player), a.amount())));
                 case DISMISS -> Company.dismiss(level, mgr, player, h);
                 case SEND_COLUMN -> {
                     if (net.aiagent256.stormhold.holding.Columns.active(mgr, h)) {
