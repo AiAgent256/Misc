@@ -416,7 +416,6 @@ public final class Fief {
         mgr.setDirty();
     }
 
-    /** A house holding whose fief this spot lies in, if any. */
     /** The holding whose people live here, whoever holds it. */
     @Nullable
     public static Holding peopleOf(HoldingManager mgr, BlockPos pos) {
@@ -426,6 +425,7 @@ public final class Fief {
         return null;
     }
 
+    /** A house holding whose fief this spot lies in, if any. */
     @Nullable
     public static Holding fiefAt(HoldingManager mgr, BlockPos pos) {
         for (Holding h : mgr.holdings.values()) {
