@@ -180,8 +180,11 @@ public class StormholdGameTests {
             if (!level.getBlockState(h.lordPos).canBeReplaced() || level.getBlockState(h.lordPos.below()).canBeReplaced())
                 throw new IllegalStateException(id + " lord's spot is blocked or floating at " + h.lordPos);
             // every castle has a gate, and a lost gate goes back up
-            for (int dx = -2; dx <= 2; dx++)
-                for (int dz = -2; dz <= 2; dz++) level.getChunk((h.gatePos.getX() >> 4) + dx, (h.gatePos.getZ() >> 4) + dz);
+            List<BlockPos> gateMarks = new ArrayList<>(List.of(h.gatePos));
+            for (var ex : h.extras.entrySet()) if (ex.getKey().startsWith("gate")) gateMarks.addAll(ex.getValue());
+            for (BlockPos gm : gateMarks)
+                for (int dx = -2; dx <= 2; dx++)
+                    for (int dz = -2; dz <= 2; dz++) level.getChunk((gm.getX() >> 4) + dx, (gm.getZ() >> 4) + dz);
             net.aiagent256.stormhold.holding.Gates.tick(level, mgr, h);
             if (h.gates == null) throw new IllegalStateException(id + " gate scan found its chunks unloaded");
             if (h.gates.isEmpty()) {
