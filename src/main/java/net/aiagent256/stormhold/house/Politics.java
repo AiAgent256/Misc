@@ -118,6 +118,7 @@ public final class Politics {
         if (now - mgr.lastPolitics < 600) return;
         mgr.lastPolitics = now;
         Chronicle.dawn(level, mgr);
+        net.aiagent256.stormhold.holding.Events.tick(level, mgr, now);
         // offers that have lapsed
         for (Contract c : mgr.contracts) {
             if (!c.done && c.expiresAt < now) {

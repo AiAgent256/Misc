@@ -211,6 +211,12 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
                     + ", " + Math.max(1, (c.expiresAt - now) / 24000) + " days left."));
         }
         for (Chronicle.Entry e : Chronicle.forPlayer(mgr, me, 40)) notes.add(new Note(e.day(), e.kind(), e.text()));
+        // a matter waiting on the player's word goes last, so the page shows it first
+        net.aiagent256.stormhold.holding.Events.Matter open = net.aiagent256.stormhold.holding.Events.open(mgr, me);
+        if (open != null) {
+            var card = net.aiagent256.stormhold.holding.Events.card(mgr, open);
+            notes.add(new Note(-2, Chronicle.NEWS, card.text() + " Answer in chat: /stormhold matters"));
+        }
         return new RealmData(Chronicle.day(level), at.getX(), at.getZ(), castles, houses, own, lines, notes);
     }
 

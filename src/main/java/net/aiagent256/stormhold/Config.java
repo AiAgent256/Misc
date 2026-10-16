@@ -16,6 +16,7 @@ public final class Config {
     public static final ForgeConfigSpec.BooleanValue CASTLES_CLAIM_GROUND;
     public static final ForgeConfigSpec.BooleanValue HOUSES_ACT;
     public static final ForgeConfigSpec.BooleanValue DRAGONS_ATTACK;
+    public static final ForgeConfigSpec.BooleanValue EVENTS;
     public static final ForgeConfigSpec.IntValue CAPTURE_SECONDS;
     public static final ForgeConfigSpec.IntValue RAID_MIN_DAYS;
     public static final ForgeConfigSpec.IntValue RAID_MAX_DAYS;
@@ -69,6 +70,8 @@ public final class Config {
                 .define("housesAct", true);
         DRAGONS_ATTACK = b.comment("With Ice and Fire installed, a wild dragon near a castle attacks it and the garrison fights it.")
                 .define("dragonsAttackCastles", true);
+        EVENTS = b.comment("Some mornings a lord is brought a matter to decide: a blight, a smith at the gate, an envoy, rats in the cellar.")
+                .define("events", true);
         CAPTURE_SECONDS = b.comment("Seconds you must hold the banner stand to take a castle.")
                 .defineInRange("captureSeconds", 90, 5, 1200);
         DETECT_RADIUS_CHUNKS = b.defineInRange("detectRadiusChunks", 7, 2, 16);

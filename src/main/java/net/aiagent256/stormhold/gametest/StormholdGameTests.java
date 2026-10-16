@@ -1017,6 +1017,129 @@ public class StormholdGameTests {
             throw new IllegalStateException("realm page did not round-trip");
     }
 
+    /** Every card in the event deck can be dealt to a lord and answered either way, and each answer leaves a mark. */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void everyMatterResolvesBothWays(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        UUID me = player.getUUID();
+        Holding h = sample(g);
+        h.name = "Dealhold";
+        h.tier = 2;
+        h.houseId = "housea";
+        h.owner = Sides.player(me);
+        h.key = "gametest-deal@" + h.box.minX() + "," + h.box.minZ();
+        h.fiefPop = 10;
+        Holding town = sample(g);
+        town.name = "Dealmarket";
+        town.layout = "town_walled";
+        town.owner = Sides.player(me);
+        town.key = "gametest-dealtown@" + town.box.minX() + "," + town.box.minZ();
+        town.box = new BoundingBox(h.box.minX() + 600, h.box.minY(), h.box.minZ(), h.box.minX() + 615, h.box.maxY(), h.box.maxZ());
+        town.fiefPop = 10;
+        // a house with a castle, so envoys, tourneys and spies have somewhere to come from
+        Holding theirs = sample(g);
+        theirs.name = "Theirhold";
+        theirs.houseId = "housea";
+        theirs.owner = Sides.house("housea");
+        theirs.key = "gametest-theirs@" + theirs.box.minX() + "," + theirs.box.minZ();
+        theirs.box = new BoundingBox(h.box.minX() + 1200, h.box.minY(), h.box.minZ(), h.box.minX() + 1215, h.box.maxY(), h.box.maxZ());
+        mgr.add(h);
+        mgr.add(town);
+        mgr.add(theirs);
+        var emerald = new net.minecraft.resources.ResourceLocation("minecraft", "emerald");
+        var iron = new net.minecraft.resources.ResourceLocation("minecraft", "iron_ingot");
+        try {
+            for (String kind : net.aiagent256.stormhold.holding.Events.KINDS) {
+                for (int way = 1; way <= 2; way++) {
+                    // the stores are full, so the first answer can always be paid for
+                    for (var item : new String[]{"bread", "iron_ingot", "cobblestone", "gold_ingot", "emerald"}) {
+                        h.stock.put(new net.minecraft.resources.ResourceLocation("minecraft", item), 100);
+                        town.stock.put(new net.minecraft.resources.ResourceLocation("minecraft", item), 100);
+                    }
+                    h.fillGarrison(1.0);
+                    h.fortify = 0;
+                    h.work = net.aiagent256.stormhold.holding.Builder.NONE;
+                    h.renown = 2;
+                    // tourney wants a friend, spy and envoy want someone cooler: set the mood per card
+                    mgr.standing.computeIfAbsent("housea", k -> new java.util.HashMap<>()).put(me,
+                            kind.equals(net.aiagent256.stormhold.holding.Events.TOURNEY) ? 60 - mgr.house("housea").disposition : -mgr.house("housea").disposition);
+                    Holding at = kind.equals(net.aiagent256.stormhold.holding.Events.PETITION) ? town : h;
+                    var m = net.aiagent256.stormhold.holding.Events.draw(level, mgr, me, at, kind);
+                    if (m == null) throw new IllegalStateException(kind + " would not deal");
+                    if (net.aiagent256.stormhold.holding.Events.open(mgr, me) != m) throw new IllegalStateException(kind + " is not the open matter");
+                    var card = net.aiagent256.stormhold.holding.Events.card(mgr, m);
+                    if (card.text().isEmpty() || card.first().isEmpty() || card.second().isEmpty()) throw new IllegalStateException(kind + " has a blank card");
+                    if (net.aiagent256.stormhold.holding.Events.present(mgr, m).size() != 2) throw new IllegalStateException(kind + " did not present");
+                    int lines = mgr.chronicle.size(), men = h.troops(), emeralds = h.stock(emerald), ironBefore = h.stock(iron), pop = at.fiefPop;
+                    if (!net.aiagent256.stormhold.holding.Events.choose(level, mgr, me, m.id, way)) throw new IllegalStateException(kind + " could not be chosen");
+                    if (!m.done || net.aiagent256.stormhold.holding.Events.open(mgr, me) != null) throw new IllegalStateException(kind + " did not settle");
+                    if (mgr.chronicle.size() != lines + 1) throw new IllegalStateException(kind + " left no line in the record");
+                    if (net.aiagent256.stormhold.holding.Events.choose(level, mgr, me, m.id, way)) throw new IllegalStateException(kind + " settled twice");
+                    switch (kind) {
+                        case net.aiagent256.stormhold.holding.Events.SMITH -> {
+                            if (way == 1 && (h.stock(iron) != ironBefore + 24 || h.stock(emerald) != emeralds - 8)) throw new IllegalStateException("the smith did not trade");
+                            if (way == 2 && h.stock(iron) != ironBefore) throw new IllegalStateException("the smith traded anyway");
+                        }
+                        case net.aiagent256.stormhold.holding.Events.DESERTERS -> {
+                            if (way == 1 && h.troops() != men) throw new IllegalStateException("the riders lost men");
+                            if (way == 2 && h.troops() != men - m.roll) throw new IllegalStateException("deserters stayed: " + h.troops() + " of " + men);
+                        }
+                        case net.aiagent256.stormhold.holding.Events.BRIGANDS -> {
+                            if (way == 2 && (h.troops() != men - 2 || h.stock(emerald) != emeralds + 15)) throw new IllegalStateException("the road was not cleared");
+                        }
+                        case net.aiagent256.stormhold.holding.Events.MASON -> {
+                            if (way == 1 && h.fortify != 1) throw new IllegalStateException("the mason did not build");
+                        }
+                        case net.aiagent256.stormhold.holding.Events.WEDDING -> {
+                            if (way == 1 && at.fiefPop != pop + 4) throw new IllegalStateException("no one came to the feast");
+                            if (way == 2 && at.fiefPop != pop - 1) throw new IllegalStateException("no one left without a feast");
+                        }
+                        case net.aiagent256.stormhold.holding.Events.PETITION -> {
+                            if (way == 1 && at.fiefPop != pop + 3) throw new IllegalStateException("the tolls did not draw trade");
+                        }
+                        case net.aiagent256.stormhold.holding.Events.RELIC -> {
+                            if (way == 1 && h.renown != 3) throw new IllegalStateException("the relic brought no renown");
+                            if (way == 2 && h.stock(emerald) != emeralds + 20) throw new IllegalStateException("the relic did not sell");
+                        }
+                        case net.aiagent256.stormhold.holding.Events.ENVOY -> {
+                            if (way == 1 && h.nextRaid < level.getGameTime() + 3 * 24000L) throw new IllegalStateException("the envoy bought no peace");
+                        }
+                        default -> {
+                        }
+                    }
+                }
+            }
+            // a matter nobody answers settles itself after two days
+            var m = net.aiagent256.stormhold.holding.Events.draw(level, mgr, me, h, net.aiagent256.stormhold.holding.Events.RATS);
+            int men = h.troops();
+            net.aiagent256.stormhold.holding.Events.tick(level, mgr, level.getGameTime() + 3 * 24000L);
+            if (!m.done || h.troops() != men - m.roll) throw new IllegalStateException("an unanswered matter did not settle the second way");
+            if (!mgr.chronicle.get(mgr.chronicle.size() - 1).text().startsWith("Left unanswered")) throw new IllegalStateException("the record did not say it lapsed");
+            // and the page shows an open one
+            net.aiagent256.stormhold.holding.Events.draw(level, mgr, me, h, net.aiagent256.stormhold.holding.Events.SMITH);
+            var data = net.aiagent256.stormhold.net.RealmData.build(level, me, player.blockPosition());
+            if (data.notes().isEmpty() || data.notes().get(data.notes().size() - 1).day() != -2) throw new IllegalStateException("the page does not show the open matter");
+            // saved and loaded
+            var tag = new net.minecraft.nbt.CompoundTag();
+            tag.put("Matters", net.aiagent256.stormhold.holding.Events.save(mgr.matters));
+            java.util.List<net.aiagent256.stormhold.holding.Events.Matter> back = new java.util.ArrayList<>();
+            net.aiagent256.stormhold.holding.Events.load(tag.getList("Matters", net.minecraft.nbt.Tag.TAG_COMPOUND), back);
+            if (back.size() != mgr.matters.size()) throw new IllegalStateException("matters did not round-trip");
+        } finally {
+            mgr.holdings.remove(h.id);
+            mgr.holdings.remove(town.id);
+            mgr.holdings.remove(theirs.id);
+            mgr.byKey.remove(h.key);
+            mgr.byKey.remove(town.key);
+            mgr.byKey.remove(theirs.key);
+            mgr.matters.removeIf(x -> me.equals(x.player));
+            mgr.standing.getOrDefault("housea", new java.util.HashMap<>()).remove(me);
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

@@ -226,12 +226,13 @@ public class RealmScreen extends Screen {
                 lastDay = n.day();
                 g.drawString(this.font, "Day " + n.day(), rx, y, 0xF0D8A0, false);
                 y += 10;
-            } else if (n.day() < 0 && lastDay != -1) {
-                lastDay = -1;
-                g.drawString(this.font, "Open offers", rx, y, 0xF0D8A0, false);
+            } else if (n.day() < 0 && n.day() != lastDay) {
+                lastDay = n.day();
+                g.drawString(this.font, n.day() == -2 ? "Waiting on your word" : "Open offers", rx, y, 0xF0D8A0, false);
                 y += 10;
             }
-            int color = n.kind() == Chronicle.WAR ? 0xFF8080 : n.kind() == Chronicle.HOUSES ? 0x80D0FF : n.kind() == Chronicle.GROWTH ? 0x90E090 : 0xE0D8C8;
+            int color = n.day() == -2 ? 0xFFE080 : n.kind() == Chronicle.WAR ? 0xFF8080 : n.kind() == Chronicle.HOUSES ? 0x80D0FF
+                    : n.kind() == Chronicle.GROWTH ? 0x90E090 : 0xE0D8C8;
             for (FormattedCharSequence l : this.font.split(Component.literal(n.text()), rw)) {
                 g.drawString(this.font, l, rx, y, color, false);
                 y += 9;

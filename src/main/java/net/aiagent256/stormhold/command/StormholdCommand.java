@@ -50,6 +50,16 @@ public final class StormholdCommand {
                 }))
                 .then(Commands.literal("accept").then(Commands.argument("holding", com.mojang.brigadier.arguments.StringArgumentType.word())
                         .then(Commands.argument("posting", com.mojang.brigadier.arguments.StringArgumentType.word()).executes(StormholdCommand::accept))))
+                .then(Commands.literal("choose").then(Commands.argument("matter", com.mojang.brigadier.arguments.StringArgumentType.word())
+                        .then(Commands.argument("which", com.mojang.brigadier.arguments.IntegerArgumentType.integer(1, 2)).executes(StormholdCommand::choose))))
+                .then(Commands.literal("matters").executes(c -> {
+                    var p = c.getSource().getPlayerOrException();
+                    var mgr = net.aiagent256.stormhold.holding.HoldingManager.get(p.serverLevel());
+                    var m = net.aiagent256.stormhold.holding.Events.open(mgr, p.getUUID());
+                    if (m == null) p.sendSystemMessage(net.minecraft.network.chat.Component.literal("Nothing waits on your word."));
+                    else for (var line : net.aiagent256.stormhold.holding.Events.present(mgr, m)) p.sendSystemMessage(line);
+                    return 1;
+                }))
                 .then(Commands.literal("befriend").requires(s -> s.hasPermission(2)).executes(StormholdCommand::befriend))
                 .then(Commands.literal("capture").requires(s -> s.hasPermission(2)).executes(StormholdCommand::capture))
                 .then(Commands.literal("raid").requires(s -> s.hasPermission(2)).executes(StormholdCommand::raid))
@@ -114,6 +124,22 @@ public final class StormholdCommand {
             java.util.UUID h = java.util.UUID.fromString(com.mojang.brigadier.arguments.StringArgumentType.getString(c, "holding"));
             java.util.UUID p = java.util.UUID.fromString(com.mojang.brigadier.arguments.StringArgumentType.getString(c, "posting"));
             return net.aiagent256.stormhold.holding.City.accept(c.getSource().getLevel(), sp, h, p) ? 1 : 0;
+        } catch (IllegalArgumentException e) {
+            return 0;
+        }
+    }
+
+    private static int choose(CommandContext<CommandSourceStack> c) {
+        if (!(c.getSource().getEntity() instanceof net.minecraft.server.level.ServerPlayer sp)) return 0;
+        try {
+            java.util.UUID id = java.util.UUID.fromString(com.mojang.brigadier.arguments.StringArgumentType.getString(c, "matter"));
+            int which = com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(c, "which");
+            HoldingManager mgr = HoldingManager.get(c.getSource().getLevel());
+            if (!net.aiagent256.stormhold.holding.Events.choose(c.getSource().getLevel(), mgr, sp.getUUID(), id, which)) {
+                sp.sendSystemMessage(Component.literal("That matter is settled.").withStyle(net.minecraft.ChatFormatting.GRAY));
+                return 0;
+            }
+            return 1;
         } catch (IllegalArgumentException e) {
             return 0;
         }

@@ -80,6 +80,7 @@ public final class Chronicle {
             if (mine.isEmpty()) continue;
             tribute(level, mgr, p.getUUID(), mine);
             for (Component c : account(level, mgr, p.getUUID(), mine, day)) p.sendSystemMessage(c);
+            Events.dawn(level, mgr, p, mine);
         }
     }
 
@@ -129,6 +130,9 @@ public final class Chronicle {
             out.add(Component.literal(mgr.house(c.houseId).title() + " still pays " + c.reward + " emeralds for " + t.name + " ("
                     + Math.max(1, (c.expiresAt - now) / 24000) + " days left).").withStyle(ChatFormatting.AQUA));
         }
+        Events.Matter open = Events.open(mgr, player);
+        if (open != null) out.add(Component.literal("A matter at " + (mgr.holdings.containsKey(open.holding) ? mgr.holdings.get(open.holding).name : "your castle")
+                + " still waits on your word; see the Realm page.").withStyle(ChatFormatting.YELLOW));
         out.add(Component.literal("The Realm page on the War Table has the rest.").withStyle(ChatFormatting.DARK_GRAY));
         return out;
     }
