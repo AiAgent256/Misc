@@ -130,6 +130,19 @@ public class StormholdGameTests {
             if (structure == null) throw new IllegalStateException("structure not registered: " + id);
             BlockPos at = g.absolutePos(BlockPos.ZERO).offset(3000 + i * 400, 0, 3000);
             net.minecraft.world.level.ChunkPos cp = new net.minecraft.world.level.ChunkPos(at);
+            // dry, flat ground to build on, whatever the world put here (an ocean, once)
+            for (int dx = -7; dx <= 7; dx++) for (int dz = -7; dz <= 7; dz++) level.getChunk(cp.x + dx, cp.z + dz);
+            int gy = gen.getFirstOccupiedHeight(at.getX(), at.getZ(), net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, level,
+                    level.getChunkSource().randomState());   // where the generator will put the castle's floor
+            for (int x = at.getX() - 100; x <= at.getX() + 100; x++) {
+                for (int z = at.getZ() - 100; z <= at.getZ() + 100; z++) {
+                    for (int yy = gy - 6; yy < gy - 1; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), 2);
+                    level.setBlock(new BlockPos(x, gy - 1, z), net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(), 2);
+                    for (int yy = gy; yy < gy + 40; yy++) {
+                        if (!level.getBlockState(new BlockPos(x, yy, z)).isAir()) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
+                    }
+                }
+            }
             net.aiagent256.stormhold.worldgen.CastleStructure.ignoreTerrain = false;
             var probe = structure.generate(level.registryAccess(), gen, gen.getBiomeSource(), level.getChunkSource().randomState(),
                     level.getStructureManager(), level.getSeed(), cp, 0, level, b -> true);
