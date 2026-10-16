@@ -992,7 +992,7 @@ public class StormholdGameTests {
                 net.aiagent256.stormhold.holding.Chronicle.day(level));
         if (lines.size() < 3 || !lines.get(0).getString().startsWith("Day ")) throw new IllegalStateException("no dawn account");
         // and the realm page builds
-        var data = net.aiagent256.stormhold.net.RealmData.build(player);
+        var data = net.aiagent256.stormhold.net.RealmData.build(level, player.getUUID(), player.blockPosition());
         if (data.own().size() != 1 || data.notes().isEmpty()) throw new IllegalStateException("realm page empty: own " + data.own().size());
         var buf = new net.minecraft.network.FriendlyByteBuf(io.netty.buffer.Unpooled.buffer());
         data.write(buf);

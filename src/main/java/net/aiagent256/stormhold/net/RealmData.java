@@ -138,8 +138,10 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
 
     /** What this player knows: every castle he's come within sight of, every house he's heard of, his own holdings. */
     public static RealmData build(ServerPlayer player) {
-        UUID me = player.getUUID();
-        ServerLevel level = player.serverLevel();
+        return build(player.serverLevel(), player.getUUID(), player.blockPosition());
+    }
+
+    public static RealmData build(ServerLevel level, UUID me, net.minecraft.core.BlockPos at) {
         HoldingManager mgr = HoldingManager.get(level);
         long now = level.getGameTime();
         List<Castle> castles = new ArrayList<>();
@@ -209,7 +211,7 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
                     + ", " + Math.max(1, (c.expiresAt - now) / 24000) + " days left."));
         }
         for (Chronicle.Entry e : Chronicle.forPlayer(mgr, me, 40)) notes.add(new Note(e.day(), e.kind(), e.text()));
-        return new RealmData(Chronicle.day(level), player.blockPosition().getX(), player.blockPosition().getZ(), castles, houses, own, lines, notes);
+        return new RealmData(Chronicle.day(level), at.getX(), at.getZ(), castles, houses, own, lines, notes);
     }
 
     public static int rgb(int dye) {
