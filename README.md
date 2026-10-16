@@ -6,7 +6,7 @@ Private Forge 1.20.1 mod for the Dungeons and Homestead pack. Castles held by ri
 
 **Finding castles.** Stormhold generates three tiers of its own castles (watchtowers, holdfasts, great castles) in five regional styles chosen by biome: Northern grey stone (taiga, snow), Riverlands brick and timber (plains, forest, swamp), Reach white stone with green copper roofs (flower fields, meadows, cherry groves), Dornish sandstone (desert, badlands, savanna), Stormlands blackstone (dark forest). Castles from When Dungeons Arise, IDAS, Illager Invasion and Dungeons and Taverns are garrisoned too (see config). `/stormhold nearest` names the closest known castle.
 
-**The garrison.** Knights patrol the baileys, archers and crossbowmen hold the walls, a lord sits in the great hall. They wear Epic Knights armour and carry shields in their house's colours. Attack one and the whole castle comes for you.
+**The garrison.** Knights patrol the baileys, archers and crossbowmen hold the walls, a lord sits in the great hall. They wear Epic Knights armour and carry shields in their house's colours, and with Epic Knights installed they fight with its weapons: knights a shortsword, katzbalger, mace or morningstar beside the shield, captains a bastard sword, lords a flame-bladed sword, in iron, diamond or netherite by renown. The Armoury issues the same. Attack one and the whole castle comes for you.
 
 **Siege rules while a house holds the castle.**
 - Walls can't be broken or built on. Ladders, scaffolding, torches and TNT are allowed.

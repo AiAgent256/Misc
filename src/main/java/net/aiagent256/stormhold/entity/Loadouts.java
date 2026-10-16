@@ -35,6 +35,30 @@ public final class Loadouts {
         return new ItemStack(fallback);
     }
 
+    /** Knights' sidearms: one-handed, so the shield stays up. */
+    private static final String[] KNIGHT_ARMS = {"shortsword", "katzbalger", "heavymace", "morgenstern", "shortsword"};
+
+    /** An Epic Knights weapon of the given metal (iron, diamond, netherite), or the vanilla sword. */
+    public static ItemStack weapon(String metal, String kind, Item fallback) {
+        return pick(metal + "_" + kind, fallback);
+    }
+
+    /** 0 none, 1 iron, 2 diamond, 3 netherite; reads Epic Knights weapons by their metal too. */
+    public static int weaponMetal(ItemStack s) {
+        if (s.isEmpty()) return 0;
+        if (s.is(Items.NETHERITE_SWORD)) return 3;
+        if (s.is(Items.DIAMOND_SWORD)) return 2;
+        if (s.is(Items.IRON_SWORD) || s.is(Items.BOW) || s.is(Items.CROSSBOW)) return 1;
+        ResourceLocation id = ForgeRegistries.ITEMS.getKey(s.getItem());
+        if (id != null && id.getNamespace().equals("magistuarmory")) {
+            String n = id.getPath();
+            if (n.startsWith("netherite_")) return 3;
+            if (n.startsWith("diamond_")) return 2;
+            if (n.startsWith("iron_") || n.equals("longbow") || n.endsWith("crossbow")) return 1;
+        }
+        return 0;
+    }
+
     private static ItemStack dyed(ItemStack s, DyeColor c) {
         if (s.getItem() instanceof DyeableLeatherItem d) d.setColor(s, c.getFireworkColor());
         return s;
@@ -71,7 +95,7 @@ public final class Loadouts {
                         pick("gothic_leggings", nether ? Items.NETHERITE_LEGGINGS : Items.DIAMOND_LEGGINGS),
                         pick("gothic_boots", nether ? Items.NETHERITE_BOOTS : Items.DIAMOND_BOOTS));
                 protect(e, Math.max(1, rn - 1), rn >= 4);
-                ItemStack sword = new ItemStack(nether ? Items.NETHERITE_SWORD : Items.DIAMOND_SWORD);
+                ItemStack sword = weapon(nether ? "netherite" : "diamond", "flamebladedsword", nether ? Items.NETHERITE_SWORD : Items.DIAMOND_SWORD);
                 sword.enchant(Enchantments.SHARPNESS, Math.min(5, Math.max(1, rn)));
                 if (rn >= 4) sword.enchant(Enchantments.FIRE_ASPECT, 1);
                 if (rn >= 5) sword.enchant(Enchantments.UNBREAKING, 3);
@@ -85,7 +109,7 @@ public final class Loadouts {
                         pick("maximilian_leggings", diamond ? Items.DIAMOND_LEGGINGS : Items.IRON_LEGGINGS),
                         pick("maximilian_boots", diamond ? Items.DIAMOND_BOOTS : Items.IRON_BOOTS));
                 if (rn >= 3) protect(e, rn - 2, rn >= 5);
-                ItemStack sword = new ItemStack(diamond ? Items.DIAMOND_SWORD : Items.IRON_SWORD);
+                ItemStack sword = weapon(diamond ? "diamond" : "iron", "bastardsword", diamond ? Items.DIAMOND_SWORD : Items.IRON_SWORD);
                 if (rn >= 2) sword.enchant(Enchantments.SHARPNESS, Math.min(4, rn - 1));
                 e.setItemSlot(EquipmentSlot.MAINHAND, sword);
                 e.setItemSlot(EquipmentSlot.OFFHAND, shield(c, house));
@@ -103,7 +127,9 @@ public final class Loadouts {
                             pick("knight_boots", diamond ? Items.DIAMOND_BOOTS : Items.IRON_BOOTS));
                 }
                 if (rn >= 3) protect(e, rn == 3 ? 1 : rn == 4 ? 2 : 4, rn >= 5);
-                ItemStack sword = new ItemStack(rn >= 4 || (rn == 3 && r.nextFloat() < 0.3F) ? Items.DIAMOND_SWORD : Items.IRON_SWORD);
+                boolean dsword = rn >= 4 || (rn == 3 && r.nextFloat() < 0.3F);
+                ItemStack sword = weapon(dsword ? "diamond" : "iron", KNIGHT_ARMS[r.nextInt(KNIGHT_ARMS.length)],
+                        dsword ? Items.DIAMOND_SWORD : Items.IRON_SWORD);
                 if (rn >= 3) sword.enchant(Enchantments.SHARPNESS, rn == 3 ? 1 : rn == 4 ? 1 + r.nextInt(2) : 3);
                 if (rn >= 5) sword.enchant(Enchantments.UNBREAKING, 2);
                 e.setItemSlot(EquipmentSlot.MAINHAND, sword);

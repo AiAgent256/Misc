@@ -200,7 +200,10 @@ public final class Armoury {
         ItemStack weapon = switch (role) {
             case ARCHER -> new ItemStack(Items.BOW);
             case CROSSBOWMAN -> new ItemStack(Items.CROSSBOW);
-            default -> new ItemStack(nether ? Items.NETHERITE_SWORD : diamond ? Items.DIAMOND_SWORD : Items.IRON_SWORD);
+            case CAPTAIN -> net.aiagent256.stormhold.entity.Loadouts.weapon(nether ? "netherite" : diamond ? "diamond" : "iron", "bastardsword",
+                    nether ? Items.NETHERITE_SWORD : diamond ? Items.DIAMOND_SWORD : Items.IRON_SWORD);
+            default -> net.aiagent256.stormhold.entity.Loadouts.weapon(nether ? "netherite" : diamond ? "diamond" : "iron", "shortsword",
+                    nether ? Items.NETHERITE_SWORD : diamond ? Items.DIAMOND_SWORD : Items.IRON_SWORD);
         };
         if (enchant) {
             int p = protLevel(kit);
@@ -239,10 +242,7 @@ public final class Armoury {
     }
 
     private static int weaponTier(ItemStack s) {
-        if (s.is(Items.NETHERITE_SWORD)) return 3;
-        if (s.is(Items.DIAMOND_SWORD)) return 2;
-        if (s.is(Items.IRON_SWORD) || s.is(Items.BOW) || s.is(Items.CROSSBOW)) return 1;
-        return 0;
+        return net.aiagent256.stormhold.entity.Loadouts.weaponMetal(s);
     }
 
     /** Swap in a piece of kit; the old piece goes to the player. Recruits units also get their inventory slot set. */
