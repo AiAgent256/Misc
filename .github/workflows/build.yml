@@ -61,12 +61,12 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git stash -u -q || true
-          git checkout -q --orphan ci-logs
-          git rm -rf -q . || true
-          cp /tmp/logs/* .
+          # one branch, one folder per build, the latest copied to the top: nothing gets overwritten by a neighbour
+          if git fetch -q origin ci-logs; then git checkout -q -B ci-logs FETCH_HEAD; else git checkout -q --orphan ci-logs && git rm -rf -q . || true; fi
+          mkdir -p "$SHA" && cp /tmp/logs/* "$SHA"/ && cp /tmp/logs/* .
           git add -A
           git commit -q -m "logs $SHA"
-          for i in 1 2 3 4; do git push -q --force origin ci-logs && break; sleep $((i * 5)); done
+          for i in 1 2 3 4; do git push -q origin ci-logs && break; sleep $((i * 5)); git fetch -q origin ci-logs && git rebase -q -X theirs FETCH_HEAD || git rebase --abort; done
           git checkout -q -f ${{ github.sha }}
 
       - name: Publish jar to dist branch
