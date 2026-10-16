@@ -210,7 +210,12 @@ public class StormholdGameTests {
                 int midZ = (h.box.minZ() + h.box.maxZ()) / 2;
                 for (int x = h.box.minX(); x <= h.box.maxX() && holes.size() < 12; x++) {
                     BlockPos p = new BlockPos(x, wallY, midZ);
-                    if (!level.getBlockState(p).isAir() && !level.getBlockState(p).is(net.minecraft.world.level.block.Blocks.CHEST)) {
+                    // only the castle's own masonry: not terrain at the template's edge, not the furnishings the
+                    // builder leaves alone (beds, carpets, candles, containers)
+                    var st = level.getBlockState(p);
+                    if (!st.isAir() && !st.is(net.minecraft.world.level.block.Blocks.CHEST) && st.getFluidState().isEmpty()
+                            && !net.aiagent256.stormhold.holding.Builder.skip(st) && !net.aiagent256.stormhold.holding.Builder.natural(st)
+                            && st.isSolidRender(level, p)) {
                         holes.add(p);
                         level.setBlock(p, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
                     }

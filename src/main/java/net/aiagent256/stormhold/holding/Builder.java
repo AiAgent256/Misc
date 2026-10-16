@@ -259,7 +259,7 @@ public final class Builder {
     }
 
     /** Things that change in play and shouldn't be "repaired": banners, containers, beds, doors, crops, torches. */
-    private static boolean skip(BlockState s) {
+    public static boolean skip(BlockState s) {
         return s.is(BlockTags.BANNERS) || s.is(BlockTags.BEDS) || s.is(BlockTags.DOORS) || s.is(BlockTags.TRAPDOORS)
                 || s.is(Blocks.CHEST) || s.is(Blocks.BARREL) || s.is(BlockTags.CROPS) || s.is(Blocks.FARMLAND)
                 || s.is(BlockTags.CANDLES) || s.is(Blocks.LANTERN) || s.is(BlockTags.LEAVES) || s.is(Blocks.WATER)
@@ -297,7 +297,7 @@ public final class Builder {
         return level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
     }
 
-    private static boolean natural(BlockState s) {
+    public static boolean natural(BlockState s) {
         if (s.is(Blocks.SNOW) || s.is(Blocks.GRASS) || s.is(Blocks.TALL_GRASS) || s.is(Blocks.FERN)) return true;
         return s.is(BlockTags.DIRT) || s.is(BlockTags.SAND) || s.is(Blocks.GRAVEL) || s.is(BlockTags.BASE_STONE_OVERWORLD)
                 || s.is(Blocks.CLAY) || s.is(Blocks.SNOW_BLOCK) || s.is(BlockTags.TERRACOTTA) || s.is(Blocks.MOSS_BLOCK) || s.is(Blocks.PODZOL);
