@@ -236,8 +236,9 @@ public final class Dragons {
             }
         }
         if (spot == null) return false;
+        final BlockPos at = spot;
         // no second skull in the same spot
-        if (!level.getEntitiesOfClass(Entity.class, new AABB(spot).inflate(0.5), e -> e.getType() == type).isEmpty()) return false;
+        if (!level.getEntitiesOfClass(Entity.class, new AABB(at).inflate(0.5), e -> e.getType() == type).isEmpty()) return false;
         CompoundTag tag = new CompoundTag();
         tag.putString("id", "iceandfire:dragon_skull");
         tag.putInt("Type", dragonType);
@@ -245,7 +246,7 @@ public final class Dragons {
         tag.putInt("DragonAge", stage * 25);
         tag.putFloat("DragonYaw", (float) (level.random.nextInt(4) * 90));
         Entity skull = net.minecraft.world.entity.EntityType.loadEntityRecursive(tag, level, e -> {
-            e.moveTo(spot.getX() + 0.5, spot.getY(), spot.getZ() + 0.5, 0, 0);
+            e.moveTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, 0, 0);
             return e;
         });
         if (skull == null) return false;
