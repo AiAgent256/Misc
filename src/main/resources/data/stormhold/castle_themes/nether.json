@@ -1,0 +1,418 @@
+{
+ "map": {
+  "minecraft:stone_bricks": [
+   [
+    "minecraft:polished_blackstone_bricks",
+    5
+   ],
+   [
+    "minecraft:blackstone",
+    2
+   ],
+   [
+    "minecraft:cracked_polished_blackstone_bricks",
+    1
+   ],
+   [
+    "minecraft:nether_bricks",
+    2
+   ]
+  ],
+  "minecraft:cracked_stone_bricks": [
+   [
+    "minecraft:cracked_polished_blackstone_bricks",
+    2
+   ],
+   [
+    "minecraft:cracked_nether_bricks",
+    1
+   ]
+  ],
+  "minecraft:mossy_stone_bricks": [
+   [
+    "minecraft:nether_bricks",
+    1
+   ]
+  ],
+  "minecraft:cobblestone": [
+   [
+    "minecraft:blackstone",
+    3
+   ],
+   [
+    "minecraft:basalt",
+    1
+   ]
+  ],
+  "minecraft:mossy_cobblestone": [
+   [
+    "minecraft:blackstone",
+    1
+   ]
+  ],
+  "minecraft:andesite": [
+   [
+    "minecraft:polished_basalt",
+    1
+   ],
+   [
+    "minecraft:blackstone",
+    1
+   ]
+  ],
+  "minecraft:polished_andesite": [
+   [
+    "minecraft:polished_basalt",
+    1
+   ]
+  ],
+  "minecraft:stone": [
+   [
+    "minecraft:basalt",
+    2
+   ],
+   [
+    "minecraft:blackstone",
+    1
+   ]
+  ],
+  "minecraft:tuff": [
+   [
+    "minecraft:smooth_basalt",
+    1
+   ]
+  ],
+  "minecraft:gravel": [
+   [
+    "minecraft:soul_soil",
+    1
+   ]
+  ],
+  "minecraft:chiseled_stone_bricks": [
+   [
+    "minecraft:chiseled_polished_blackstone",
+    1
+   ]
+  ],
+  "minecraft:stone_brick_stairs": [
+   [
+    "minecraft:polished_blackstone_brick_stairs",
+    1
+   ]
+  ],
+  "minecraft:stone_brick_slab": [
+   [
+    "minecraft:polished_blackstone_brick_slab",
+    1
+   ]
+  ],
+  "minecraft:stone_brick_wall": [
+   [
+    "minecraft:polished_blackstone_brick_wall",
+    1
+   ]
+  ],
+  "minecraft:cobblestone_wall": [
+   [
+    "minecraft:blackstone_wall",
+    1
+   ]
+  ],
+  "minecraft:deepslate_bricks": [
+   [
+    "minecraft:nether_bricks",
+    3
+   ],
+   [
+    "minecraft:red_nether_bricks",
+    1
+   ]
+  ],
+  "minecraft:cracked_deepslate_bricks": [
+   [
+    "minecraft:cracked_nether_bricks",
+    1
+   ]
+  ],
+  "minecraft:cobbled_deepslate": [
+   [
+    "minecraft:blackstone",
+    1
+   ]
+  ],
+  "minecraft:polished_deepslate": [
+   [
+    "minecraft:polished_blackstone",
+    1
+   ]
+  ],
+  "minecraft:chiseled_deepslate": [
+   [
+    "minecraft:chiseled_nether_bricks",
+    1
+   ]
+  ],
+  "minecraft:deepslate_brick_stairs": [
+   [
+    "minecraft:nether_brick_stairs",
+    1
+   ]
+  ],
+  "minecraft:deepslate_brick_slab": [
+   [
+    "minecraft:nether_brick_slab",
+    1
+   ]
+  ],
+  "minecraft:deepslate_brick_wall": [
+   [
+    "minecraft:nether_brick_wall",
+    1
+   ]
+  ],
+  "minecraft:polished_deepslate_stairs": [
+   [
+    "minecraft:polished_blackstone_stairs",
+    1
+   ]
+  ],
+  "minecraft:polished_deepslate_slab": [
+   [
+    "minecraft:polished_blackstone_slab",
+    1
+   ]
+  ],
+  "minecraft:deepslate_tiles": [
+   [
+    "minecraft:red_nether_bricks",
+    1
+   ]
+  ],
+  "minecraft:deepslate_tile_stairs": [
+   [
+    "minecraft:red_nether_brick_stairs",
+    1
+   ]
+  ],
+  "minecraft:spruce_planks": [
+   [
+    "minecraft:crimson_planks",
+    1
+   ]
+  ],
+  "minecraft:spruce_stairs": [
+   [
+    "minecraft:crimson_stairs",
+    1
+   ]
+  ],
+  "minecraft:spruce_slab": [
+   [
+    "minecraft:crimson_slab",
+    1
+   ]
+  ],
+  "minecraft:spruce_fence": [
+   [
+    "minecraft:crimson_fence",
+    1
+   ]
+  ],
+  "minecraft:spruce_fence_gate": [
+   [
+    "minecraft:crimson_fence_gate",
+    1
+   ]
+  ],
+  "minecraft:spruce_log": [
+   [
+    "minecraft:crimson_stem",
+    1
+   ]
+  ],
+  "minecraft:spruce_door": [
+   [
+    "minecraft:crimson_door",
+    1
+   ]
+  ],
+  "minecraft:spruce_trapdoor": [
+   [
+    "minecraft:crimson_trapdoor",
+    1
+   ]
+  ],
+  "minecraft:dark_oak_planks": [
+   [
+    "minecraft:warped_planks",
+    1
+   ]
+  ],
+  "minecraft:dark_oak_stairs": [
+   [
+    "minecraft:warped_stairs",
+    1
+   ]
+  ],
+  "minecraft:dark_oak_fence": [
+   [
+    "minecraft:warped_fence",
+    1
+   ]
+  ],
+  "minecraft:dark_oak_log": [
+   [
+    "minecraft:warped_stem",
+    1
+   ]
+  ],
+  "minecraft:oak_planks": [
+   [
+    "minecraft:crimson_planks",
+    1
+   ]
+  ],
+  "minecraft:oak_stairs": [
+   [
+    "minecraft:crimson_stairs",
+    1
+   ]
+  ],
+  "minecraft:oak_fence": [
+   [
+    "minecraft:crimson_fence",
+    1
+   ]
+  ],
+  "minecraft:oak_log": [
+   [
+    "minecraft:crimson_stem",
+    1
+   ]
+  ],
+  "minecraft:oak_leaves": [
+   [
+    "minecraft:nether_wart_block",
+    1
+   ]
+  ],
+  "minecraft:spruce_leaves": [
+   [
+    "minecraft:nether_wart_block",
+    1
+   ]
+  ],
+  "minecraft:grass_block": [
+   [
+    "minecraft:crimson_nylium",
+    2
+   ],
+   [
+    "minecraft:netherrack",
+    1
+   ]
+  ],
+  "minecraft:dirt": [
+   [
+    "minecraft:netherrack",
+    1
+   ]
+  ],
+  "minecraft:coarse_dirt": [
+   [
+    "minecraft:netherrack",
+    1
+   ]
+  ],
+  "minecraft:dirt_path": [
+   [
+    "minecraft:soul_soil",
+    1
+   ]
+  ],
+  "minecraft:podzol": [
+   [
+    "minecraft:crimson_nylium",
+    1
+   ]
+  ],
+  "minecraft:grass": [
+   [
+    "minecraft:crimson_roots",
+    1
+   ]
+  ],
+  "minecraft:tall_grass": [
+   [
+    "minecraft:crimson_roots",
+    1
+   ]
+  ],
+  "minecraft:fern": [
+   [
+    "minecraft:warped_roots",
+    1
+   ]
+  ],
+  "minecraft:hay_block": [
+   [
+    "minecraft:shroomlight",
+    1
+   ]
+  ],
+  "minecraft:water": [
+   [
+    "minecraft:magma_block",
+    1
+   ]
+  ],
+  "minecraft:lantern": [
+   [
+    "minecraft:soul_lantern",
+    1
+   ]
+  ],
+  "minecraft:torch": [
+   [
+    "minecraft:soul_torch",
+    1
+   ]
+  ],
+  "minecraft:wall_torch": [
+   [
+    "minecraft:soul_wall_torch",
+    1
+   ]
+  ],
+  "minecraft:campfire": [
+   [
+    "minecraft:soul_campfire",
+    1
+   ]
+  ],
+  "minecraft:gray_stained_glass_pane": [
+   [
+    "minecraft:red_stained_glass_pane",
+    1
+   ]
+  ],
+  "minecraft:glass_pane": [
+   [
+    "minecraft:red_stained_glass_pane",
+    1
+   ]
+  ],
+  "minecraft:cobweb": [
+   [
+    "minecraft:cobweb",
+    1
+   ]
+  ],
+  "minecraft:skeleton_skull": [
+   [
+    "minecraft:wither_skeleton_skull",
+    1
+   ]
+  ]
+ }
+}

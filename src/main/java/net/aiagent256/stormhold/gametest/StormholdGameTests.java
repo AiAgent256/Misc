@@ -34,7 +34,8 @@ import java.util.UUID;
 public class StormholdGameTests {
     private static final String[] LAYOUTS = {"great_castle_a", "great_castle_b", "great_castle_c", "holdfast_a",
             "holdfast_b", "watchtower_a", "watchtower_b", "great_castle_a2", "great_castle_b2", "great_castle_c2",
-            "holdfast_a2", "holdfast_b2", "watchtower_a2", "watchtower_b2", "town_walled", "town_cross", "town_green"};
+            "holdfast_a2", "holdfast_b2", "watchtower_a2", "watchtower_b2", "town_walled", "town_cross", "town_green",
+            "great_city", "canal_city"};
 
     @GameTest(template = "arena")
     public static void castleDataLoads(GameTestHelper g) {
@@ -44,9 +45,21 @@ public class StormholdGameTests {
             if (stm.get(CastleTilePiece.tileId(n, 0, 0)).isEmpty()) throw new IllegalStateException("missing template " + n);
             if (DataRegistries.layout(n).posts.get(Role.KNIGHT) == null) throw new IllegalStateException("no knight posts in " + n);
         }
-        for (String t : new String[]{"riverlands", "reach", "dorne", "stormlands"}) {
+        for (String t : new String[]{"riverlands", "reach", "dorne", "stormlands", "nether"}) {
             if (DataRegistries.theme(t).isEmpty()) throw new IllegalStateException("missing theme " + t);
         }
+        // every keep has its crypt: the marker the generator leaves at the founder's tomb
+        for (String n : new String[]{"holdfast_a", "holdfast_b", "great_castle_a", "great_castle_b", "great_castle_c", "great_city", "canal_city"}) {
+            var crypt = DataRegistries.layout(n).extras.get("crypt");
+            if (crypt == null || crypt.isEmpty()) throw new IllegalStateException("no crypt under " + n);
+        }
+        // the Nether holdfast is registered and flagged for the Nether
+        var reg = g.getLevel().registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.STRUCTURE);
+        var nether = reg.get(Stormhold.id("nether_holdfast_nether"));
+        if (!(nether instanceof net.aiagent256.stormhold.worldgen.CastleStructure cs) || !cs.nether())
+            throw new IllegalStateException("the Nether holdfast is not registered for the Nether");
+        if (reg.get(Stormhold.id("holdfast_north")) instanceof net.aiagent256.stormhold.worldgen.CastleStructure o && o.nether())
+            throw new IllegalStateException("a surface holdfast is flagged for the Nether");
         g.succeed();
     }
 
@@ -825,7 +838,7 @@ public class StormholdGameTests {
         h.surroundingsDone = true;
         mgr.add(h);
         try {
-            net.aiagent256.stormhold.holding.Fief.plan(h);
+            net.aiagent256.stormhold.holding.Fief.plan(level, h);
             if (h.fiefPlan == null || h.fiefPlan.size() != 3) throw new IllegalStateException("hamlet plan " + h.fiefPlan);
             for (int i = 0; i < 80 && !h.fiefPlan.isEmpty(); i++) net.aiagent256.stormhold.holding.Fief.buildNext(level, mgr, h);
             if (h.fief.size() != 3) throw new IllegalStateException("built " + h.fief.size() + " of 3: " + h.fief + " plan left " + h.fiefPlan);
@@ -1223,6 +1236,31 @@ public class StormholdGameTests {
             mgr.dragons.removeIf(x -> x.dragon.equals(beast.getUUID()));
             mgr.standing.getOrDefault("housed", new java.util.HashMap<>()).remove(me);
         }
+        g.succeed();
+    }
+
+    /** The Nether holdfast finds a floor under the roof: somewhere in forty chunks it sites itself above the lava. */
+    @GameTest(template = "arena", timeoutTicks = 400)
+    public static void netherHoldfastSitesOnTheFloor(GameTestHelper g) {
+        ServerLevel nether = g.getLevel().getServer().getLevel(net.minecraft.world.level.Level.NETHER);
+        if (nether == null) throw new IllegalStateException("no Nether on this server");
+        var reg = nether.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.STRUCTURE);
+        var structure = reg.get(Stormhold.id("nether_holdfast_nether"));
+        if (structure == null) throw new IllegalStateException("nether_holdfast_nether not registered");
+        var gen = nether.getChunkSource().getGenerator();
+        int found = 0, tried = 0;
+        for (int i = 0; i < 40 && found == 0; i++) {
+            tried++;
+            net.minecraft.world.level.ChunkPos cp = new net.minecraft.world.level.ChunkPos(200 + i * 7, 200 + (i % 5) * 11);
+            var start = structure.generate(nether.registryAccess(), gen, gen.getBiomeSource(), nether.getChunkSource().randomState(),
+                    nether.getStructureManager(), nether.getSeed(), cp, 0, nether, b -> true);
+            if (!start.isValid()) continue;
+            BoundingBox bb = start.getBoundingBox();
+            if (bb.minY() < 30 || bb.minY() > 110) throw new IllegalStateException("a Nether holdfast sited at y " + bb.minY());
+            found++;
+        }
+        if (found == 0) throw new IllegalStateException("no site for a Nether holdfast in " + tried + " chunks; last: "
+                + net.aiagent256.stormhold.worldgen.CastleStructure.lastRejection);
         g.succeed();
     }
 

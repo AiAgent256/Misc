@@ -49,9 +49,11 @@ public final class Fief {
     private static final List<String> TOWN = List.of("cottage_a", "well", "cottage_b", "pasture", "cottage_c", "mine", "cottage_d",
             "mill", "chapel", "cottage_a", "lumber", "cottage_b", "quarry", "pasture", "dock");
 
-    public static void plan(Holding h) {
+    public static void plan(ServerLevel level, Holding h) {
         if (h.fiefPlan != null) return;
-        h.fiefPlan = new ArrayList<>(h.tier >= 4 || h.isTown() ? List.of() : h.tier == 3 ? TOWN : h.tier == 2 ? VILLAGE : HAMLET);
+        // nobody farms the Nether: a holdfast there has its garrison and nothing outside the walls
+        boolean none = h.tier >= 4 || h.isTown() || level.dimension() != net.minecraft.world.level.Level.OVERWORLD;
+        h.fiefPlan = new ArrayList<>(none ? List.of() : h.tier == 3 ? TOWN : h.tier == 2 ? VILLAGE : HAMLET);
     }
 
     /** What a growing fief would add next, past its plan. */

@@ -210,7 +210,7 @@ public final class Net {
                 case EXPAND_FIEF -> {
                     var bread = new net.minecraft.resources.ResourceLocation("minecraft", "bread");
                     var iron = new net.minecraft.resources.ResourceLocation("minecraft", "iron_ingot");
-                    if (h.fiefPlan == null) net.aiagent256.stormhold.holding.Fief.plan(h);
+                    if (h.fiefPlan == null) net.aiagent256.stormhold.holding.Fief.plan(level, h);
                     if (h.fiefPlan.size() >= 3) {
                         player.sendSystemMessage(Component.literal("The builders at " + h.name + " already have their hands full."));
                     } else if (net.aiagent256.stormhold.holding.Stores.realmStock(mgr, h, player.getUUID(), bread) < 32

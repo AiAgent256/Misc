@@ -5,6 +5,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.aiagent256.stormhold.registry.ModStructures;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.NoiseColumn;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureType;
@@ -34,7 +36,8 @@ public class CastleStructure extends Structure {
             settingsCodec(i),
             Variant.CODEC.listOf().fieldOf("layouts").forGetter(s -> s.variants),
             Codec.STRING.optionalFieldOf("theme", "north").forGetter(s -> s.theme),
-            Codec.INT.optionalFieldOf("max_slope", 14).forGetter(s -> s.maxSlope)
+            Codec.INT.optionalFieldOf("max_slope", 14).forGetter(s -> s.maxSlope),
+            Codec.BOOL.optionalFieldOf("nether", false).forGetter(s -> s.nether)
     ).apply(i, CastleStructure::new));
 
     /** Game tests run in a flat world where terrain scoring is meaningless. */
@@ -44,12 +47,23 @@ public class CastleStructure extends Structure {
     private final List<Variant> variants;
     private final String theme;
     private final int maxSlope;
+    /** Sited on the floor of the Nether (under its roof, above the lava) instead of on the world surface. */
+    private final boolean nether;
 
     public CastleStructure(StructureSettings settings, List<Variant> variants, String theme, int maxSlope) {
+        this(settings, variants, theme, maxSlope, false);
+    }
+
+    public CastleStructure(StructureSettings settings, List<Variant> variants, String theme, int maxSlope, boolean nether) {
         super(settings);
         this.variants = variants;
         this.theme = theme;
         this.maxSlope = maxSlope;
+        this.nether = nether;
+    }
+
+    public boolean nether() {
+        return nether;
     }
 
     public String theme() {
@@ -110,6 +124,7 @@ public class CastleStructure extends Structure {
     }
 
     private Site evaluate(GenerationContext ctx, int cx, int cz, Variant v) {
+        if (nether) return evaluateNether(ctx, cx, cz, v);
         if (ignoreTerrain) {
             return new Site(cx, cz, height(ctx, cx, cz, Heightmap.Types.WORLD_SURFACE_WG), 0);
         }
@@ -162,15 +177,60 @@ public class CastleStructure extends Structure {
         return new Site(cx, cz, median, score);
     }
 
+    /** Headroom a Nether castle needs over its floor: the holdfast plans are about forty tall. */
+    private static final int NETHER_HEADROOM = 44, NETHER_LOW = 32, NETHER_HIGH = 100;
+
+    /**
+     * The Nether has no surface: the floor is the lowest ledge above the lava sea with enough open air over it
+     * for the walls and towers. -1 where there is none (lava, or a cave too low for the castle).
+     */
+    private static int netherFloor(GenerationContext ctx, int x, int z) {
+        NoiseColumn col = ctx.chunkGenerator().getBaseColumn(x, z, ctx.heightAccessor(), ctx.randomState());
+        for (int y = NETHER_LOW; y <= NETHER_HIGH; y++) {
+            BlockState below = col.getBlock(y - 1), here = col.getBlock(y);
+            if (!here.isAir() || below.isAir() || !below.getFluidState().isEmpty()) continue;
+            int clear = 0;
+            while (clear < NETHER_HEADROOM && y + clear < 126 && col.getBlock(y + clear).isAir()) clear++;
+            if (clear >= NETHER_HEADROOM) return y - 1;
+            y += clear;
+        }
+        return -1;
+    }
+
+    private Site evaluateNether(GenerationContext ctx, int cx, int cz, Variant v) {
+        int hx = Math.max(4, v.sizeX() / 2 - 4), hz = Math.max(4, v.sizeZ() / 2 - 4);
+        int[] hs = new int[9];
+        int k = 0;
+        for (int a = -1; a <= 1; a++) {
+            for (int b = -1; b <= 1; b++) {
+                int y = netherFloor(ctx, cx + a * hx, cz + b * hz);
+                if (y < 0) {
+                    lastRejection = "no floor under the roof at " + (cx + a * hx) + ", " + (cz + b * hz);
+                    return null;
+                }
+                hs[k++] = y;
+            }
+        }
+        int[] sorted = hs.clone();
+        Arrays.sort(sorted);
+        int slope = sorted[8] - sorted[0];
+        if (slope > maxSlope) {
+            lastRejection = "nether slope " + slope;
+            return null;
+        }
+        return new Site(cx, cz, sorted[4], -slope);
+    }
+
     private static int height(GenerationContext ctx, int x, int z, Heightmap.Types type) {
         return ctx.chunkGenerator().getFirstOccupiedHeight(x, z, type, ctx.heightAccessor(), ctx.randomState());
     }
 
     private void addPieces(StructurePiecesBuilder builder, StructureTemplateManager mgr, Variant v, BlockPos origin) {
+        // every tile of the grid is exported, so nothing is read here: reading a city's templates to find out
+        // whether they exist is what made /locate stall the server
         int nx = (v.sizeX() + 31) / 32, nz = (v.sizeZ() + 31) / 32;
         for (int tx = 0; tx < nx; tx++) {
             for (int tz = 0; tz < nz; tz++) {
-                if (mgr.get(CastleTilePiece.tileId(v.name(), tx, tz)).isEmpty()) continue;
                 builder.addPiece(new CastleTilePiece(mgr, v.name(), theme, tx, tz, origin, v.ground()));
             }
         }

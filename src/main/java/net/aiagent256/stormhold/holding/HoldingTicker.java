@@ -70,7 +70,7 @@ public final class HoldingTicker {
             Roads.plan(level, mgr, h);
         Garrisons.materialize(level, mgr, h);
         if (h.surroundingsDone && Config.FIEFS_ENABLED.get()) {
-            if (h.fiefPlan == null) Fief.plan(h);
+            if (h.fiefPlan == null) Fief.plan(level, h);
             if (!h.fiefPlan.isEmpty() && now % 40 == 0) Fief.buildNext(level, mgr, h);
         }
         Builder.tick(level, mgr, h);

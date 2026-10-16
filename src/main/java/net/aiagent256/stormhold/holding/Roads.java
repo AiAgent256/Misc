@@ -35,6 +35,7 @@ public final class Roads {
     public static void plan(ServerLevel level, HoldingManager mgr, Holding h) {
         h.surroundingsDone = true;
         mgr.setDirty();
+        if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return;   // no fields or roads in the Nether
         if (h.layout != null) paintFields(level, h);
         if (!Config.ROADS_ENABLED.get()) return;
         BlockPos start = h.gatePos.equals(BlockPos.ZERO) ? h.center() : h.gatePos;

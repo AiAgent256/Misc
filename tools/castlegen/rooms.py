@@ -934,7 +934,7 @@ def dress_stable(d, room, ch):
             (x, z) = back[k]
             if d.free(x, z):
                 d.put(x, z, "minecraft:hay_block[axis=y]")
-            if k + 2 < len(back):
+            if k + 2 < min(len(back), len(mid)):
                 for (px, pz) in (back[k + 2], mid[k + 2]):
                     if d.free(px, pz):
                         d.put(px, pz, "minecraft:dark_oak_fence")

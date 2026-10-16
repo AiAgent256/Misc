@@ -61,12 +61,19 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git stash -u -q || true
-          # one branch, one folder per build, the latest copied to the top: nothing gets overwritten by a neighbour
-          if git fetch -q origin ci-logs; then git checkout -q -B ci-logs FETCH_HEAD; else git checkout -q --orphan ci-logs && git rm -rf -q . || true; fi
-          mkdir -p "$SHA" && cp /tmp/logs/* "$SHA"/ && cp /tmp/logs/* .
-          git add -A
-          git commit -q -m "logs $SHA"
-          for i in 1 2 3 4; do git push -q origin ci-logs && break; sleep $((i * 5)); git fetch -q origin ci-logs && git rebase -q -X theirs FETCH_HEAD || git rebase --abort; done
+          # one folder of logs per build, the latest copied to the top; only those files are committed
+          publish() {
+            git fetch -q origin ci-logs && PREV=$(git rev-parse FETCH_HEAD) || PREV=""
+            git checkout -q --orphan ci-logs 2>/dev/null || git checkout -q --orphan ci-logs-tmp
+            git rm -rf -q --cached . || true
+            if [ -n "$PREV" ]; then git ls-tree --name-only "$PREV" | grep -E '^[0-9a-f]{7,}$' | xargs -r git checkout -q "$PREV" -- ; fi
+            mkdir -p "$SHA" && cp /tmp/logs/* "$SHA"/ && cp /tmp/logs/* .
+            git add -- STATUS.txt "$SHA"
+            git add -- build.log gametest.log 2>/dev/null || true
+            git commit -q -m "logs $SHA"
+            if [ -n "$PREV" ]; then git push -q --force-with-lease=ci-logs:"$PREV" origin HEAD:ci-logs; else git push -q --force origin HEAD:ci-logs; fi
+          }
+          for i in 1 2 3 4; do publish && break; sleep $((i * 5)); git checkout -q -f ${{ github.sha }}; git branch -D -q ci-logs ci-logs-tmp 2>/dev/null || true; done
           git checkout -q -f ${{ github.sha }}
 
       - name: Publish jar to dist branch

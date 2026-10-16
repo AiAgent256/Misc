@@ -2,7 +2,7 @@
 import json
 import os
 
-from themes import BIOMES
+from themes import BIOMES, OVERWORLD
 
 TIERS = {
     "great_castle": {"layouts": ["great_castle_a", "great_castle_b", "great_castle_c",
@@ -13,7 +13,10 @@ TIERS = {
     # the market towns between the castles: commoner, closer together, on flat ground
     "town": {"layouts": ["town_walled", "town_cross", "town_green"], "spacing": 22, "separation": 9, "salt": 611290377},
     # one capital per house region (1536 blocks); it levels a lot of ground, so it tolerates rough terrain
-    "great_city": {"layouts": ["great_city"], "spacing": 96, "separation": 48, "salt": 402911733, "max_slope": 36},
+    "great_city": {"layouts": ["great_city", "canal_city"], "spacing": 96, "separation": 48, "salt": 402911733, "max_slope": 36},
+    # the Nether holdfast: the holdfast plans in blackstone and nether brick, sited on the floor of the Nether
+    "nether_holdfast": {"layouts": ["holdfast_a", "holdfast_b", "holdfast_a2", "holdfast_b2"], "spacing": 40, "separation": 16,
+                        "salt": 884120977, "themes": ["nether"], "nether": True, "max_slope": 10},
 }
 # Castles keep clear of these (and smaller castles keep clear of bigger ones). Siting shifts a castle
 # away from a possible village rather than dropping it. Modded entries are optional.
@@ -24,7 +27,7 @@ AVOID_EXTRA += [f"valarian_conquest:{f}_{k}" for f in ("barathian", "valarian", 
                                                          "visgothian", "burgundian", "bohemian", "neutral") for k in ("castle", "outpost")
                 if not (f == "bohemian" and k == "castle") and not (f == "neutral" and k == "castle")]
 AVOID_EXTRA += ["valarian_conquest:bandit_camp", "valarian_conquest:neutral_tent_camp", "valarian_conquest:neutral_tent_camp_2"]
-THEME_WEIGHT = {"north": 3, "riverlands": 3, "reach": 2, "dorne": 2, "stormlands": 2}
+THEME_WEIGHT = {"north": 3, "riverlands": 3, "reach": 2, "dorne": 2, "stormlands": 2, "nether": 1}
 
 
 def write(root, layout_meta):
@@ -42,7 +45,7 @@ def write(root, layout_meta):
             json.dump({"replace": False, "values": vals}, f, indent=1)
     for tier, cfg in TIERS.items():
         entries = []
-        for theme in BIOMES:
+        for theme in cfg.get("themes", OVERWORLD):
             sid = f"{tier}_{theme}"
             layouts = []
             for ln in cfg["layouts"]:
@@ -60,6 +63,8 @@ def write(root, layout_meta):
             }
             if "max_slope" in cfg:
                 st["max_slope"] = cfg["max_slope"]
+            if cfg.get("nether"):
+                st["nether"] = True
             with open(os.path.join(sdir, f"{sid}.json"), "w") as f:
                 json.dump(st, f, indent=1)
             entries.append({"structure": f"stormhold:{sid}", "weight": THEME_WEIGHT[theme]})
@@ -75,6 +80,6 @@ def write(root, layout_meta):
     avoid_dir = os.path.join(base, "tags/worldgen/structure")
     os.makedirs(avoid_dir, exist_ok=True)
     vals = ["#minecraft:village"] + [{"id": i, "required": False} for i in AVOID_EXTRA]
-    vals += [f"stormhold:{t}_{th}" for t in TIERS for th in BIOMES]
+    vals += [f"stormhold:{t}_{th}" for t, cfg in TIERS.items() for th in cfg.get("themes", OVERWORLD)]
     with open(os.path.join(avoid_dir, "castle_avoid.json"), "w") as f:
         json.dump({"replace": False, "values": vals}, f, indent=1)

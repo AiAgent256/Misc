@@ -41,8 +41,13 @@ public class Holding {
         return layout != null && layout.startsWith("town_");
     }
 
+    /** A holdfast of the Nether: the holdfast plans in blackstone, under the roof of the world. */
+    public boolean isNether() {
+        return structure != null && structure.getPath().startsWith("nether_");
+    }
+
     public String kindName() {
-        return isTown() ? "Market town" : tierName(tier);
+        return isTown() ? "Market town" : isNether() ? "Nether holdfast" : tierName(tier);
     }
 
     public String lordTitle() {
