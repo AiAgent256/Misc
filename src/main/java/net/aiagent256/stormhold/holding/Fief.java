@@ -417,7 +417,6 @@ public final class Fief {
     }
 
     /** A house holding whose fief this spot lies in, if any. */
-    @Nullable
     /** The holding whose people live here, whoever holds it. */
     @Nullable
     public static Holding peopleOf(HoldingManager mgr, BlockPos pos) {
@@ -427,6 +426,7 @@ public final class Fief {
         return null;
     }
 
+    @Nullable
     public static Holding fiefAt(HoldingManager mgr, BlockPos pos) {
         for (Holding h : mgr.holdings.values()) {
             if (h.fief.isEmpty() || !h.isHouseOwned()) continue;
