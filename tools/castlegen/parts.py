@@ -135,6 +135,66 @@ def posts_on_walk(g, d, along, walk_y, role, dsel=1, every=5, offset=0):
         g.mark(role, x, walk_y, z)
 
 
+
+
+CAP_STYLES = ("cone", "spire", "low", "hoard", "flat", "pyramid")
+CAP_STYLE = "cone"          # set by build_all per variant before the layout is built
+
+
+def cap_roof(g, cx, cz, r, top, square=None):
+    """Roof a tower in the castle's cap style (g.cap_style; 'cone' when unset).
+
+    cone    the tall slate cone
+    spire   a taller, thinner one
+    low     a squat cone, like a slate hat
+    hoard   a timber hoarding: a covered fighting gallery round the top, slate hat over it
+    flat    no roof: the crenellated platform stays open
+    pyramid stepped slate pyramid (square towers; round ones get 'low')
+    """
+    style = CAP_STYLE
+    g.last_cap = style
+    if style == "flat":
+        return top
+    if style == "pyramid" and square is None:
+        style = "low"
+    if style == "hoard" and square is not None:
+        style = "pyramid"
+    if style == "cone":
+        return cone_roof(g, cx, cz, r, top, ROOF)
+    if style == "spire":
+        g.fill_mask(disk(g, cx, cz, r + 1) & ~disk(g, cx, cz, r - 1), top, top, STONE)
+        return cone_roof(g, cx, cz, r, top, ROOF, height_factor=2.4)
+    if style == "low":
+        return cone_roof(g, cx, cz, r, top, ROOF, height_factor=0.9)
+    if style == "pyramid":
+        x0, z0, x1, z1 = square
+        k = 0
+        y = top
+        while x0 + k <= x1 - k and z0 + k <= z1 - k:
+            g.fill(x0 + k - 1, y, z0 + k - 1, x1 - k + 1, y, z1 - k + 1, ROOF)
+            k += 1
+            y += 1
+        g.set((x0 + x1) // 2, y, (z0 + z1) // 2, "minecraft:lightning_rod")
+        return y
+    if style == "hoard":
+        # the gallery: timber walls one block out from the tower, slits at eye height, a slate hat over all
+        # only where there's open air: a gate tower's hoarding mustn't eat the gallery beside it
+        def open_at(y):
+            return ~np.isin(g.a[:, :, y], [i for i, st in enumerate(g.palette) if st not in ("<void>", "minecraft:air")])
+        wall = ring(g, cx, cz, r + 2, r + 1)
+        ai = angle_index(g, cx, cz, r + 2)
+        g.fill_mask(disk(g, cx, cz, r), top, top + 4, "minecraft:air")                  # the merlons stay as piers
+        g.fill_mask(wall & open_at(top - 1), top - 1, top - 1, "minecraft:dark_oak_planks")   # gallery floor
+        fgrid = facing_to_center_grid(g, cx, cz)
+        stairs_by_facing(g, ring(g, cx, cz, r + 3, r + 2) & open_at(top - 1), top - 1, "minecraft:dark_oak_stairs", fgrid, half="top")
+        for y in range(top, top + 4):
+            g.fill_mask(wall & open_at(y), y, y, "minecraft:dark_oak_planks")
+        g.fill_mask(wall & (np.mod(ai, 3) == 0) & open_at(top + 1), top + 1, top + 1, "minecraft:air")  # slits at eye height
+        g.fill_mask(disk(g, cx, cz, r + 3) & open_at(top + 4), top + 4, top + 4, "minecraft:dark_oak_planks")
+        return cone_roof(g, cx, cz, r + 2, top + 5, ROOF, height_factor=0.8)
+    return cone_roof(g, cx, cz, r, top, ROOF)
+
+
 def round_tower(g, cx, cz, r, top, GL, floors=(), spiral=True, cone=False, t=3,
                 doors=(), banner_dirs=(), lantern_floors=True):
     """Round tower from y=0. Roof platform standing level = top. Returns spiral ring."""
@@ -199,8 +259,20 @@ def round_tower(g, cx, cz, r, top, GL, floors=(), spiral=True, cone=False, t=3,
                 if k < 0 and not g.is_solid(xx, y - 1, zz):
                     g.set(xx, y - 1, zz, FLOOR_STONE)
     if cone:
-        g.fill_mask(full, top, top + 6, "minecraft:air")
-        cone_roof(g, cx, cz, r, top, ROOF)
+        if CAP_STYLE != "flat":
+            g.fill_mask(full, top, top + 6, "minecraft:air")
+        cap_roof(g, cx, cz, r, top)
+        if getattr(g, "last_cap", None) == "hoard" and r - t >= 2:
+            # a ladder up the inside of the shell to the hoarding, through a hatch in the roof slab
+            dx, dz = (0, 1)
+            if doors:
+                ddx, ddz, _ = doors[0]
+                dx, dz = (-ddx, -ddz) if (ddx or ddz) else (0, 1)
+            lx, lz = cx + dx * (r - t), cz + dz * (r - t)
+            f = "east" if dx < 0 else "west" if dx > 0 else "south" if dz < 0 else "north"
+            for y in range(GL, top):
+                g.set(lx, y, lz, f"minecraft:ladder[facing={f}]")
+            g.protected_xz = getattr(g, "protected_xz", set()) | {(lx, lz)}
     for (dx, dz) in banner_dirs:
         x = cx + int(round(dx * (r + 1)))
         z = cz + int(round(dz * (r + 1)))
@@ -258,7 +330,7 @@ def square_tower(g, x0, z0, x1, z1, top, GL, floors=(), spiral_at=None, t=3, con
                 g.set(x, top, z, RAIL)
     if cone:
         cx, cz = (x0 + x1) // 2, (z0 + z1) // 2
-        cone_roof(g, cx, cz, (x1 - x0) // 2, top, ROOF)
+        cap_roof(g, cx, cz, (x1 - x0) // 2, top, square=(x0, z0, x1, z1))
     for side in banner_sides:
         cx, cz = (x0 + x1) // 2, (z0 + z1) // 2
         if side == "north":

@@ -38,6 +38,23 @@ def _classes(g):
     return air, solid, stairs, openish
 
 
+class _Lazy:
+    """A palette class array that grows with the palette (dressing adds new block states)."""
+
+    def __init__(self, g, which):
+        self.g, self.which = g, which
+        self.n = -1
+
+    def _arr(self):
+        if len(self.g.palette) != self.n:
+            self.arrs = _classes(self.g)
+            self.n = len(self.g.palette)
+        return self.arrs[self.which]
+
+    def __getitem__(self, i):
+        return self._arr()[i]
+
+
 # ---------------------------------------------------------------- rooms
 
 
@@ -72,7 +89,7 @@ def find_rooms(g, GL, protected):
         below = A[:, :, y - 1]
         floor = solid[below] & ~stairs[below] & ~openish[below]
         roofed = np.zeros_like(here)
-        for h in range(2, 9):
+        for h in range(2, 15):
             if y + h < g.Y:
                 roofed |= solid[A[:, :, y + h]]
         mask = here & floor & roofed
@@ -89,6 +106,8 @@ def find_rooms(g, GL, protected):
             room = Room(y, cells, g)
             if min(room.w(), room.d()) <= 2:
                 continue  # a corridor or gallery
+            if sz < 0.5 * room.w() * room.d():
+                continue  # a ring gallery or an L of corridors, not a room
             # must be mostly walled in: count what surrounds it at this height
             open_edges = 0
             edges = 0
@@ -104,10 +123,9 @@ def find_rooms(g, GL, protected):
                         continue
                     pid = A[nx, nz, y]
                     name = g.palette[pid]
-                    if air[pid] or openish[pid]:
+                    if air[pid] or "door" in name or "gate" in name or "ladder" in name:
                         open_edges += 1
-                        if air[pid] or "door" in name or "gate" in name or "ladder" in name:
-                            doorways.add((x, z))
+                        doorways.add((x, z))
             if edges == 0 or open_edges / edges > 0.30:
                 continue
             # the gate passage is not a room
@@ -204,8 +222,9 @@ class Dresser:
         self.y = room.y
         self.rng = g.rng
         self.used = set()
+        self.raised = set()
         air, solid, stairs, openish = _classes(g)
-        self.solid, self.stairs, self.openish = solid, stairs, openish
+        self.solid, self.stairs, self.openish = _Lazy(g, 1), _Lazy(g, 2), _Lazy(g, 3)
         self.clear = set(getattr(g, "protected_xz", set()))
         for (x, z) in room.doorways:
             for dx in (-2, -1, 0, 1, 2):
@@ -254,11 +273,12 @@ class Dresser:
                       and all((c[0] + dx, c[1] + dz) in room.cells for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)))]
 
     # -- queries
-    def free(self, x, z, tall=1):
-        if (x, z) in self.used or (x, z) in self.clear or (x, z) not in self.room.cells:
+    def free(self, x, z, tall=1, ignore_used=False):
+        if (not ignore_used and (x, z) in self.used) or (x, z) in self.clear or (x, z) not in self.room.cells:
             return False
+        base = self.y + (1 if (x, z) in self.raised else 0)
         for h in range(tall):
-            if self.g.get(x, self.y + h, z) != AIR:
+            if self.g.get(x, base + h, z) != AIR:
                 return False
         return True
 
@@ -298,25 +318,199 @@ class Dresser:
         self.take(hx, hz)
         return True
 
-    def table(self, x, z, length, axis, chairs=True, top="minecraft:spruce_slab[type=top]", leg="minecraft:dark_oak_fence"):
-        """A 2-tall trestle table of `length` along axis, with stair chairs either side."""
+    def table(self, x, z, length, axis, chairs=True, top="minecraft:spruce_slab[type=top]", leg="minecraft:dark_oak_fence",
+              dy=0, chair_sides=None, dressing=None, ignore_used=False):
+        """A 2-tall trestle table of `length` along axis, with stair chairs either side (or only on `chair_sides`)."""
         cells = [(x + i, z) if axis == "x" else (x, z + i) for i in range(length)]
         for (cx, cz) in cells:
-            if not self.free(cx, cz, 2):
+            if not self.free(cx, cz, 2, ignore_used=ignore_used):
                 return False
         for (cx, cz) in cells:
-            self.put(cx, cz, leg)
-            self.g.set(cx, self.y + 1, cz, top)
+            self.put(cx, cz, leg, dy=dy)
+            self.g.set(cx, self.y + dy + 1, cz, top)
+        if dressing is None:
+            dressing = ["minecraft:candle[candles=2,lit=true]", "minecraft:candle[candles=1,lit=true]",
+                        "minecraft:lantern[hanging=false]", AIR, AIR]
         for (cx, cz) in cells[::2]:
-            self.g.set(cx, self.y + 2, cz, self.rng.choice(["minecraft:candle[candles=2,lit=true]", "minecraft:candle[candles=1,lit=true]",
-                                                            "minecraft:lantern[hanging=false]", AIR, AIR]))
+            self.g.set(cx, self.y + dy + 2, cz, self.rng.choice(dressing))
         if chairs:
+            sides = ((0, 1), (0, -1)) if axis == "x" else ((1, 0), (-1, 0))
+            if chair_sides is not None:
+                sides = tuple(s for s in sides if s in chair_sides)
             for (cx, cz) in cells:
-                for (dx, dz) in (((0, 1), (0, -1)) if axis == "x" else ((1, 0), (-1, 0))):
+                for (dx, dz) in sides:
                     sx, sz = cx + dx, cz + dz
-                    if self.free(sx, sz) and self.rng.random() < 0.75:
-                        self.g.stair(sx, self.y, sz, "minecraft:dark_oak_stairs", self.facing((-dx, -dz)))
+                    if self.free(sx, sz, 1, ignore_used=ignore_used) and self.rng.random() < 0.75:
+                        self.g.stair(sx, self.y + dy, sz, "minecraft:dark_oak_stairs", self.facing((-dx, -dz)))
                         self.take(sx, sz)
+        return True
+
+    # -- structure
+    def doorway_centre(self):
+        d = list(self.room.doorways)
+        if not d:
+            return (self.room.x0 + self.room.x1) / 2, (self.room.z0 + self.room.z1) / 2
+        return sum(c[0] for c in d) / len(d), sum(c[1] for c in d) / len(d)
+
+    def far_side(self):
+        """Which wall of the room is farthest from where you come in: 'x0', 'x1', 'z0' or 'z1'."""
+        r = self.room
+        dx, dz = self.doorway_centre()
+        cands = {"x0": dx - r.x0, "x1": r.x1 - dx, "z0": dz - r.z0, "z1": r.z1 - dz}
+        return max(cands, key=cands.get)
+
+    def side_cells(self, side, depth=1):
+        """Room cells within `depth` of the given wall, nearest row first."""
+        r = self.room
+        out = []
+        for k in range(depth):
+            if side == "x0":
+                row = [(r.x0 + k, z) for z in range(r.z0, r.z1 + 1)]
+            elif side == "x1":
+                row = [(r.x1 - k, z) for z in range(r.z0, r.z1 + 1)]
+            elif side == "z0":
+                row = [(x, r.z0 + k) for x in range(r.x0, r.x1 + 1)]
+            else:
+                row = [(x, r.z1 - k) for x in range(r.x0, r.x1 + 1)]
+            out.append([c for c in row if c in r.cells])
+        return out
+
+    def side_facing(self, side):
+        """Facing that points from the wall `side` into the room."""
+        return {"x0": (1, 0), "x1": (-1, 0), "z0": (0, 1), "z1": (0, -1)}[side]
+
+    def beams(self, block="minecraft:dark_oak_log", every=3):
+        """Ceiling beams across the short axis, just under the ceiling."""
+        r = self.room
+        if r.height < 4 or min(r.w(), r.d()) < 5:
+            return
+        top = self.y + r.height
+        if top >= self.g.Y:
+            return
+        hy = top - 1
+        axis = "x" if r.w() < r.d() else "z"        # beams span the short way
+        rng_ = range(r.z0 + 1, r.z1, every) if axis == "x" else range(r.x0 + 1, r.x1, every)
+        for k in rng_:
+            cells = [(x, k) for x in range(r.x0, r.x1 + 1)] if axis == "x" else [(k, z) for z in range(r.z0, r.z1 + 1)]
+            for (x, z) in cells:
+                if (x, z) not in r.cells or self.g.get(x, hy, z) != AIR or not self.solid[self.g.a[x, z, top]]:
+                    continue
+                # never over a stair or ladder: a soldier climbing needs the headroom
+                if any(self.stairs[self.g.a[x, z, yy]] or "ladder" in self.g.get(x, yy, z) for yy in range(self.y, hy)):
+                    continue
+                self.g.set(x, hy, z, f"{block}[axis={axis}]")
+
+    def rug(self, color, w, d):
+        """A carpet patch in the middle of the room, on free cells only."""
+        r = self.room
+        cx, cz = (r.x0 + r.x1) // 2, (r.z0 + r.z1) // 2
+        for x in range(cx - w // 2, cx - w // 2 + w):
+            for z in range(cz - d // 2, cz - d // 2 + d):
+                if self.free(x, z):
+                    self.g.set(x, self.y, z, f"minecraft:{color}_carpet")
+                    self.take(x, z)
+
+    def runner(self, color, side):
+        """A carpet line down the middle of the room toward `side`."""
+        r = self.room
+        if side in ("x0", "x1"):
+            cz = (r.z0 + r.z1) // 2
+            cells = [(x, cz) for x in range(r.x0, r.x1 + 1)]
+        else:
+            cx = (r.x0 + r.x1) // 2
+            cells = [(cx, z) for z in range(r.z0, r.z1 + 1)]
+        for (x, z) in cells:
+            if (x, z) in r.cells and (x, z) not in self.used and self.g.get(x, self.y, z) == AIR:
+                self.g.set(x, self.y, z, f"minecraft:{color}_carpet")
+
+    def dais(self, side, depth=2, block="minecraft:spruce_planks", step="minecraft:spruce_stairs"):
+        """Raise the floor `depth` deep along `side` by one block, with a step down into the room.
+        Returns the raised cells (standing level y+1) or None."""
+        r = self.room
+        if r.height < 4:
+            return None
+        rows = self.side_cells(side, depth + 1)
+        raised = [c for row in rows[:depth] for c in row]
+        edge = rows[depth]
+        if len(raised) < 6 or any(not self.free(x, z) for (x, z) in raised + edge):
+            return None
+        for (x, z) in raised:
+            self.put(x, z, block)
+            self.raised.add((x, z))
+        f = self.side_facing(side)
+        for (x, z) in edge:
+            self.g.stair(x, self.y, z, step, self.facing(f))
+            self.take(x, z)
+        return raised
+
+    def window(self, side, block="minecraft:light_blue_stained_glass_pane", width=1, height=2, dy=1):
+        """Cut a window through the middle of `side`'s wall if that wall faces the open air."""
+        r = self.room
+        f = self.side_facing(side)
+        row = self.side_cells(side, 1)[0]
+        if not row:
+            return False
+        mid = row[len(row) // 2]
+        wx, wz = mid[0] - f[0], mid[1] - f[1]
+        # walk out through the wall: it must be solid for 1..3 blocks and then open
+        t = 0
+        while t < 4 and self.g.inb(wx, self.y + dy, wz) and self.solid[self.g.a[wx, wz, self.y + dy]]:
+            wx, wz = wx - f[0], wz - f[1]
+            t += 1
+        if t == 0 or t >= 4:
+            return False
+        if self.g.inb(wx, self.y + dy, wz) and (self.g.get(wx, self.y + dy, wz) not in (AIR, "<void>")
+                                                or (self.g.inb(wx, self.y + dy + 8, wz) and self.solid[self.g.a[wx, wz, self.y + dy + 8]])):
+            return False
+        for k in range(1, t + 1):
+            for h in range(height):
+                for w in range(-(width // 2), width - width // 2):
+                    x = mid[0] - f[0] * k + f[1] * w
+                    z = mid[1] - f[1] * k - f[0] * w
+                    if (x, z) in r.cells:
+                        continue
+                    self.g.set(x, self.y + dy + h, z, block)
+        return True
+
+    def bunk(self, x, z, f, color):
+        """Two beds stacked against the wall."""
+        if not self.bed(x, z, f, color):
+            return False
+        hx, hz = x + f[0], z + f[1]
+        if self.g.get(x, self.y + 1, z) == AIR and self.g.get(hx, self.y + 1, hz) == AIR and self.room.height >= 4:
+            self.g.bed(x, self.y + 1, z, self.facing(f), color)
+        return True
+
+    def canopy_bed(self, x, z, f, color, canopy="minecraft:red_wool"):
+        """A four-poster: bed, posts, a cloth canopy over it."""
+        if not self.bed(x, z, f, color):
+            return False
+        hx, hz = x + f[0], z + f[1]
+        if self.room.height < 4:
+            return True
+        for (cx, cz) in ((x, z), (hx, hz)):
+            if self.g.get(cx, self.y + 1, cz) == AIR:
+                self.g.set(cx, self.y + 1, cz, "minecraft:dark_oak_fence")
+            if self.g.get(cx, self.y + 2, cz) == AIR:
+                self.g.set(cx, self.y + 2, cz, canopy)
+        return True
+
+    def brazier(self, x, z):
+        self.put(x, z, "minecraft:cobblestone_wall")
+        self.g.set(x, self.y + 1, z, "minecraft:campfire[lit=true,signal_fire=false]")
+
+    def hang(self, x, z, drop=1, end=None):
+        """A chain from the ceiling, ending in `end` (a lantern, a skull) or nothing."""
+        r = self.room
+        top = self.y + r.height
+        if top >= self.g.Y or not self.solid[self.g.a[x, z, top]]:
+            return False
+        for i in range(drop):
+            if self.g.get(x, top - 1 - i, z) != AIR:
+                return False
+            self.g.set(x, top - 1 - i, z, "minecraft:chain[axis=y]")
+        if end and self.g.get(x, top - 1 - drop, z) == AIR and top - 1 - drop > self.y + 1:
+            self.g.set(x, top - 1 - drop, z, end)
         return True
 
     def lanterns(self, every=5):

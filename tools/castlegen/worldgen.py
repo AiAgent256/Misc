@@ -5,10 +5,11 @@ import os
 from themes import BIOMES
 
 TIERS = {
-    "great_castle": {"layouts": ["great_castle_a", "great_castle_b", "great_castle_c"],
+    "great_castle": {"layouts": ["great_castle_a", "great_castle_b", "great_castle_c",
+                                 "great_castle_a2", "great_castle_b2", "great_castle_c2"],
                      "spacing": 46, "separation": 20, "salt": 718213044},
-    "holdfast": {"layouts": ["holdfast_a", "holdfast_b"], "spacing": 30, "separation": 12, "salt": 515870611},
-    "watchtower": {"layouts": ["watchtower_a", "watchtower_b"], "spacing": 18, "separation": 7, "salt": 93011254},
+    "holdfast": {"layouts": ["holdfast_a", "holdfast_b", "holdfast_a2", "holdfast_b2"], "spacing": 30, "separation": 12, "salt": 515870611},
+    "watchtower": {"layouts": ["watchtower_a", "watchtower_b", "watchtower_a2", "watchtower_b2"], "spacing": 18, "separation": 7, "salt": 93011254},
     # one capital per house region (1536 blocks); it levels a lot of ground, so it tolerates rough terrain
     "great_city": {"layouts": ["great_city"], "spacing": 96, "separation": 48, "salt": 402911733, "max_slope": 36},
 }

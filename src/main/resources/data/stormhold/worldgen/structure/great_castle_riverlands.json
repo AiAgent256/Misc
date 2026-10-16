@@ -26,6 +26,27 @@
    "size_z": 112,
    "ground": 6,
    "weight": 1
+  },
+  {
+   "name": "great_castle_a2",
+   "size_x": 128,
+   "size_z": 128,
+   "ground": 6,
+   "weight": 1
+  },
+  {
+   "name": "great_castle_b2",
+   "size_x": 128,
+   "size_z": 128,
+   "ground": 6,
+   "weight": 1
+  },
+  {
+   "name": "great_castle_c2",
+   "size_x": 160,
+   "size_z": 112,
+   "ground": 6,
+   "weight": 1
   }
  ]
 }

@@ -13,7 +13,9 @@ import castle2
 import city
 import export
 import fixup
+import parts
 import furnish
+import rooms
 import render
 import themes
 import walk
@@ -26,6 +28,18 @@ LAYOUT_DIR = os.path.join(ROOT, "src/main/resources/data/stormhold/castle_layout
 
 LAYOUTS = (castle.great_castle_a, castle2.great_castle_b, castle2.great_castle_c,
            castle.holdfast_a, castle2.holdfast_b, castle.watchtower_a, castle2.watchtower_b, city.great_city)
+# A second build of each castle with a different seed, roof style and temper, so two castles of the same
+# plan don't read as copies. The city is one of a kind.
+VARIANTS = {"great_castle_a": ("hoard", 2), "great_castle_b": ("spire", 3), "great_castle_c": ("low", 1),
+            "holdfast_a": ("pyramid", 4), "holdfast_b": ("hoard", 2), "watchtower_a": ("flat", 3), "watchtower_b": ("spire", 1)}
+
+
+def builds():
+    for fn in LAYOUTS:
+        yield fn, fn.__name__, "cone", None
+        if fn.__name__ in VARIANTS:
+            style, seed_shift = VARIANTS[fn.__name__]
+            yield fn, fn.__name__ + "2", style, seed_shift
 
 
 def main():
@@ -38,19 +52,23 @@ def main():
     os.makedirs(args.renders, exist_ok=True)
     themes.write_json(os.path.join(ROOT, "src/main/resources/data/stormhold/castle_themes"))
     metas = {}
-    for fn in LAYOUTS:
-        if args.only and fn.__name__ != args.only:
+    for fn, name, style, seed_shift in builds():
+        if args.only and name != args.only:
             continue
         t = time.time()
-        g, meta = fn()
-        name = meta["name"]
-        rooms = furnish.furnish(g, meta["GL"])
+        parts.CAP_STYLE = style
+        g, meta = fn() if seed_shift is None else fn(seed=fn.__defaults__[0] + seed_shift)
+        parts.CAP_STYLE = "cone"
+        meta["name"] = name
+        character = meta.get("character") or rooms.character_for(name, seed_shift or 0)
+        meta["character"] = character
+        kinds = rooms.furnish(g, meta["GL"], character)
         opened = fixup.clear_blocked_doorways(g, meta["GL"], tuple(meta.get("levels", ())))
         dropped = fixup.drop_buried_markers(g)
         bad, checked = walk.audit(g, meta)
         unreachable = sum(len(v) for v in bad.values())
-        print(f"{name}: built in {time.time() - t:.1f}s, palette {len(g.palette)}, rooms " +
-              ", ".join(f"{k}={v}" for k, v in sorted(rooms.items())))
+        print(f"{name} ({character}): built in {time.time() - t:.1f}s, palette {len(g.palette)}, rooms " +
+              ", ".join(f"{k}={v}" for k, v in sorted(kinds.items())))
         print(f"  walkability: {checked} posts checked, {unreachable} unreachable, {opened} doorways opened, {dropped} buried posts dropped")
         if unreachable:
             for k, v in bad.items():

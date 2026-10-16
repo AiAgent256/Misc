@@ -25,7 +25,31 @@ BASE = {
     "polished_blackstone_bricks": (48, 42, 49), "target": (220, 210, 200), "carved_pumpkin": (200, 120, 20),
     "shroomlight": (240, 146, 70), "glass_pane": (190, 210, 220), "gray_stained_glass_pane": (80, 80, 90),
     "pointed_dripstone": (130, 100, 85), "polished_deepslate_stairs": (74, 74, 78), "fern": (80, 130, 50),
+    "white_terracotta": (210, 178, 161), "light_gray_terracotta": (135, 107, 98), "yellow_terracotta": (186, 133, 35),
+    "orange_terracotta": (162, 84, 38), "brown_terracotta": (77, 51, 36), "red_terracotta": (143, 61, 47),
+    "terracotta": (152, 94, 68), "mud_bricks": (137, 104, 79), "mud_brick_stairs": (137, 104, 79),
+    "mud_brick_slab": (137, 104, 79), "brick_stairs": (150, 97, 83), "brick_slab": (150, 97, 83),
+    "stripped_dark_oak_log": (97, 76, 50), "stripped_spruce_log": (116, 90, 52), "dark_oak_trapdoor": (66, 43, 20),
+    "spruce_trapdoor": (114, 84, 48), "spruce_log": (58, 37, 16), "oak_planks": (162, 130, 78), "oak_log": (109, 85, 50),
+    "stripped_oak_log": (177, 144, 86), "decorated_pot": (150, 90, 60), "cake": (240, 230, 220), "smoker": (90, 80, 70),
+    "blast_furnace": (80, 80, 84), "anvil": (70, 70, 72), "loom": (140, 110, 70), "cauldron": (60, 60, 64),
+    "crafting_table": (120, 90, 50), "composter": (110, 80, 40), "fletching_table": (170, 140, 90),
+    "cartography_table": (100, 70, 40), "smithing_table": (60, 50, 50), "grindstone": (120, 120, 120),
+    "oak_fence": (162, 130, 78), "dark_oak_wood": (60, 46, 26), "cobblestone_stairs": (118, 118, 118),
+    "cobblestone_slab": (118, 118, 118), "cobblestone_wall": (118, 118, 118), "andesite_stairs": (138, 138, 138),
+    "andesite_slab": (138, 138, 138), "andesite_wall": (138, 138, 138), "oak_stairs": (162, 130, 78), "oak_slab": (162, 130, 78),
+    "dark_oak_door": (66, 43, 20), "spruce_door": (114, 84, 48), "oak_door": (162, 130, 78), "iron_door": (190, 190, 190),
+    "hanging_sign": (114, 84, 48), "wall_hanging_sign": (114, 84, 48), "flower_pot": (150, 90, 60), "lectern": (160, 120, 70),
+    "melon": (120, 160, 50), "pumpkin": (200, 120, 20), "wheat": (190, 170, 80), "farmland": (100, 70, 40),
+    "oak_leaves": (60, 120, 40), "azalea_leaves": (80, 130, 50), "sweet_berry_bush": (70, 110, 50), "mossy_stone_brick_stairs": (106, 118, 96),
+    "polished_andesite_stairs": (132, 135, 134), "polished_andesite_slab": (132, 135, 134), "stone_stairs": (128, 128, 128),
+    "stone_slab": (128, 128, 128), "smooth_stone": (160, 160, 160), "smooth_stone_slab": (160, 160, 160),
+    "brick_wall": (150, 97, 83), "mud_brick_wall": (137, 104, 79), "sandstone": (216, 203, 155), "cut_sandstone": (216, 203, 155),
 }
+WOOL = {"red": (160, 39, 34), "yellow": (248, 197, 39), "blue": (53, 57, 157), "green": (84, 109, 27), "white": (230, 230, 230),
+        "orange": (240, 118, 19), "purple": (121, 42, 172), "lime": (112, 185, 25), "brown": (114, 71, 40), "cyan": (21, 137, 145),
+        "gray": (62, 68, 71), "light_gray": (142, 142, 134), "black": (20, 21, 25), "pink": (237, 141, 172), "magenta": (189, 68, 179),
+        "light_blue": (58, 175, 217)}
 
 
 def color_of(state):
@@ -34,6 +58,9 @@ def color_of(state):
         return BASE[name]
     for k, v in BASE.items():
         if name.endswith(k):
+            return v
+    for c, v in WOOL.items():
+        if name.startswith(c + "_") and any(name.endswith(k) for k in ("wool", "carpet", "bed", "banner", "wall_banner", "concrete")):
             return v
     if "stained_glass" in name:
         return (150, 150, 220)
