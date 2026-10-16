@@ -189,9 +189,12 @@ def facing_to_center_grid(g, cx, cz):
     return out
 
 
-def spiral_stair(g, cx, cz, y_start, y_end, step_block, core_block, clear=True):
+def spiral_stair(g, cx, cz, y_start, y_end, step_block, core_block, clear=True, landings=(), flat=8):
     """Square newel spiral in a 5x5 shaft centred on (cx, cz).
-    Steps rise one block per cell, 16 cells per turn. Last step top at y_end."""
+    Steps rise one block per cell, 16 cells per turn. Last step top at y_end.
+    `landings` are standing levels (a floor's y + 1): when the stair reaches one it runs flat for
+    `flat` cells, a half turn of level floor, so a door at that level on any side of that half can be
+    walked to from the stair. Returns the ring cells; g.spiral_last holds the index of the last step."""
     ringcells = []
     for x in range(cx - 2, cx + 2):
         ringcells.append((x, cz - 2, "east"))
@@ -204,13 +207,36 @@ def spiral_stair(g, cx, cz, y_start, y_end, step_block, core_block, clear=True):
     if clear:
         g.fill(cx - 2, y_start, cz - 2, cx + 2, y_end + 3, cz + 2, "minecraft:air")
     g.fill(cx - 1, y_start - 1, cz - 1, cx + 1, y_end + 2, cz + 1, core_block)
+    # the shaft is nobody's room: furnishing keeps out of it
+    g.__dict__.setdefault("protected_xz", set()).update((x, z) for x in range(cx - 2, cx + 3) for z in range(cz - 2, cz + 3))
     i = 0
-    while y_start + i <= y_end:
+    y = y_start
+    flat_left = 0
+    done = set()
+    while y <= y_end:
         x, z, f = ringcells[i % 16]
-        g.set(x, y_start + i, z, f"{step_block}[facing={f},half=bottom]")
+        if flat_left == 0 and (y + 1) in landings and (y + 1) not in done and y > y_start:
+            flat_left = flat
+            done.add(y + 1)
         if i > 0:
-            g.set(x, y_start + i - 1, z, core_block)
+            g.set(x, y - 1, z, core_block)
+        if flat_left > 0:
+            g.set(x, y, z, core_block)
+            g.fill(x, y + 1, z, x, y + 2, z, "minecraft:air")
+            flat_left -= 1
+        else:
+            g.set(x, y, z, f"{step_block}[facing={f},half=bottom]")
+            y += 1
         i += 1
+    g.spiral_last = (i - 1) % 16
+    # a landing round the stair head: every ring cell not under the last four steps gets a floor at
+    # y_end, so you can step off the top step in any direction instead of into the shaft
+    last = i - 1
+    for j, (x, z, _) in enumerate(ringcells):
+        if any(((last - k) % 16) == j for k in range(0, 4)):
+            continue
+        if g.get(x, y_end, z) == "minecraft:air":
+            g.set(x, y_end, z, core_block)
     # light the shaft: lanterns on top of the newel core edge every 8
     for y in range(y_start + 3, y_end, 6):
         g.set(cx - 1, y, cz - 1, "minecraft:shroomlight")

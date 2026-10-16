@@ -10,6 +10,7 @@ from parts import (STONE, DARK, FOUND, PAVE, ROAD, FLOOR_STONE, ROOF, ROOF_STAIR
                    pointed_arch, building, lamp_post, tree_weirwood, stairs_by_facing)
 from castle import portcullis_plane, bartizan
 from castle2 import portcullis_plane_x, parapet_rect, hall_furnish
+from town import dense_block, terrace, lane, arcade, stall_cluster, townhouse, well as town_well
 
 LOOT = "stormhold:chests/"
 AIR = "minecraft:air"
@@ -26,6 +27,18 @@ BED_COLORS = ["red", "brown", "green", "blue", "gray", "white", "purple", "light
 
 
 # ---------------------------------------------------------------- pieces
+
+def carve(g, x0, y0, z0, x1, y1, z1, block=AIR, floor=None):
+    """Fill a box, leaving stair shafts (g.protected_xz) alone so a corridor never cuts a spiral."""
+    p = getattr(g, "protected_xz", set())
+    for x in range(min(x0, x1), max(x0, x1) + 1):
+        for z in range(min(z0, z1), max(z0, z1) + 1):
+            if (x, z) in p:
+                continue
+            g.fill(x, y0, z, x, y1, z, block)
+            if floor is not None:
+                g.set(x, y0 - 1, z, floor)
+
 
 def house(g, x0, z0, x1, z1, GL, rng, door, wall=None, h=None, stalls=False, sign=None):
     """A town house whose door is on the street side: door in ('north','south','east','west')."""
@@ -320,8 +333,10 @@ def keep(g, GL3):
     straight_wall(g, kx0, kz0, kx1, kz0 + 4, kw, "north", GL3)
     straight_wall(g, kx0, kz1 - 4, kx1, kz1, kw, "south", GL3)
     for (cx, cz) in ((kx0 + 2, kz0 + 2), (kx1 - 2, kz0 + 2), (kx0 + 2, kz1 - 2), (kx1 - 2, kz1 - 2)):
+        sx, sz = (1 if cx < 128 else -1), (1 if cz < 48 else -1)
+        ground = (0, sz, GL3) if cx > 128 and cz < 48 else (sx * 0.7, sz * 0.7, GL3)
         ring_tower(g, cx, cz, 8, kw + 10, GL3, stages=1, cone=True, posts="archer",
-                   doors=((1 if cx < 128 else -1, 0, kw), (0, 1 if cz < 48 else -1, kw)))
+                   doors=((sx, 0, kw), (0, sz, kw), ground))
     for x in range(kx0 + 12, kx1 - 8, 8):
         g.mark("archer", x, kw, kz0 + 2); g.mark("archer", x, kw, kz1 - 2)
     for z in range(kz0 + 12, kz1 - 8, 8):
@@ -331,11 +346,15 @@ def keep(g, GL3):
     pointed_arch(g, 124, 131, GL3, 9, kz1 - 7, kz1 + 1)
     portcullis_plane(g, 124, 131, GL3, 9, kz1)
     for tx in (117, 138):
-        round_tower(g, tx, kz1 - 3, 5, kw + 12, GL3, floors=(GL3 + 8, kw - 1), spiral=False, cone=True, t=2,
-                    doors=((0, -1, kw), (1 if tx < 128 else -1, 0, kw + 5)))
-    parapet_rect(g, 118, kz1 - 8, 137, kz1 + 2, kw + 6)
-    g.fill(119, kw + 6, kz1 - 7, 136, kw + 10, kz1 + 1, AIR)
+        round_tower(g, tx, kz1 - 3, 5, kw + 12, GL3, floors=(GL3 + 8, kw - 1, kw + 4), spiral=False, cone=True, t=2,
+                    doors=((0, -1, kw), (1 if tx < 128 else -1, 0, kw + 5), (1, 0, kw), (-1, 0, kw)))
+        for y in range(kw, kw + 5):
+            g.set(tx, y, kz1 - 5, "minecraft:ladder[facing=south]")
+    parapet_rect(g, 119, kz1 - 7, 136, kz1 + 1, kw + 6)
+    g.fill(120, kw + 6, kz1 - 6, 135, kw + 10, kz1, AIR)
     g.fill(119, kw + 5, kz1 - 7, 136, kw + 5, kz1 + 1, STONE)
+    for x in (119, 136):
+        g.fill(x, kw + 6, kz1 - 3, x, kw + 8, kz1 - 2, AIR)             # the towers' doors onto the roof
     for x in (121, 127, 134):
         g.mark("crossbowman", x, kw + 6, kz1 - 1)
     g.wall_banner(122, GL3 + 13, kz1 + 2, "south"); g.wall_banner(133, GL3 + 13, kz1 + 2, "south")
@@ -393,16 +412,16 @@ def keep(g, GL3):
     for (x, z) in ((hx0 + 4, hz0 + 7), (hx1 - 4, hz0 + 7), (hx0 + 4, hz1 - 7), (hx1 - 4, hz1 - 7), (108, 42), (130, 42)):
         g.mark("knight", x, GL3, z)
     # ---- the donjon: square base, round lantern stage, four bartizans, royal apartments ----
-    tx0, tz0, tx1, tz1 = 146, 22, 166, 42
+    tx0, tz0, tx1, tz1 = 146, 28, 164, 46
     dtop = GL3 + 56
     floors = tuple(range(GL3 + 10, dtop - 6, 10))
-    square_tower(g, tx0, tz0, tx1, tz1, dtop, GL3, floors=floors, spiral_at=(150, 26), t=4,
+    square_tower(g, tx0, tz0, tx1, tz1, dtop, GL3, floors=floors, spiral_at=(152, 34), t=4,
                  banner_sides=("north", "south", "east", "west"))
     for (cx2, cz2) in ((tx0 - 1, tz0 - 1), (tx1 + 1, tz0 - 1), (tx0 - 1, tz1 + 1), (tx1 + 1, tz1 + 1)):
         bartizan(g, cx2, cz2, dtop + 1, r=3)
-    g.fill(150, dtop, 26, 162, dtop + 1, 38, STONE)
-    stepped_top(g, 156, 32, 9, dtop + 1, stages=2, cone=True, posts="crossbowman")
-    g.fill(tx0, GL3, 30, tx0, GL3 + 3, 34, AIR)
+    carve(g, 150, dtop, 32, 160, dtop + 1, 42, STONE)                  # stage plinth, clear of the stair head
+    stepped_top(g, 155, 37, 8, dtop + 1, stages=2, cone=True, posts="crossbowman")
+    g.fill(tx0 - 1, GL3, 38, tx0 + 3, GL3 + 2, 40, AIR)                 # the door, through the whole wall
     for fy in floors:
         g.fill(tx0, fy + 1, 30, tx0, fy + 2, 34, AIR) if False else None
     # tall windows on the donjon faces
@@ -413,32 +432,32 @@ def keep(g, GL3):
         for x in (tx0, tx1):
             for z in (tz0 + 6, tz0 + 10, tz0 + 14):
                 g.fill(x, fy + 2, z, x, fy + 5, z, GLASS)
-    g.mark("banner_stand", 164, dtop, 40)
-    for (x, z) in ((149, 25), (163, 25), (149, 39)):
+    g.mark("banner_stand", 162, dtop, 44)
+    for (x, z) in ((149, 31), (161, 31), (149, 44)):
         g.mark("crossbowman", x, dtop, z)
-    for z in range(27, 40, 3):
+    for z in range(33, 44, 3):
         g.chest(tx1 - 5, floors[0] + 1, z, "west", LOOT + "castle_treasury")
         g.chest(tx0 + 5, floors[0] + 1, z, "east", LOOT + "castle_treasury")
-    g.fill(153, floors[0] + 1, 30, 159, floors[0] + 1, 34, "minecraft:gold_block")
-    g.fill(154, floors[0] + 2, 31, 158, floors[0] + 2, 33, "minecraft:gold_block")
-    for z in range(27, 40, 4):
+    g.fill(156, floors[0] + 1, 38, 160, floors[0] + 1, 42, "minecraft:gold_block")
+    g.fill(157, floors[0] + 2, 39, 159, floors[0] + 2, 41, "minecraft:gold_block")
+    for z in range(33, 44, 4):
         g.bed(tx1 - 6, floors[1] + 1, z, "east", "red"); g.bed(tx0 + 7, floors[2] + 1, z, "west", "purple")
     # the Tower of the Hand: slender, taller than the walls
-    ring_tower(g, 92, 66, 6, GL3 + 40, GL3, stages=1, cone=True, posts="archer", doors=((0, -1, GL3),))
+    ring_tower(g, 154, 55, 6, GL3 + 40, GL3, stages=1, cone=True, posts="archer", doors=((0, 1, GL3),))
     # godswood, kitchens, stables, a well
     g.fill(146, GL3 - 1, 46, 166, GL3 - 1, 70, Mix(("minecraft:grass_block", 65), ("minecraft:moss_block", 20), ("minecraft:podzol", 15)))
-    tree_weirwood(g, 155, 58, GL3)
-    for (x, z) in ((148, 50), (163, 66), (164, 48)):
+    tree_weirwood(g, 162, 58, GL3)
+    for (x, z) in ((163, 66), (164, 48)):
         tree_oak(g, x, z, GL3, g.rng)
     building(g, 96, 62, 116, 70, GL3, 8, "x", door_cells=((106, 62),), chimney=(98, 68))
     for x in (98, 101, 104, 107):
         g.barrel(x, GL3, 69, LOOT + "castle_kitchen")
     g.set(113, GL3, 69, "minecraft:smoker[facing=north,lit=true]"); g.set(110, GL3, 69, "minecraft:smoker[facing=north,lit=true]")
-    building(g, 120, 62, 142, 70, GL3, 7, "x")
-    g.fill(122, GL3, 62, 140, GL3 + 3, 62, AIR)
-    for x in range(122, 141, 4):
+    building(g, 136, 62, 158, 70, GL3, 7, "x")                      # stables, clear of the gate passage
+    g.fill(138, GL3, 62, 156, GL3 + 3, 62, AIR)
+    for x in range(138, 157, 4):
         g.fill(x, GL3, 63, x, GL3, 69, "minecraft:spruce_fence"); g.set(x + 2, GL3, 69, "minecraft:hay_block[axis=y]")
-    for (x, z) in ((108, 60), (130, 60), (140, 50), (100, 50), (140, 72), (112, 72)):
+    for (x, z) in ((108, 60), (130, 60), (140, 50), (100, 50), (120, 60), (140, 56)):
         g.mark("knight", x, GL3, z)
     g.mark("captain", 128, GL3, 64)
     statue_plinth(g, 122, 48, GL3, h=5); statue_plinth(g, 133, 48, GL3, h=5)
@@ -464,6 +483,8 @@ def stepped_top(g, cx, cz, r, y, stages=2, cone=True, posts=None):
         g.fill_mask(ring(g, cx, cz, rr + 1, rr) & (np.mod(ai, 4) < 2), y + 1, y + 1, "minecraft:stone_brick_wall")
         for a2 in np.linspace(0, 2 * np.pi, 6, endpoint=False):
             g.lantern(int(round(cx + (rr - 1) * np.cos(a2))), y + 6, int(round(cz + (rr - 1) * np.sin(a2))))
+        # a door from the stage out onto the walkway round it
+        g.fill(int(cx) + rr - 2, y, int(cz), int(cx) + rr + 1, y + 2, int(cz) + 1, AIR)
         if posts and k == 0:
             # on the walkway between the parapet and the first stage
             for a2 in np.linspace(0.2, 2 * np.pi, 4, endpoint=False):
@@ -478,7 +499,8 @@ def stepped_top(g, cx, cz, r, y, stages=2, cone=True, posts=None):
 
 def ring_tower(g, cx, cz, r, top, GL, stages=2, cone=True, posts=None, doors=()):
     """A tall round tower that steps in once or twice near the top, with a lantern gallery."""
-    sp = round_tower(g, cx, cz, r, top, GL, floors=tuple(range(GL + 9, top - 8, 9)), spiral=True, cone=False, doors=doors)
+    floors = sorted(set(range(GL + 9, top - 8, 9)) | {y - 1 for (_, _, y) in doors if y > GL + 2})
+    sp = round_tower(g, cx, cz, r, top, GL, floors=tuple(floors), spiral=True, cone=False, doors=doors)
     stepped_top(g, cx, cz, r, top, stages=stages, cone=cone, posts=posts)
     return sp
 
@@ -691,39 +713,45 @@ def great_city(seed=77):
         statue_plinth(g, 121, z, GL); statue_plinth(g, 134, z, GL)
     triumphal_arch(g, 127, 150, GL)
 
-    # ---- districts ----
+    # ---- districts: packed terraces, alleys a cart wide, trades by street ----
     doors = []
-    doors.append(inn(g, 18, 118, 44, 127, GL, rng, "south"))
-    doors += row_x(g, 68, 118, 118, 9, GL, rng, "south", stalls=True)
-    doors += row_x(g, 136, 186, 118, 9, GL, rng, "south", stalls=True)
+    # north of the cross street, west of the avenue: the market street along the terrace foot
+    doors.append(inn(g, 18, 118, 42, 127, GL, rng, "south"))
+    doors += terrace(g, 45, 58, 118, 9, GL, rng, "south", trades=["general", "none"])
+    doors += terrace(g, 65, 122, 118, 9, GL, rng, "south", trades=["baker", "general", "chandler", "none", "potter", "general"])
+    doors += terrace(g, 133, 190, 118, 9, GL, rng, "south", trades=["cloth", "general", "apothecary", "none", "cloth", "general"])
+    # Smiths' Row: the smithy and its neighbours, chimneys smoking
     building(g, 200, 118, 216, 126, GL, 7, "x", door_cells=((208, 126),), chimney=(202, 120))
     g.set(203, GL, 121, "minecraft:anvil[facing=east]"); g.set(206, GL, 121, "minecraft:smithing_table")
     g.set(213, GL, 120, "minecraft:blast_furnace[facing=south,lit=false]"); g.set(210, GL, 120, "minecraft:lava_cauldron")
     g.chest(214, GL, 124, "west", LOOT + "castle_smithy")
     g.mark("smithy", 208, GL, 128)
-    building(g, 222, 118, 240, 126, GL, 6, "x")
-    g.fill(224, GL, 126, 238, GL + 3, 126, AIR)
-    for x in range(224, 239, 4):
-        g.fill(x, GL, 119, x, GL, 125, "minecraft:spruce_fence"); g.set(x + 2, GL, 119, "minecraft:hay_block[axis=y]")
-    doors += block_houses(g, 16, 134, 56, 156, GL, rng)
-    doors += block_houses(g, 68, 134, 118, 156, GL, rng)
-    doors += block_houses(g, 136, 134, 186, 156, GL, rng)
-    doors += block_houses(g, 200, 134, 240, 156, GL, rng)
-    # flanks: the north-west quarter is houses, the north-east holds the Dragonpit
-    doors += block_houses(g, 20, 20, 56, 58, GL, rng)
-    doors += block_houses(g, 20, 70, 56, 110, GL, rng)
+    doors += terrace(g, 219, 237, 118, 9, GL, rng, "south", trades=["smith", "smith", "tanner"])
+    # the four blocks between the cross street and the market street, each split by a back lane
+    doors += dense_block(g, 18, 133, 58, 158, GL, rng, trades=["general", "none", "none", "baker", "none"], alley=("z", 36))
+    doors += dense_block(g, 65, 133, 122, 158, GL, rng, trades=["none", "cloth", "none", "none", "chandler"], alley=("z", 93))
+    doors += dense_block(g, 133, 133, 190, 158, GL, rng, trades=["none", "none", "potter", "none", "general"], alley=("z", 161))
+    doors += dense_block(g, 197, 133, 237, 158, GL, rng, trades=["smith", "none", "tanner", "none", "none"], alley=("z", 220))
+    # flanks: the north-west quarter is a warren of lanes, the north-east holds the Dragonpit
+    doors += dense_block(g, 18, 18, 58, 60, GL, rng, sides=("south", "west", "east"), trades=["none", "none", "apothecary", "none"], alley=("x", 39))
+    doors += dense_block(g, 18, 67, 58, 112, GL, rng, trades=["none", "general", "none", "none"], alley=("x", 90))
     dragonpit(g, 218, 42, 19, GL)
-    doors += block_houses(g, 200, 70, 236, 110, GL, rng)
+    doors += dense_block(g, 197, 67, 237, 112, GL, rng, trades=["none", "none", "butcher", "none"], alley=("x", 90))
     # south of the cross street: the sept in its plaza, the market, the barracks
     great_sept(g, 36, 188, 17, GL)
     g.fill(34, GL - 1, 166, 38, GL - 1, 168, ROAD)
     market_square(g, 68, 168, 186, 194, GL, rng)
+    arcade(g, 68, 168, 186, 170, GL, rng, "south", trades=["cloth", "general", "potter", "chandler"])
+    arcade(g, 68, 192, 186, 194, GL, rng, "north", trades=["baker", "butcher", "general", "fish"])
+    stall_cluster(g, 72, 173, 110, 190, GL, rng, trades=["general", "cloth", "potter", "baker", "general"])
+    stall_cluster(g, 146, 173, 182, 190, GL, rng, trades=["fish", "general", "butcher", "chandler", "general"])
     bell_tower(g, 70, 170, GL)
     barracks(g, 200, 170, 240, 192, GL, rng)
-    doors.append(inn(g, 68, 204, 92, 216, GL, rng, "south"))
-    doors += block_houses(g, 96, 202, 118, 216, GL, rng, sides=("south", "north"), depth=7)
-    doors += block_houses(g, 136, 202, 186, 216, GL, rng, sides=("south", "north"), depth=7)
-    doors += block_houses(g, 200, 202, 240, 216, GL, rng, sides=("south", "north"), depth=7)
+    # the harbour quarter: fishmongers and taverns stacked over the quay street
+    doors.append(inn(g, 65, 204, 92, 216, GL, rng, "south"))
+    doors += dense_block(g, 95, 201, 122, 216, GL, rng, sides=("south", "north"), depth=7, trades=["fish", "none", "general"], court=False)
+    doors += dense_block(g, 133, 201, 190, 216, GL, rng, sides=("south", "north"), depth=7, trades=["fish", "none", "tanner", "none"], court=False)
+    doors += dense_block(g, 197, 201, 237, 216, GL, rng, sides=("south", "north"), depth=7, trades=["none", "fish", "none"], court=False)
 
     # ---- inner wall and upper city ----
     iw = GL2 + 18
@@ -733,9 +761,19 @@ def great_city(seed=77):
     for (cx, cz) in ((66, 16), (189, 16), (66, 111), (189, 111)):
         ring_tower(g, cx, cz, 7, iw + 8, GL2, stages=1, cone=True, posts="archer",
                    doors=((1 if cx < 128 else -1, 0, iw), (0, 1 if cz < 64 else -1, iw)))
+    # the side streets pass under the south-east and south-west towers through vaulted ways
+    for (x0, x1) in ((60, 63), (193, 196)):
+        g.fill(x0, GL, 102, x1, GL + 3, 120, AIR)
+        g.fill(x0, GL - 1, 102, x1, GL - 1, 120, ROAD)
+        g.fill(x0, GL + 4, 102, x1, GL + 4, 120, STONE)
+        for z in range(104, 119, 4):
+            g.set(x0 - 1, GL + 3, z, "minecraft:lantern[hanging=true]") if g.get(x0 - 1, GL + 4, z) != AIR else None
     for x in (110, 146):
         square_tower(g, x, 108, x + 9, 117, iw + 6, GL2, floors=(GL2 + 8, iw - 1), spiral_at=(x + 4, 112))
-        g.fill(x, iw, 112, x, iw + 1, 114, AIR); g.fill(x + 9, iw, 112, x + 9, iw + 1, 114, AIR)
+        g.fill(x, iw, 111, x + 2, iw + 1, 113, AIR); g.fill(x + 7, iw, 111, x + 9, iw + 1, 113, AIR)
+        g.fill(x, iw - 1, 111, x + 2, iw - 1, 113, STONE); g.fill(x + 7, iw - 1, 111, x + 9, iw - 1, 113, STONE)
+        g.fill(x + 4, GL2, 107, x + 5, GL2 + 2, 109, AIR)                 # door from the upper city
+        g.fill(x + 4, GL2 - 1, 107, x + 5, GL2 - 1, 109, FLOOR_STONE)
         g.mark("crossbowman", x + 4, iw + 6, 112)
     # inner gate on the avenue: a barbican with the grand stair climbing to it
     g.fill(119, 0, 104, 136, iw + 4, 114, STONE)
@@ -798,11 +836,14 @@ def great_city(seed=77):
                 continue
             square_tower(g, x, z0, x + 13, z0 + 13, ttop, GL, floors=(GL + 9, GL + 18, walk - 1), spiral_at=(x + 6, z0 + 6))
             for (cx2, cz2) in ((x - 1, z0 - 1), (x + 14, z0 - 1), (x - 1, z0 + 14), (x + 14, z0 + 14)):
+                if sgn > 0 and cz2 == z0 + 14:
+                    continue                       # the keep's corner towers stand right behind the north towers
                 bartizan(g, cx2, cz2, ttop + 1)
-            wz = z0 + 13 if sgn > 0 else z0
+            wz0, wz1 = (z0 + 11, z0 + 14) if sgn > 0 else (z0 - 1, z0 + 2)
             for y in (walk, GL + 10):
-                g.fill(x, y, z0 + 5, x, y + 1, z0 + 7, AIR); g.fill(x + 13, y, z0 + 5, x + 13, y + 1, z0 + 7, AIR)
-            g.fill(x + 5, GL, wz, x + 7, GL + 2, wz, AIR)
+                g.fill(x, y, z0 + 5, x + 2, y + 1, z0 + 7, AIR); g.fill(x + 11, y, z0 + 5, x + 13, y + 1, z0 + 7, AIR)
+                g.fill(x, y - 1, z0 + 5, x + 2, y - 1, z0 + 7, STONE); g.fill(x + 11, y - 1, z0 + 5, x + 13, y - 1, z0 + 7, STONE)
+            g.fill(x + 5, GL, wz0, x + 7, GL + 2, wz1, AIR)
             g.mark("archer", x + 3, ttop, z0 + 3); g.mark("archer", x + 10, ttop, z0 + 10); g.mark("crossbowman", x + 6, ttop, z0 + 6)
     for z in range(az + 40, bz - 20, 48):
         for (x0, sgn) in ((ax - 3, 1), (bx - 10, -1)):
@@ -811,10 +852,11 @@ def great_city(seed=77):
             square_tower(g, x0, z, x0 + 13, z + 13, ttop, GL, floors=(GL + 9, GL + 18, walk - 1), spiral_at=(x0 + 6, z + 6))
             for (cx2, cz2) in ((x0 - 1, z - 1), (x0 + 14, z - 1), (x0 - 1, z + 14), (x0 + 14, z + 14)):
                 bartizan(g, cx2, cz2, ttop + 1)
-            wx = x0 + 13 if sgn > 0 else x0
+            wx0, wx1 = (x0 + 11, x0 + 14) if sgn > 0 else (x0 - 1, x0 + 2)
             for y in (walk, GL + 10):
-                g.fill(x0 + 5, y, z, x0 + 7, y + 1, z, AIR); g.fill(x0 + 5, y, z + 13, x0 + 7, y + 1, z + 13, AIR)
-            g.fill(wx, GL, z + 5, wx, GL + 2, z + 7, AIR)
+                g.fill(x0 + 5, y, z, x0 + 7, y + 1, z + 2, AIR); g.fill(x0 + 5, y, z + 11, x0 + 7, y + 1, z + 13, AIR)
+                g.fill(x0 + 5, y - 1, z, x0 + 7, y - 1, z + 2, STONE); g.fill(x0 + 5, y - 1, z + 11, x0 + 7, y - 1, z + 13, STONE)
+            g.fill(wx0, GL, z + 5, wx1, GL + 2, z + 7, AIR)
             g.mark("archer", x0 + 3, ttop, z + 3); g.mark("archer", x0 + 10, ttop, z + 10); g.mark("crossbowman", x0 + 6, ttop, z + 6)
     for (cx, cz) in ((ax + 2, az + 2), (bx - 2, az + 2), (ax + 2, bz - 2), (bx - 2, bz - 2)):
         ring_tower(g, cx, cz, 10, ttop + 4, GL, stages=2, cone=True, posts="archer",
@@ -835,7 +877,11 @@ def great_city(seed=77):
         g.fill(bx0 + 1, GL + 13, cz_mid - 8, bx1 - 1, gtop - 2, cz_mid + 8, AIR)
         g.fill(bx0 + 1, GL + 12, cz_mid - 8, bx1 - 1, GL + 12, cz_mid + 8, PLANK)
         sp_x = (bx0 + 3) if sgn < 0 else (bx1 - 3)
-        spiral_stair(g, sp_x, cz_mid + 5, GL + 13, gtop - 1, STONE_STAIR, STONE)
+        g.fill(bx0 + 1, walk - 1, cz_mid - 8, bx1 - 1, walk - 1, cz_mid + 8, PLANK)     # gallery at wall-walk level
+        spiral_stair(g, sp_x, cz_mid + 5, GL + 13, gtop - 1, STONE_STAIR, STONE, landings=(walk,))
+        # the wall-walk runs straight through both drum towers and across the gallery
+        wx0, wx1 = (ax + 1, ax + 4) if sgn < 0 else (bx - 4, bx - 1)
+        carve(g, wx0, walk, cz_mid - 22, wx1, walk + 1, cz_mid + 22, AIR, floor=STONE)
         parapet_rect(g, bx0 - 1, cz_mid - 10, bx1 + 1, cz_mid + 10, gtop)
         g.fill(bx0, gtop, cz_mid - 9, bx1, gtop + 4, cz_mid + 9, AIR)
         g.fill(bx0, gtop - 1, cz_mid - 9, bx1, gtop - 1, cz_mid + 9, STONE)
@@ -859,7 +905,9 @@ def great_city(seed=77):
     portcullis_plane(g, 124, 131, GL, 11, bz - 7)
     g.fill(118, GL + 13, bz - 7, 137, gtop - 2, bz, AIR)
     g.fill(118, GL + 12, bz - 7, 137, GL + 12, bz, PLANK)
-    spiral_stair(g, 120, bz - 4, GL + 13, gtop - 1, STONE_STAIR, STONE)
+    g.fill(118, walk - 1, bz - 7, 137, walk - 1, bz, PLANK)                            # gallery at wall-walk level
+    spiral_stair(g, 120, bz - 4, GL + 13, gtop - 1, STONE_STAIR, STONE, landings=(walk,))
+    carve(g, 104, walk, bz - 5, 151, walk + 1, bz - 2, AIR, floor=STONE)               # walk through towers and gallery
     parapet_rect(g, 116, bz - 9, 139, bz + 2, gtop)
     g.fill(117, gtop, bz - 8, 138, gtop + 4, bz + 1, AIR)
     g.fill(117, gtop - 1, bz - 8, 138, gtop - 1, bz + 1, STONE)
@@ -868,8 +916,18 @@ def great_city(seed=77):
         g.mark("crossbowman", x, gtop, bz)
     g.wall_banner(121, GL + 16, bz + 2, "south"); g.wall_banner(134, GL + 16, bz + 2, "south")
     g.mark("captain", 127, GL, bz - 14)
+    # the quay road runs along the foot of the wall and through vaulted ways under the river-gate towers
+    g.fill(14, GL - 1, 217, 241, GL - 1, 218, ROAD)
+    for (x0, x1) in ((104, 123), (132, 151), (47, 62), (191, 206)):
+        g.fill(x0, GL, 217, x1, GL + 3, 220 if x0 > 100 and x0 < 160 else 218, AIR)
+        g.fill(x0, GL - 1, 217, x1, GL - 1, 218, ROAD)
+        g.fill(x0, GL + 4, 217, x1, GL + 4, 218, STONE)
+        for x in range(x0 + 2, x1, 5):
+            g.set(x, GL + 3, 216, "minecraft:lantern[hanging=true]") if g.get(x, GL + 4, 216) != AIR else None
+    g.fill(104, GL, 217, 123, GL + 2, 218, AIR); g.fill(132, GL, 217, 151, GL + 2, 218, AIR)
 
     rng.shuffle(doors)
-    for (x, z) in doors[:12]:
+    for d in doors[:12]:
+        x, z = d[0], d[-1]
         g.mark("house", x, GL if z > 114 or x < 64 or x > 191 else GL2, z)
-    return g, {"name": "great_city", "tier": 4, "GL": GL}
+    return g, {"name": "great_city", "tier": 4, "GL": GL, "levels": (GL2, GL3)}

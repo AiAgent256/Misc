@@ -12,9 +12,11 @@ import castle
 import castle2
 import city
 import export
+import fixup
 import furnish
 import render
 import themes
+import walk
 import worldgen
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -43,8 +45,17 @@ def main():
         g, meta = fn()
         name = meta["name"]
         rooms = furnish.furnish(g, meta["GL"])
+        opened = fixup.clear_blocked_doorways(g, meta["GL"], tuple(meta.get("levels", ())))
+        dropped = fixup.drop_buried_markers(g)
+        bad, checked = walk.audit(g, meta)
+        unreachable = sum(len(v) for v in bad.values())
         print(f"{name}: built in {time.time() - t:.1f}s, palette {len(g.palette)}, rooms " +
               ", ".join(f"{k}={v}" for k, v in sorted(rooms.items())))
+        print(f"  walkability: {checked} posts checked, {unreachable} unreachable, {opened} doorways opened, {dropped} buried posts dropped")
+        if unreachable:
+            for k, v in bad.items():
+                print(f"    {k}: {v[:6]}")
+            raise SystemExit(f"{name}: {unreachable} posts cannot be walked to from the gate")
         if not args.no_export:
             tiles = export.write_tiles(g, os.path.join(STRUCT_DIR, name), name)
             layout = export.write_layout(g, meta, tiles, os.path.join(LAYOUT_DIR, f"{name}.json"))

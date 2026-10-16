@@ -5,7 +5,7 @@ from grid import Grid, Mix, disk, ring, rect, rect_ring, spiral_stair, gable_roo
 from parts import (STONE, DARK, FOUND, PAVE, ROAD, FLOOR_STONE, ROOF, ROOF_STAIR, STONE_STAIR,
                    DARK_STAIR, SLAB_CAP, RAIL, PLANK, DARK_PLANK, PORTCULLIS, GLASS,
                    curtain, posts_on_walk, round_tower, square_tower, straight_wall,
-                   pointed_arch, building, lamp_post, tree_weirwood, side_grids)
+                   pointed_arch, building, lamp_post, tree_weirwood, side_grids, wall_stair)
 
 LOOT = "stormhold:chests/"
 
@@ -33,7 +33,9 @@ def d_tower(g, side, pos, a, b, walk, GL, r=6):
     round_tower(g, cx, cz, r, top, GL, floors=(GL + 8, walk - 1), spiral=False,
                 doors=((dx, dz, walk), (-dx, -dz, walk), (dx, dz, GL + 9), (-dx, -dz, GL + 9)),
                 banner_dirs=(), lantern_floors=True)
-    # inner stair: ladder-free access is via the walk doors; mark posts
+    # a ladder from the wall-walk floor up through a hatch to the roof; mark posts
+    for y in range(walk, top):
+        g.set(cx + 2, y, cz, "minecraft:ladder[facing=west]")
     for k in range(6):
         ang = k * np.pi / 3
         g.mark("archer", int(round(cx + 3 * np.cos(ang))), top, int(round(cz + 3 * np.sin(ang))))
@@ -115,19 +117,19 @@ def great_castle_a(seed=7):
         square_tower(g, x0, z0, x1, z1, mtop, GL, floors=mf, spiral_at=sp, banner_sides=bs)
         # doors onto the wall walk and gallery on both sides
         if x0 < W / 2 and z0 > 20:  # west
-            for z in (z0, z1):
+            for (za, zb) in ((z0, z0 + 2), (z1 - 2, z1)):
                 for y in (walk, GL + 9):
-                    g.fill(a + 1, y, z, a + 4, y + 1, z, "minecraft:air")
+                    g.fill(a + 1, y, za, a + 4, y + 1, zb, "minecraft:air")
             g.fill(a + 6, GL, 62, a + 8, GL + 2, 64, "minecraft:air")
         elif x0 > W / 2:  # east
-            for z in (z0, z1):
+            for (za, zb) in ((z0, z0 + 2), (z1 - 2, z1)):
                 for y in (walk, GL + 9):
-                    g.fill(b - 4, y, z, b - 1, y + 1, z, "minecraft:air")
+                    g.fill(b - 4, y, za, b - 1, y + 1, zb, "minecraft:air")
             g.fill(b - 8, GL, 62, b - 6, GL + 2, 64, "minecraft:air")
         else:  # north
-            for x in (x0, x1):
+            for (xa, xb) in ((x0, x0 + 2), (x1 - 2, x1)):
                 for y in (walk, GL + 9):
-                    g.fill(x, y, a + 1, x, y + 1, a + 4, "minecraft:air")
+                    g.fill(xa, y, a + 1, xb, y + 1, a + 4, "minecraft:air")
         for (px, pz) in ((x0 + 1, z0 + 1), (x1 - 1, z1 - 1), (x0 + 1, z1 - 1), (x1 - 1, z0 + 1)):
             g.mark("crossbowman", px, mtop, pz)
 
@@ -151,7 +153,8 @@ def great_castle_a(seed=7):
     for z in range(b - 4, b + 5, 2):
         g.fill(64, GL + 10, z, 64, GL + 11, z, "minecraft:air")
     g.lantern(61, gtop - 2, b); g.lantern(67, gtop - 2, b)
-    spiral_stair(g, 60, b - 3, GL + 12, gtop - 1, STONE_STAIR, STONE)
+    g.fill(58, walk - 1, b - 6, 70, walk - 1, b + 6, PLANK)        # gallery at wall-walk level
+    spiral_stair(g, 60, b - 3, GL + 12, gtop - 1, STONE_STAIR, STONE, landings=(walk,))
     g.fill(57, gtop - 1, b - 7, 71, gtop - 1, b + 7, STONE)
     g.fill(58, gtop - 1, b - 5, 62, gtop - 1, b - 1, "minecraft:air")
     # gatehouse top parapet
@@ -208,12 +211,21 @@ def great_castle_a(seed=7):
                      spiral_at=((x0 + x1) // 2, iw_z1 - 1), banner_sides=("south",))
         g.mark("crossbowman", x0 + 1, iwalk + 7, iw_z1 + 3)
         g.mark("crossbowman", x1 - 1, iwalk + 7, iw_z1 + 3)
+        # door from the tower onto the inner wall-walk
+        if x0 < 64:
+            g.fill(x0, iwalk, iw_z1 - 2, x0 + 1, iwalk + 1, iw_z1 - 1, "minecraft:air")
+        else:
+            g.fill(x1 - 1, iwalk, iw_z1 - 2, x1, iwalk + 1, iw_z1 - 1, "minecraft:air")
     g.fill(igx0 - 1, 0, iw_z1 - 4, igx1 + 1, iwalk + 2, iw_z1 + 2, STONE)
     pointed_arch(g, igx0, igx1, GL, 7, iw_z1 - 4, iw_z1 + 2)
     portcullis_plane(g, igx0, igx1, GL, 7, iw_z1 + 2)
     g.fill(igx0, GL - 1, iw_z1 - 4, igx1, GL - 1, iw_z1 + 2, ROAD)
     g.mark("captain", 64, GL, iw_z1 - 6)
     g.mark("rally", 64, GL, iw_z1 - 7)
+    # guardrooms: the gate passage opens sideways through both gatehouse towers into the inner ward
+    for (x0, x1) in ((52, igx0), (igx1, 76)):
+        g.fill(x0, GL, iw_z1 - 2, x1, GL + 2, iw_z1 - 1, "minecraft:air")
+        g.fill(x0, GL - 1, iw_z1 - 2, x1, GL - 1, iw_z1 - 1, ROAD)
 
     # inner ward ground
     iward = rect(g, iw_x0 + 3, a + thick, iw_x1 - 3, iw_z1 - 3)
@@ -442,7 +454,7 @@ def great_castle_a(seed=7):
     for z in range(iw_z1 + 8, b - 8, 8):
         g.mark("knight", 62, GL, z); g.mark("knight", 66, GL, z)
     # barracks (west)
-    building(g, 17, 70, 31, 106, GL, 10, "z", door_cells=((31, 80), (31, 96)), upper_floor=GL + 4,
+    building(g, 17, 70, 31, 106, GL, 10, "z", door_cells=((31, 80), (31, 96), (22, 70), (23, 70)), upper_floor=GL + 4,
              chimney=(24, 88), timber=True)
     for z in range(72, 105, 3):
         g.bed(18, GL, z, "west", "brown")
@@ -574,14 +586,19 @@ def holdfast_a(seed=11):
         sz = 1 if cz < W / 2 else -1
         square_tower(g, cx - 4, cz - 4, cx + 4, cz + 4, ttop, GL, floors=(walk - 1,), spiral_at=None,
                      cone=(cz > W / 2))
-        for (x0, z0, x1, z1) in ((cx + 4 * sx - (1 if sx > 0 else -1) * 0, cz - 1, cx + 4 * sx, cz + 1),
-                                 (cx - 1, cz + 4 * sz, cx + 1, cz + 4 * sz)):
-            g.fill(min(x0, x1), walk, min(z0, z1), max(x0, x1), walk + 1, max(z0, z1), "minecraft:air")
+        # doors from the wall-walk into the tower, right through its wall
+        g.fill(cx + 2 * sx, walk, cz - 1, cx + 4 * sx, walk + 1, cz + 1, "minecraft:air")
+        g.fill(cx - 1, walk, cz + 2 * sz, cx + 1, walk + 1, cz + 4 * sz, "minecraft:air")
         g.fill(cx - 1, GL, cz + 4 * sz, cx + 1, GL + 2, cz + 4 * sz, "minecraft:air") if False else None
         g.mark("archer", cx, ttop, cz) if cz < W / 2 else None
-        # ladder access from courtyard
-        lx, lz = cx + 4 * sx, cz
-        g.fill(cx + 3 * sx, GL, cz - 1, cx + 3 * sx, walk - 1, cz - 1, "minecraft:air")
+        # ladder from the wall-walk floor up through a hatch onto the tower roof
+        lf = "east" if sx > 0 else "west"
+        for y in range(walk, ttop):
+            g.set(cx - sx, y, cz - sz, f"minecraft:ladder[facing={lf}]")
+        g.set(cx - sx, ttop, cz - sz, "minecraft:air")
+    # stairs from the yard to the wall-walk: one against the west wall, one against the east
+    wall_stair(g, a + thick, 34, GL, walk, "z", "west")
+    wall_stair(g, b - thick, 34, GL, walk, "z", "east")
     # gatehouse
     g.fill(25, 0, b - 4, 38, walk + 3, b + 4, STONE)
     pointed_arch(g, 29, 34, GL, 7, b - 4, b + 4)
@@ -602,6 +619,12 @@ def holdfast_a(seed=11):
     g.fill(25, walk + 2, b - 4, 38, walk + 2, b + 4, STONE)
     for x in (27, 31, 35):
         g.mark("crossbowman", x, walk + 3, b + 2)
+    # stairs from both wall-walks up onto the gatehouse roof
+    for k in range(3):
+        for (x, f) in ((25 + k, "east"), (38 - k, "west")):
+            g.stair(x, walk + k, b - 1, STONE_STAIR, f)
+            g.fill(x, walk + k + 1, b - 1, x, walk + k + 3, b - 1, "minecraft:air")
+    g.fill(28, walk + 3, b - 1, 35, walk + 5, b - 1, "minecraft:air")
     g.wall_banner(27, GL + 10, b + 5, "south"); g.wall_banner(36, GL + 10, b + 5, "south")
     g.mark("gate", 31, GL, W - 2)
     g.mark("knight", 29, GL, b - 6); g.mark("knight", 34, GL, b - 6)

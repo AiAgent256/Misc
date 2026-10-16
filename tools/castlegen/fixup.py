@@ -1,0 +1,69 @@
+"""Last pass before export: clear what blocks the garrison's way.
+
+Hand-built plinths, string courses and stair skirts have a habit of running straight across a doorway
+that was cut through the wall behind them. Rather than chase each one, look for the pattern: a low
+solid cell with open floor on both sides of it along one axis, at ground level, and open it.
+"""
+from walk import passable, supports
+
+AIR = "minecraft:air"
+
+
+def _open(g, x, y, z):
+    return passable(g.get(x, y, z)) and passable(g.get(x, y + 1, z))
+
+
+def clear_blocked_doorways(g, GL, levels=()):
+    """
+    For each standing level (ground and any terraces), any 1-thick obstacle up to 3 high with walkable
+    floor on both sides of it (same level) is a doorway blocker: open it and make sure there's a floor.
+    Returns the number of cells opened.
+    """
+    n = 0
+    for y0 in (GL,) + tuple(levels):
+        for x in range(1, g.X - 1):
+            for z in range(1, g.Z - 1):
+                here = g.get(x, y0, z)
+                if passable(here) or "water" in here:
+                    continue
+                if any(k in here for k in ("fence", "_wall", "lantern", "campfire", "chest", "barrel", "bed", "table",
+                                            "anvil", "furnace", "smoker", "loom", "pot", "cauldron", "sign", "stairs", "slab",
+                                            "log", "leaves", "hay", "wool", "glass", "composter", "bookshelf")):
+                    continue                      # furniture, posts and steps, not masonry
+                # obstacle no more than 3 high, open sky-side above it isn't required (it's a door)
+                h = 0
+                while h < 3 and not passable(g.get(x, y0 + h, z)):
+                    h += 1
+                if h == 3 and not passable(g.get(x, y0 + 3, z)):
+                    continue                      # a wall, not a sill
+                for (dx, dz) in ((1, 0), (0, 1)):
+                    a = (x - dx, z - dz)
+                    b = (x + dx, z + dz)
+                    # part of a run of masonry (a sill, a plinth), not a lone block
+                    run = (not passable(g.get(x + dz, y0, z + dx))) or (not passable(g.get(x - dz, y0, z - dx)))
+                    if run and _open(g, a[0], y0, a[1]) and _open(g, b[0], y0, b[1]) \
+                            and supports(g.get(a[0], y0 - 1, a[1])) and supports(g.get(b[0], y0 - 1, b[1])):
+                        # don't cut through something that is itself a floor edge (a step in the terrain)
+                        for yy in range(y0, y0 + max(h, 2)):
+                            g.set(x, yy, z, AIR)
+                        if not supports(g.get(x, y0 - 1, z)):
+                            g.set(x, y0 - 1, z, "minecraft:stone_bricks")
+                        n += 1
+                        break
+    return n
+
+
+def drop_buried_markers(g, keep=("gate", "lord", "war_table", "banner_stand", "rally")):
+    """Posts that ended up inside masonry (a gatehouse built over a wall-walk post) are dropped."""
+    n = 0
+    for role, lst in list(g.markers.items()):
+        if role in keep:
+            continue
+        good = []
+        for (x, y, z) in lst:
+            if passable(g.get(x, y, z)) and passable(g.get(x, y + 1, z)):
+                good.append((x, y, z))
+            else:
+                n += 1
+        g.markers[role] = good
+    return n

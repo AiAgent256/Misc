@@ -26,6 +26,10 @@ PLANK = "minecraft:spruce_planks"
 DARK_PLANK = "minecraft:dark_oak_planks"
 PORTCULLIS = "stormhold:portcullis"
 GLASS = "minecraft:gray_stained_glass_pane"
+WALL_FOOT = Mix(("minecraft:mossy_stone_bricks", 30), ("minecraft:mossy_cobblestone", 20), ("minecraft:tuff", 15),
+                ("minecraft:cobblestone", 15), ("minecraft:stone_bricks", 20))
+WALL_TOP = Mix(("minecraft:cracked_stone_bricks", 35), ("minecraft:stone_bricks", 30), ("minecraft:andesite", 20),
+               ("minecraft:mossy_stone_bricks", 15))
 
 
 def side_grids(g, a, b, az=None, bz=None):
@@ -68,9 +72,29 @@ def curtain(g, a, b, thick, walk_y, GL, gallery=True, banners_every=16, grids=No
     d, along, out = grids if grids is not None else side_grids(g, a, b, az, bz)
     body = (d >= 0) & (d < thick)
     g.fill_mask(body, 0, walk_y - 1, STONE)
+    # the outer face weathers from the ground up: mossy, wet stone at the foot, clean ashlar in the
+    # middle, cracked and lichened near the top where the rain gets it
+    face = body & (d == 0)
+    g.fill_mask(face, GL - 1, GL + 1, WALL_FOOT)
+    g.fill_mask(face, walk_y - 5, walk_y - 1, WALL_TOP)
+    # putlog holes left from the scaffolding, scattered
+    holes = face & (np.mod(along * 7 + 3, 11) == 0)
+    g.fill_mask(holes, GL + 6, GL + 6, DARK)
+    g.fill_mask(face & (np.mod(along * 5 + 1, 13) == 0), walk_y - 9, walk_y - 9, DARK)
     # string courses
     g.fill_mask(body & (d == 0), GL + 3, GL + 3, DARK)
     g.fill_mask(body & (d == 0), walk_y - 6, walk_y - 6, DARK)
+    # buttresses every 8 blocks: a two-wide pier standing one out from the face, stepped back twice
+    pier = (d == -1) & (np.mod(along, 8) < 2)
+    g.fill_mask(pier, 0, walk_y - 7, STONE)
+    stairs_by_facing(g, pier, walk_y - 6, STONE_STAIR, out, invert=True)
+    foot = (d == -2) & (np.mod(along, 8) < 2)
+    g.fill_mask(foot, 0, GL + 4, STONE)
+    stairs_by_facing(g, foot, GL + 5, STONE_STAIR, out, invert=True)
+    # blind arcading between the buttresses: recessed panels a block deep with a stair-capped head
+    panel = face & (np.mod(along, 8) >= 3) & (np.mod(along, 8) <= 6)
+    g.fill_mask(panel, GL + 5, GL + 8, DARK)
+    stairs_by_facing(g, panel, GL + 9, DARK_STAIR, out, invert=True, half="top")
     # battered plinth (stairs face inward = opposite of outward)
     g.fill_mask(d == -1, 0, GL + 1, DARK)
     stairs_by_facing(g, d == -1, GL + 2, DARK_STAIR, out, invert=True)
@@ -152,19 +176,28 @@ def round_tower(g, cx, cz, r, top, GL, floors=(), spiral=True, cone=False, t=3,
     g.fill_mask(proj, top, top, STONE)
     sp = None
     if spiral and r - t >= 3:
-        sp = spiral_stair(g, cx, cz, GL, top - 1, STONE_STAIR, STONE)
+        sp = spiral_stair(g, cx, cz, GL, top - 1, STONE_STAIR, STONE, landings=tuple(fy + 1 for fy in floors))
         # rail around the shaft at roof level, leaving the exit open
-        last = (top - 1 - GL) % 16
+        last = g.spiral_last
         exit_cells = {sp[(last + k) % 16][:2] for k in range(-3, 2)}
         for (x, z, _) in sp:
             if (x, z) not in exit_cells:
                 g.set(x, top, z, RAIL)
     for (dx, dz, y) in doors:
-        for k in range(t + 1):
+        # a ground door also cuts through the plinth outside the wall, and gets a sill to step on
+        lo = -2 if y <= GL + 2 else 0
+        for k in range(lo, t + 1):
             x = cx + int(round(dx * (r - k)))
             z = cz + int(round(dz * (r - k)))
-            for xx, zz in ((x, z), (x + (1 if dz else 0), z + (1 if dx else 0))):
-                g.fill(xx, y, zz, xx, y + 1, zz, "minecraft:air")
+            if dx and dz:
+                # a diagonal door: cut 2x2 at every step so the passage is walkable, not a chain of corners
+                cells_ = ((x, z), (x + 1, z), (x, z + 1), (x + 1, z + 1))
+            else:
+                cells_ = ((x, z), (x + (1 if dz else 0), z + (1 if dx else 0)))
+            for xx, zz in cells_:
+                g.fill(xx, y, zz, xx, y + 2, zz, "minecraft:air")     # three high: room to step up a floor inside
+                if k < 0 and not g.is_solid(xx, y - 1, zz):
+                    g.set(xx, y - 1, zz, FLOOR_STONE)
     if cone:
         g.fill_mask(full, top, top + 6, "minecraft:air")
         cone_roof(g, cx, cz, r, top, ROOF)
@@ -217,8 +250,8 @@ def square_tower(g, x0, z0, x1, z1, top, GL, floors=(), spiral_at=None, t=3, con
     sp = None
     if spiral_at:
         cx, cz = spiral_at
-        sp = spiral_stair(g, cx, cz, GL, top - 1, STONE_STAIR, STONE)
-        last = (top - 1 - GL) % 16
+        sp = spiral_stair(g, cx, cz, GL, top - 1, STONE_STAIR, STONE, landings=tuple(fy + 1 for fy in floors))
+        last = g.spiral_last
         exit_cells = {sp[(last + k) % 16][:2] for k in range(-3, 2)}
         for (x, z, _) in sp:
             if (x, z) not in exit_cells:
@@ -308,26 +341,54 @@ def building(g, x0, z0, x1, z1, GL, wall_h, axis, door_cells=(), upper_floor=Non
         g.fill(x0, GL + 4, z1, x1, GL + 4, z1, "minecraft:dark_oak_log[axis=x]")
         g.fill(x0, GL + 4, z0, x0, GL + 4, z1, "minecraft:dark_oak_log[axis=z]")
         g.fill(x1, GL + 4, z0, x1, GL + 4, z1, "minecraft:dark_oak_log[axis=z]")
-    # windows
+    # quoins: the corners picked out in dressed stone, every other course
+    if not timber:
+        for (qx, qz) in ((x0, z0), (x1, z0), (x0, z1), (x1, z1)):
+            for y in range(GL, GL + wall_h - 1, 2):
+                g.set(qx, y, qz, "minecraft:polished_andesite")
+    # windows, each with a sill outside and a lintel over it; some get shutters
+    def window(x, y, z, f):
+        g.fill(x, y, z, x, y + 1, z, GLASS)
+        ox, oz = x + FACING_VEC[f][0], z + FACING_VEC[f][1]
+        if g.get(ox, y - 1, oz) == "minecraft:air":
+            g.stair(ox, y - 1, oz, STONE_STAIR, OPPOSITE[f], half="top")
+        if g.get(x, y + 2, z) != "minecraft:air" and g.get(ox, y + 2, oz) == "minecraft:air":
+            g.set(ox, y + 2, oz, "minecraft:stone_brick_slab[type=top]")
+        if (x + z) % 3 == 0:
+            for s_ in (-1, 1):
+                sx, sz = (ox + s_, oz) if f in ("north", "south") else (ox, oz + s_)
+                if g.get(sx, y, sz) == "minecraft:air" and g.get(sx - FACING_VEC[f][0], y, sz - FACING_VEC[f][1]) != "minecraft:air":
+                    g.set(sx, y, sz, f"minecraft:spruce_trapdoor[facing={OPPOSITE[f]},open=true,half=bottom]")
     for x in range(x0 + 2, x1 - 1, 4):
-        for z in (z0, z1):
-            g.fill(x, GL + 1, z, x, GL + 2, z, GLASS)
+        for z, f in ((z0, "north"), (z1, "south")):
+            window(x, GL + 1, z, f)
             if wall_h > 6:
-                g.fill(x, GL + 6, z, x, GL + 7, z, GLASS)
+                window(x, GL + 6, z, f)
     for z in range(z0 + 2, z1 - 1, 4):
-        for x in (x0, x1):
-            g.fill(x, GL + 1, z, x, GL + 2, z, GLASS)
+        for x, f in ((x0, "west"), (x1, "east")):
+            window(x, GL + 1, z, f)
             if wall_h > 6:
-                g.fill(x, GL + 6, z, x, GL + 7, z, GLASS)
+                window(x, GL + 6, z, f)
     for (x, z) in door_cells:
         g.fill(x, GL, z, x, GL + 2, z, "minecraft:air")
+        # a doorstep, a hood over the door and a lantern beside it
+        f = "north" if z == z0 else "south" if z == z1 else "west" if x == x0 else "east"
+        ox, oz = x + FACING_VEC[f][0], z + FACING_VEC[f][1]
+        if g.get(ox, GL - 1, oz) != "minecraft:air":
+            g.set(ox, GL - 1, oz, "minecraft:stone_bricks")
+        if g.get(ox, GL + 3, oz) == "minecraft:air":
+            g.stair(ox, GL + 3, oz, DARK_STAIR, OPPOSITE[f], half="top")
+        lx, lz = (ox + 1, oz) if f in ("north", "south") else (ox, oz + 1)
+        if g.get(lx, GL + 2, lz) == "minecraft:air" and g.get(lx - FACING_VEC[f][0], GL + 2, lz - FACING_VEC[f][1]) != "minecraft:air":
+            g.set(lx, GL + 2, lz, f"minecraft:wall_torch[facing={f}]")
     if upper_floor:
         g.fill(x0 + 1, upper_floor, z0 + 1, x1 - 1, upper_floor, z1 - 1, PLANK)
     top = gable_roof(g, x0, z0, x1, z1, GL + wall_h, axis, roof or ROOF_STAIR, wall_block)
     if chimney:
         cx, cz = chimney
         g.fill(cx, GL, cz, cx, top + 1, cz, "minecraft:bricks")
-        g.set(cx, top + 2, cz, "minecraft:campfire[lit=true,signal_fire=false]")
+        g.set(cx, top + 2, cz, "minecraft:brick_wall")
+        g.set(cx, top + 3, cz, "minecraft:campfire[lit=true,signal_fire=false]")
     # interior light
     for x in range(x0 + 3, x1 - 1, 6):
         for z in range(z0 + 3, z1 - 1, 6):
@@ -353,3 +414,35 @@ def tree_weirwood(g, cx, cz, GL):
     g.fill_mask(canopy, GL + 6, GL + 7, Mix(("minecraft:nether_wart_block", 80), ("minecraft:red_mushroom_block", 20)))
     g.fill_mask(disk(g, cx + 0.5, cz + 0.5, 3.6), GL + 8, GL + 9, "minecraft:nether_wart_block")
     g.fill_mask(disk(g, cx + 0.5, cz + 0.5, 2), GL + 10, GL + 10, "minecraft:nether_wart_block")
+
+
+def wall_stair(g, x, z, GL, walk, along, toward):
+    """
+    A straight open stair against the inner face of a curtain, from the yard at (x, z) up to the
+    wall-walk. `along` is the axis the stair runs on ('x' or 'z'), `toward` the facing of the wall
+    from the stair (the rail it lands through). Steps face up the stair. Lands one cell onto the walk.
+    """
+    n = walk - GL
+    dx, dz = FACING_VEC[toward]
+    if along == "x":
+        step_dir = "east" if x < g.X // 2 else "west"
+        sx = 1 if step_dir == "east" else -1
+        for k in range(n):
+            g.stair(x + k * sx, GL + k, z, STONE_STAIR, step_dir)
+            g.fill(x + k * sx, GL, z, x + k * sx, GL + k - 1, z, STONE)
+            g.fill(x + k * sx, GL + k + 1, z, x + k * sx, GL + k + 3, z, "minecraft:air")
+        tx = x + n * sx
+        g.fill(tx, GL, z, tx, walk - 1, z, STONE)
+        g.fill(tx, walk, z, tx, walk + 2, z, "minecraft:air")
+        g.fill(tx + dx, walk, z + dz, tx + dx, walk + 2, z + dz, "minecraft:air")
+    else:
+        step_dir = "south" if z < g.Z // 2 else "north"
+        sz = 1 if step_dir == "south" else -1
+        for k in range(n):
+            g.stair(x, GL + k, z + k * sz, STONE_STAIR, step_dir)
+            g.fill(x, GL, z + k * sz, x, GL + k - 1, z + k * sz, STONE)
+            g.fill(x, GL + k + 1, z + k * sz, x, GL + k + 3, z + k * sz, "minecraft:air")
+        tz = z + n * sz
+        g.fill(x, GL, tz, x, walk - 1, tz, STONE)
+        g.fill(x, walk, tz, x, walk + 2, tz, "minecraft:air")
+        g.fill(x + dx, walk, tz + dz, x + dx, walk + 2, tz + dz, "minecraft:air")

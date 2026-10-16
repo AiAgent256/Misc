@@ -35,6 +35,8 @@ def to_tag(v):
         return nbtlib.Byte(1 if v else 0)
     if isinstance(v, int):
         return Int(v)
+    if isinstance(v, list):
+        return nbtlib.List[String]([String(x) for x in v]) if all(isinstance(x, str) for x in v) else nbtlib.List([to_tag(x) for x in v])
     raise TypeError(v)
 
 
@@ -91,6 +93,8 @@ def clean_posts(g):
             here, above = g.get(x, y, z), g.get(x, y + 1, z)
             if here in ("minecraft:air",) and above in ("minecraft:air", "<void>") and g.is_solid(x, y - 1, z):
                 keep.append([x, y, z])
+            elif role == "house" and "door" in here:
+                keep.append([x, y, z])                 # a house is marked by its door
         out[role] = keep
     return out
 

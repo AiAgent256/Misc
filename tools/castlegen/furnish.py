@@ -206,7 +206,7 @@ class Dresser:
         self.used = set()
         air, solid, stairs, openish = _classes(g)
         self.solid, self.stairs, self.openish = solid, stairs, openish
-        self.clear = set()
+        self.clear = set(getattr(g, "protected_xz", set()))
         for (x, z) in room.doorways:
             for dx in (-2, -1, 0, 1, 2):
                 for dz in (-2, -1, 0, 1, 2):
@@ -223,6 +223,21 @@ class Dresser:
                     self.clear.add((x, z))
             if (x, self.y, z) in protected or (x, self.y + 1, z) in protected:
                 self.clear.add((x, z))
+            # a passage: walls on both sides along one axis. Never put anything in a passage.
+            def wallish(nx, nz):
+                if not g.inb(nx, self.y, nz):
+                    return True
+                b = g.a[nx, nz, self.y]
+                return solid[b] and not stairs[b]
+            def narrow(ax, bx, az, bz):
+                # walls within two cells on both sides, no more than two cells wide between them
+                l = 1 if wallish(x - ax, z - az) else 2 if wallish(x - bx, z - bz) else 3 if wallish(x - bx - ax, z - bz - az) else None
+                r = 1 if wallish(x + ax, z + az) else 2 if wallish(x + bx, z + bz) else 3 if wallish(x + bx + ax, z + bz + az) else None
+                return l is not None and r is not None and l + r <= 4
+            if narrow(1, 2, 0, 0) or narrow(0, 0, 1, 2):
+                self.clear.add((x, z))
+                for (dx, dz) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    self.clear.add((x + dx, z + dz))
         self.wall = {}   # cell -> facing (into the room) for cells against a solid wall
         for (x, z) in room.cells:
             if (x, z) in self.clear:
@@ -650,6 +665,34 @@ DRESSERS = {
 }
 
 
+class _Guarded:
+    """A view of the grid that refuses to place anything in a protected column (stair shafts)."""
+
+    def __init__(self, g):
+        self._g = g
+        self._p = getattr(g, "protected_xz", set())
+
+    def __getattr__(self, k):
+        return getattr(self._g, k)
+
+    def set(self, x, y, z, block, nbt=None):
+        if (x, z) in self._p:
+            return
+        self._g.set(x, y, z, block, nbt)
+
+    def lantern(self, x, y, z, hanging=True):
+        if (x, z) in self._p:
+            return
+        self._g.lantern(x, y, z, hanging)
+
+    def fill(self, x0, y0, z0, x1, y1, z1, block):
+        for x in range(min(x0, x1), max(x0, x1) + 1):
+            for z in range(min(z0, z1), max(z0, z1) + 1):
+                if (x, z) in self._p:
+                    continue
+                self._g.fill(x, y0, z, x, y1, z, block)
+
+
 def furnish(g, GL, report=None):
     """Dress every room. Returns {kind: count}."""
     protected = set()
@@ -666,7 +709,9 @@ def furnish(g, GL, report=None):
         if kind is None:
             continue
         room.kind = kind
-        d = Dresser(g, room, protected)
+        if len(room.cells) <= 12 and len(room.doorways) >= 2:
+            continue                                  # a stair head or a tower passage, not a room
+        d = Dresser(_Guarded(g), room, protected)
         DRESSERS[kind](d, room)
         counts[kind] = counts.get(kind, 0) + 1
         if report is not None:
