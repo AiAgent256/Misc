@@ -236,6 +236,8 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         }
         String rs = RecruitsCompat.sideOf(e);
         if (rs != null) return !rs.equals(side) && (isHouse() || Sides.isPlayer(rs));
+        // a wild dragon is everyone's problem
+        if (net.aiagent256.stormhold.holding.Dragons.isWild(e)) return true;
         // monsters inside or near the walls are everyone's problem; knights leave creepers to the archers
         if (e instanceof Enemy) return role().ranged || !(e instanceof Creeper);
         return false;

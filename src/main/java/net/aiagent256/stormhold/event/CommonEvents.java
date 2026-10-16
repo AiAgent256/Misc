@@ -81,6 +81,8 @@ public final class CommonEvents {
     @SubscribeEvent
     public static void death(LivingDeathEvent e) {
         if (e.getEntity() instanceof GarrisonEntity g && !g.level().isClientSide) HoldingEvents.onDeath(g);
+        if (e.getEntity().level() instanceof ServerLevel dl && net.aiagent256.stormhold.holding.Dragons.isDragon(e.getEntity()))
+            net.aiagent256.stormhold.holding.Dragons.onDeath(dl, e.getEntity(), e.getSource().getEntity());
         if (e.getEntity() instanceof net.minecraft.world.entity.npc.Villager v && v.level() instanceof ServerLevel level
                 && e.getSource().getEntity() instanceof Player killer && !killer.isCreative()) {
             HoldingManager mgr = HoldingManager.get(level);

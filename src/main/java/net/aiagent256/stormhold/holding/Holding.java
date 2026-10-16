@@ -105,6 +105,8 @@ public class Holding {
     public boolean villagersSpawned;
     public boolean bannersDirty = true;
     public boolean surroundingsDone;
+    /** Not saved: when a wild dragon was last seen at this castle. */
+    public long dragonAt;
     /** The fief: what's still to build (piece names), what stands (name + box), and the last census. */
     @Nullable public List<String> fiefPlan;
     public final List<FiefBuilding> fief = new ArrayList<>();

@@ -75,6 +75,7 @@ public final class HoldingTicker {
         }
         Builder.tick(level, mgr, h);
         Produce.tick(level, mgr, h, now);
+        if (now % 60 == 20) Dragons.watch(level, mgr, h, now);
         if (now % 200 == 0) Builder.ensureBuilder(level, h);
         greet(level, mgr, h);
         if (!h.villagersSpawned) Garrisons.spawnVillagers(level, h);
