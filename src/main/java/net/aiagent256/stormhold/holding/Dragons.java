@@ -73,7 +73,7 @@ public final class Dragons {
         }
         h.dragonAt = now;
         // the garrison turns on it: the men on the walls first, since they can reach it
-        List<GarrisonEntity> men = level.getEntitiesOfClass(GarrisonEntity.class, area, g -> g.isAlive() && !g.side.isEmpty());
+        List<GarrisonEntity> men = level.getEntitiesOfClass(GarrisonEntity.class, area, g -> g.isAlive() && !g.side().isEmpty());
         GarrisonEntity nearest = null;
         double best = Double.MAX_VALUE;
         for (GarrisonEntity g : men) {
