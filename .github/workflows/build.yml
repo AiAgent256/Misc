@@ -66,7 +66,7 @@ jobs:
           cp /tmp/logs/* .
           git add -A
           git commit -q -m "logs $SHA"
-          git push -q --force origin ci-logs
+          for i in 1 2 3 4; do git push -q --force origin ci-logs && break; sleep $((i * 5)); done
           git checkout -q -f ${{ github.sha }}
 
       - name: Publish jar to dist branch
@@ -83,4 +83,4 @@ jobs:
           cp /tmp/dist/* .
           git add -A
           git commit -q -m "build $SHA"
-          git push -q --force origin dist
+          for i in 1 2 3 4; do git push -q --force origin dist && break; sleep $((i * 5)); done
