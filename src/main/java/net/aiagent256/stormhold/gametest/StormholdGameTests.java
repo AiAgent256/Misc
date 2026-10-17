@@ -1265,7 +1265,8 @@ public class StormholdGameTests {
             var start = structure.generate(nether.registryAccess(), gen, gen.getBiomeSource(), nether.getChunkSource().randomState(),
                     nether.getStructureManager(), nether.getSeed(), cp, 0, nether, b -> true);
             if (!start.isValid()) continue;
-            BoundingBox bb = start.getBoundingBox();
+            // the start's box is inflated by the terrain smoother's margin; the pieces' boxes start at the floor
+            BoundingBox bb = start.getPieces().get(0).getBoundingBox();
             if (bb.minY() < 30 || bb.minY() > 110) throw new IllegalStateException("a Nether holdfast sited at y " + bb.minY());
             found++;
         }
