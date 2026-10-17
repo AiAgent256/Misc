@@ -746,3 +746,215 @@ def watchtower_b(seed=9):
     lamp_post(g, c - 4, W - 8, GL); lamp_post(g, c + 3, W - 8, GL)
     lamp_post(g, c - 12, 26, GL); lamp_post(g, c + 10, 26, GL)
     return g, {"name": "watchtower_b", "tier": 1, "GL": GL}
+
+
+def holdfast_c(seed=17):
+    """Tier 2 ringwork: a round curtain with four towers, a round keep in the middle, hall and lodgings round the yard."""
+    W, H, GL = 72, 56, 5
+    g = Grid(W, H, W, seed)
+    c = W // 2
+    xs, zs = g.xz()
+    rr = np.sqrt((xs - c) ** 2 + (zs - c) ** 2)
+    Ro, thick, walk = 33, 4, GL + 9
+    inside = rr <= Ro + 1.5
+    g.fill_mask(inside, 0, GL - 2, FOUND)
+    g.fill_mask(inside, GL - 1, GL - 1, PAVE)
+    g.fill_mask(inside, GL, GL + 10, AIR)
+    g.fill_mask(~inside, 0, GL - 2, FOUND)
+    g.fill_mask(~inside, GL - 1, GL - 1, "minecraft:grass_block")
+    g.fill_mask(~inside, GL, GL + 6, AIR)
+    # the ring wall and its walk
+    d, along, out = ring_grids(g, c, c, Ro)
+    curtain(g, None, None, thick, walk, GL, gallery=False, grids=(d, along, out), banners_every=12)
+    posts_on_walk(g, d, along, walk, "archer", dsel=1, every=6, offset=2)
+    ttop = walk + 7
+    for k in range(4):
+        ang = np.radians(45 + 90 * k)
+        cx, cz = int(round(c + (Ro - 1) * np.cos(ang))), int(round(c + (Ro - 1) * np.sin(ang)))
+        tx, tz = -np.sin(ang), np.cos(ang)
+        round_tower(g, cx, cz, 6, ttop, GL, floors=(walk - 1,), spiral=False, cone=(k % 2 == 0),
+                    doors=((tx, tz, walk), (-tx, -tz, walk)), banner_dirs=((round(np.cos(ang), 2), round(np.sin(ang), 2)),))
+        for y in range(walk, ttop):
+            g.set(cx + 2, y, cz, "minecraft:ladder[facing=west]")
+        g.set(cx + 2, ttop, cz, AIR)
+        for j in range(4):
+            a2 = j * np.pi / 2
+            g.mark("archer", int(round(cx + 3 * np.cos(a2))), ttop, int(round(cz + 3 * np.sin(a2))))
+    # two radial stairs, east and west, from the yard up onto the walk
+    for sgn in (1, -1):
+        for k in range(walk - GL):
+            x = c + sgn * (18 + k)
+            g.stair(x, GL + k, c, STONE_STAIR, "east" if sgn > 0 else "west")
+            g.stair(x, GL + k, c + 1, STONE_STAIR, "east" if sgn > 0 else "west")
+            for zz in (c, c + 1):
+                g.fill(x, GL, zz, x, GL + k - 1, zz, "minecraft:stone_brick_slab[type=double]") if k > 0 else None
+                g.fill(x, GL + k + 1, zz, x, GL + k + 3, zz, AIR)
+        x = c + sgn * (18 + walk - GL)
+        g.fill(x, GL, c, x + sgn * 2, walk - 1, c + 1, STONE)
+        g.fill(x, walk, c, x + sgn * 2, walk + 2, c + 1, AIR)
+    # gate: a gap in the ring on the south between two drum towers, a portcullis across it
+    for tx in (c - 7, c + 6):
+        round_tower(g, tx, c + Ro - 2, 4, walk + 5, GL, floors=(walk - 1,), spiral=False, cone=True, t=2,
+                    doors=((1, 0, walk), (-1, 0, walk)))
+    g.fill(c - 2, GL, c + Ro - thick - 1, c + 1, GL + 6, c + Ro + 2, AIR)
+    g.fill(c - 2, GL - 1, c + Ro - thick - 1, c + 1, GL - 1, W - 1, ROAD)
+    g.fill(c - 2, GL + 7, c + Ro - thick, c + 1, walk - 1, c + Ro, STONE)        # the gate's lintel and the walk over it
+    g.fill(c - 2, walk, c + Ro - thick, c + 1, walk + 2, c + Ro, AIR)
+    portcullis_plane(g, c - 2, c + 1, GL, 6, c + Ro - 1)
+    g.mark("gate", c - 1, GL, W - 1)
+    g.mark("knight", c - 4, GL, c + Ro - 7); g.mark("knight", c + 3, GL, c + Ro - 7)
+    g.mark("captain", c - 1, GL, c + Ro - 9); g.mark("rally", c - 1, GL, c + Ro - 11)
+    # the keep: a round tower twenty-three across, hall below, lord's floor above, treasury under the roof
+    kx, kz, kr = c, c - 6, 11
+    ktop = GL + 30
+    kfloors = (GL + 8, GL + 16, GL + 23)
+    round_tower(g, kx, kz, kr, ktop, GL, floors=kfloors, spiral=True, doors=((0, 1, GL),),
+                banner_dirs=((0, 1), (1, 0), (-1, 0)))
+    for fy in kfloors:
+        for ang in (0.0, np.pi, np.pi / 2):
+            g.fill(int(round(kx + (kr - 1) * np.cos(ang))), fy + 2, int(round(kz + (kr - 1) * np.sin(ang))),
+                   int(round(kx + (kr - 1) * np.cos(ang))), fy + 3, int(round(kz + (kr - 1) * np.sin(ang))), GLASS)
+    g.fill(kx - 4, GL, kz - 7, kx + 4, GL, kz - 6, "minecraft:polished_deepslate")
+    g.stair(kx - 1, GL + 1, kz - 7, "minecraft:dark_oak_stairs", "south"); g.stair(kx, GL + 1, kz - 7, "minecraft:dark_oak_stairs", "south")
+    g.wall_banner(kx - 2, GL + 5, kz - 8, "south"); g.wall_banner(kx + 2, GL + 5, kz - 8, "south")
+    g.fill(kx - 1, GL, kz - 5, kx + 1, GL, kz + 6, "minecraft:red_carpet")
+    g.mark("lord", kx, GL, kz - 5)
+    g.mark("war_table", kx - 5, GL, kz - 5)
+    for (x, z) in ((kx - 6, kz + 2), (kx + 6, kz + 2)):
+        g.mark("knight", x, GL, z)
+    for ang in (np.pi / 4, 3 * np.pi / 4):
+        g.chest(int(round(kx + 6 * np.cos(ang))), kfloors[1] + 1, int(round(kz + 6 * np.sin(ang))), "south", LOOT + "holdfast_treasury")
+    for ang in (5 * np.pi / 4, 7 * np.pi / 4):
+        g.bed(int(round(kx + 6 * np.cos(ang))), kfloors[0] + 1, int(round(kz + 6 * np.sin(ang))), "north", "gray")
+    g.bed(kx + 5, kfloors[2] + 1, kz, "east", "red")
+    g.mark("banner_stand", kx + 6, ktop, kz)
+    for ang in (0.0, np.pi / 2, np.pi, 3 * np.pi / 2):
+        g.mark("archer", int(round(kx + 8 * np.cos(ang))), ktop, int(round(kz + 8 * np.sin(ang))))
+    # round the yard: barracks and a lodging west, stable and smithy east, a well on the way to the gate
+    building(g, c - 27, c + 4, c - 17, c + 18, GL, 6, "z", door_cells=((c - 17, c + 11),), chimney=(c - 25, c + 6))
+    for z in range(c + 6, c + 17, 3):
+        g.bed(c - 26, GL, z, "west", "brown")
+    g.barrel(c - 18, GL, c + 17, LOOT + "castle_barracks", facing="west")
+    building(g, c - 24, c - 18, c - 14, c - 8, GL, 5, "z", door_cells=((c - 14, c - 13),), chimney=(c - 22, c - 16))
+    for z in range(c - 16, c - 9, 3):
+        g.bed(c - 23, GL, z, "west", "brown")
+    building(g, c + 17, c + 4, c + 27, c + 16, GL, 5, "z")
+    g.fill(c + 17, GL, c + 6, c + 17, GL + 2, c + 14, AIR)
+    g.set(c + 26, GL, c + 8, "minecraft:hay_block[axis=y]"); g.set(c + 26, GL, c + 13, "minecraft:hay_block[axis=y]")
+    building(g, c + 14, c - 18, c + 24, c - 8, GL, 5, "z", door_cells=((c + 14, c - 13),), chimney=(c + 22, c - 16))
+    g.set(c + 16, GL, c - 16, "minecraft:anvil[facing=north]"); g.set(c + 16, GL, c - 10, "minecraft:blast_furnace[facing=north]")
+    g.set(c + 20, GL, c - 16, "minecraft:grindstone[face=floor,facing=north]")
+    g.fill(c - 6, GL - 3, c + 16, c - 4, GL - 1, c + 18, "minecraft:stone_bricks")
+    g.set(c - 5, GL - 1, c + 17, "minecraft:water"); g.set(c - 5, GL - 2, c + 17, "minecraft:water")
+    g.set(c - 5, GL, c + 17, "minecraft:oak_fence"); g.set(c - 5, GL + 1, c + 17, "minecraft:oak_fence")
+    g.set(c - 5, GL + 2, c + 17, "minecraft:dark_oak_slab[type=bottom]")
+    for (x, z) in ((c - 12, c + 10), (c + 11, c + 10), (c - 8, c + 20), (c + 7, c + 20), (c - 14, c - 4), (c + 13, c - 4),
+                   (c - 1, c + 14), (c - 20, c + 2), (c + 19, c + 2)):
+        g.mark("knight", x, GL, z)
+    lamp_post(g, c - 4, c + 22, GL); lamp_post(g, c + 3, c + 22, GL)
+    lamp_post(g, c - 10, c + 6, GL); lamp_post(g, c + 9, c + 6, GL)
+    return g, {"name": "holdfast_c", "tier": 2, "GL": GL}
+
+
+def watchtower_c(seed=19):
+    """Tier 1 motte and bailey: a square tower on an earth mound, a stair cut up its face, a palisaded bailey below."""
+    W, H, GL = 48, 46, 4
+    g = Grid(W, H, W, seed)
+    xs, zs = g.xz()
+    c = W // 2
+    g.fill(0, 0, 0, W - 1, GL - 2, W - 1, FOUND)
+    g.fill(0, GL - 1, 0, W - 1, GL - 1, W - 1, Mix(("minecraft:grass_block", 50), ("minecraft:coarse_dirt", 25),
+                                                     ("minecraft:dirt_path", 15), ("minecraft:gravel", 10)))
+    g.fill(0, GL, 0, W - 1, GL + 8, W - 1, AIR)
+    # the palisade and its platform, as at the timber tower
+    pal = rect_ring(g, 2, 2, W - 3, W - 3, 1)
+    g.fill_mask(pal, GL - 1, GL + 4, "minecraft:spruce_log[axis=y]")
+    g.fill_mask(pal & (np.mod(xs + zs, 2) == 0), GL + 5, GL + 5, "minecraft:spruce_fence")
+    plat = rect_ring(g, 3, 3, W - 4, W - 4, 2)
+    g.fill_mask(plat, GL + 2, GL + 2, "minecraft:spruce_planks")
+    g.fill_mask(plat & (np.mod(xs, 4) == 0) & (np.mod(zs, 4) == 0), GL, GL + 1, "minecraft:spruce_fence")
+    g.fill_mask(rect_ring(g, 5, 5, W - 6, W - 6, 1), GL + 3, GL + 3, "minecraft:spruce_fence")
+    gx0, gx1 = c - 2, c + 1
+    g.fill(gx0, GL - 1, W - 3, gx1, GL + 5, W - 3, AIR)
+    g.fill(gx0 - 1, GL, W - 6, gx1 + 1, GL + 4, W - 4, AIR)
+    g.fill(gx0, GL - 1, W - 8, gx1, GL - 1, W - 1, "minecraft:dirt_path")
+    for x in (gx0 - 1, gx1 + 1):
+        g.fill(x, GL - 1, W - 4, x, GL + 6, W - 3, "minecraft:spruce_log[axis=y]")
+    g.fill(gx0 - 1, GL + 7, W - 4, gx1 + 1, GL + 7, W - 3, "minecraft:spruce_log[axis=x]")
+    g.fill(gx0, GL + 5, W - 4, gx1, GL + 6, W - 4, "minecraft:spruce_planks")
+    portcullis_plane(g, gx0, gx1, GL, 5, W - 3)
+    g.mark("gate", c, GL, W - 1)
+    for sx in (gx0 - 4, gx1 + 4):
+        for k in range(3):
+            z = W - 8 + k
+            g.stair(sx, GL + k, z, "minecraft:spruce_stairs", "south")
+            g.fill(sx, GL - 1, z, sx, GL + k - 1, z, "minecraft:spruce_log[axis=y]") if k > 0 else None
+            g.fill(sx, GL + k + 1, z, sx, GL + 5, z, AIR)
+        g.set(sx, GL + 3, W - 6, AIR)
+    for (x, z) in ((8, 4), (c, 4), (W - 9, 4), (4, 12), (4, c), (4, W - 12), (W - 5, 12), (W - 5, c), (W - 5, W - 12),
+                   (10, W - 5), (W - 11, W - 5)):
+        g.mark("archer", x, GL + 3, z)
+    # the motte: an earth mound, radius eighteen at the foot and ten at the top, six high, turfed
+    mx, mz = c, c - 8
+    MT = GL + 6
+    def mr(k):
+        return 18 - (k * 8) // 6
+    for k in range(7):
+        g.fill_mask(disk(g, mx, mz, mr(k)), GL - 1 + k, GL - 1 + k, "minecraft:dirt")
+    for k in range(7):
+        r2 = mr(k + 1) if k < 6 else 0
+        g.fill_mask(disk(g, mx, mz, mr(k)) & ~disk(g, mx, mz, r2), GL - 1 + k, GL - 1 + k,
+                    Mix(("minecraft:grass_block", 75), ("minecraft:moss_block", 15), ("minecraft:coarse_dirt", 10)))
+    g.fill_mask(disk(g, mx, mz, 10), MT - 1, MT - 1, Mix(("minecraft:grass_block", 60), ("minecraft:dirt_path", 40)))
+    # a stair cut into the south face of the mound, two wide, from the bailey to the top
+    for k in range(6):
+        z = mz + 18 - k
+        for x in (mx - 1, mx):
+            g.stair(x, GL + k, z, "minecraft:spruce_stairs", "north")
+            g.fill(x, GL - 1, z, x, GL + k - 1, z, "minecraft:dirt") if k > 0 else None
+            g.fill(x, GL + k + 1, z, x, GL + k + 3, z, AIR)
+    g.fill(mx - 1, MT - 1, mz + 10, mx, MT - 1, mz + 12, "minecraft:dirt_path")
+    g.fill(mx - 1, MT, mz + 10, mx, MT + 2, mz + 12, AIR)
+    # the tower on top: fourteen square, a stair hall inside, four floors
+    tx0, tz0, tx1, tz1 = mx - 7, mz - 7, mx + 6, mz + 6
+    top = MT + 24
+    square_tower(g, tx0, tz0, tx1, tz1, top, MT, floors=(MT + 7, MT + 14), stair="north",
+                 banner_sides=("south", "east", "west"))
+    g.fill(tx0 - 1, 0, tz0 - 1, tx1 + 1, MT - 2, tz1 + 1, STONE)       # footing down into the mound
+    for (cx, cz) in ((tx0 - 1, tz0 - 1), (tx1 + 1, tz0 - 1), (tx0 - 1, tz1 + 1), (tx1 + 1, tz1 + 1)):
+        bartizan(g, cx, cz, top + 1)
+    g.fill(mx - 1, MT, tz1 - 3, mx, MT + 2, tz1 + 1, AIR)                  # the door, through the wall and the plinth
+    g.fill(mx - 1, MT - 1, tz1 - 3, mx, MT - 1, tz1 + 1, FLOOR_STONE)
+    g.mark("banner_stand", tx0 + 3, top, tz1 - 3)
+    g.mark("lord", tx1 - 4, MT + 15, tz0 + 8)
+    g.stair(tx1 - 3, MT + 15, tz0 + 8, "minecraft:dark_oak_stairs", "west")
+    g.mark("war_table", tx0 + 4, MT + 15, tz0 + 8)
+    g.chest(tx0 + 3, MT + 15, tz0 + 4, "east", LOOT + "watchtower_treasury")
+    g.chest(tx0 + 3, MT + 15, tz0 + 6, "east", LOOT + "watchtower_treasury")
+    g.bed(tx0 + 3, MT + 8, tz0 + 9, "east", "red")
+    for (x, z) in ((tx0 + 3, tz0 + 3), (tx1 - 3, tz1 - 3), (tx0 + 3, tz1 - 3)):
+        g.mark("archer", x, top, z)
+    g.mark("captain", mx, MT, mz + 9)
+    # the bailey, round the foot of the mound: barracks, stable, well, smithy, a campfire
+    building(g, 7, 34, 16, 43, GL, 5, "x", door_cells=((16, 38),), chimney=(8, 35))
+    for z in range(36, 43, 3):
+        g.bed(8, GL, z, "west", "brown")
+    g.barrel(15, GL, 42, LOOT + "castle_barracks", facing="west")
+    building(g, W - 16, 34, W - 7, 43, GL, 5, "z", door_cells=((W - 16, 38),))
+    g.fill(W - 16, GL, 36, W - 16, GL + 2, 41, AIR)
+    for z in (36, 41):
+        g.set(W - 8, GL, z, "minecraft:hay_block[axis=y]")
+    g.fill(41, GL - 3, 23, 43, GL - 1, 25, "minecraft:stone_bricks")
+    g.set(42, GL - 1, 24, "minecraft:water"); g.set(42, GL - 2, 24, "minecraft:water")
+    g.set(42, GL, 24, "minecraft:oak_fence"); g.set(42, GL + 1, 24, "minecraft:oak_fence")
+    g.set(42, GL + 2, 24, "minecraft:dark_oak_slab[type=bottom]")
+    g.set(6, GL, 22, "minecraft:campfire[lit=true,signal_fire=false]")
+    for (x, z) in ((5, 22), (7, 22), (6, 23)):
+        g.stair(x, GL, z, "minecraft:spruce_stairs", "north")
+    g.set(43, GL, 28, "minecraft:anvil[facing=north]"); g.set(43, GL, 30, "minecraft:blast_furnace[facing=west]")
+    for (x, z) in ((5, 8), (41, 8), (19, 38), (30, 38), (6, 27), (41, 32), (24, 36), (16, 40), (32, 40)):
+        g.mark("knight", x, GL, z)
+    g.mark("rally", c, GL, 38)
+    lamp_post(g, c - 4, W - 8, GL); lamp_post(g, c + 3, W - 8, GL)
+    lamp_post(g, 10, 30, GL); lamp_post(g, 36, 32, GL)
+    return g, {"name": "watchtower_c", "tier": 1, "GL": GL}

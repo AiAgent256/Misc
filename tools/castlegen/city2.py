@@ -260,11 +260,12 @@ def canal_city(seed=91):
         for z in range(104, 119, 4):
             g.set(x0 - 1, GL + 3, z, "minecraft:lantern[hanging=true]") if g.get(x0 - 1, GL + 4, z) != AIR else None
     for x in (110, 146):
-        square_tower(g, x, 108, x + 9, 117, iw + 6, GL2, floors=(GL2 + 8, iw - 1), spiral_at=(x + 4, 112))
-        g.fill(x, iw, 111, x + 2, iw + 1, 113, AIR); g.fill(x + 7, iw, 111, x + 9, iw + 1, 113, AIR)
-        g.fill(x, iw - 1, 111, x + 2, iw - 1, 113, STONE); g.fill(x + 7, iw - 1, 111, x + 9, iw - 1, 113, STONE)
-        g.fill(x + 4, GL2, 107, x + 5, GL2 + 2, 109, AIR)
-        g.fill(x + 4, GL2 - 1, 107, x + 5, GL2 - 1, 109, FLOOR_STONE)
+        # fourteen square, so the stair inside runs two wide
+        square_tower(g, x - 2, 106, x + 11, 119, iw + 6, GL2, floors=(GL2 + 8, iw - 1), spiral_at=(x + 5, 113))
+        g.fill(x - 2, iw, 111, x + 1, iw + 1, 113, AIR); g.fill(x + 8, iw, 111, x + 11, iw + 1, 113, AIR)
+        g.fill(x - 2, iw - 1, 111, x + 1, iw - 1, 113, STONE); g.fill(x + 8, iw - 1, 111, x + 11, iw - 1, 113, STONE)
+        g.fill(x + 4, GL2, 105, x + 5, GL2 + 2, 109, AIR)
+        g.fill(x + 4, GL2 - 1, 105, x + 5, GL2 - 1, 109, FLOOR_STONE)
         g.mark("crossbowman", x + 4, iw + 6, 112)
     # inner gate: the barbican with the grand stair climbing from the basin head
     g.fill(119, 0, 104, 136, iw + 4, 114, STONE)

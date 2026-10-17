@@ -34,8 +34,8 @@ import java.util.UUID;
 public class StormholdGameTests {
     private static final String[] LAYOUTS = {"great_castle_a", "great_castle_b", "great_castle_c", "holdfast_a",
             "holdfast_b", "watchtower_a", "watchtower_b", "great_castle_a2", "great_castle_b2", "great_castle_c2",
-            "holdfast_a2", "holdfast_b2", "watchtower_a2", "watchtower_b2", "town_walled", "town_cross", "town_green",
-            "great_city", "canal_city"};
+            "holdfast_a2", "holdfast_b2", "watchtower_a2", "watchtower_b2", "holdfast_c", "holdfast_c2", "watchtower_c",
+            "watchtower_c2", "town_walled", "town_cross", "town_green", "great_city", "canal_city"};
 
     @GameTest(template = "arena")
     public static void castleDataLoads(GameTestHelper g) {
@@ -52,7 +52,7 @@ public class StormholdGameTests {
             if (DataRegistries.theme(t).isEmpty()) throw new IllegalStateException("missing theme " + t);
         }
         // every keep has its crypt: the marker the generator leaves at the founder's tomb
-        for (String n : new String[]{"holdfast_a", "holdfast_b", "great_castle_a", "great_castle_b", "great_castle_c", "great_city", "canal_city"}) {
+        for (String n : new String[]{"holdfast_a", "holdfast_b", "holdfast_c", "great_castle_a", "great_castle_b", "great_castle_c", "great_city", "canal_city"}) {
             var crypt = DataRegistries.layout(n).extras.get("crypt");
             if (crypt == null || crypt.isEmpty()) throw new IllegalStateException("no crypt under " + n);
         }

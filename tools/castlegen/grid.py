@@ -326,7 +326,7 @@ def dogleg_stair(g, x0, z0, y_start, y_end, step_block, core_block, floor_block,
     # open side the next dog-leg starts from)
     full, virtual = [lv[0]], set()
     for ya, yb in zip(lv, lv[1:]):
-        k = -(-(yb - ya) // 8)
+        k = -(-(yb - ya) // 9)
         for i in range(1, k):
             lvl = ya + round((yb - ya) * i / k)
             full.append(lvl)
@@ -345,9 +345,8 @@ def dogleg_stair(g, x0, z0, y_start, y_end, step_block, core_block, floor_block,
             for v in range(0, 4):
                 x, z = m(u, v)
                 g.set(x, l - 1, z, floor_block)
-        for u in range(3, 7):
-            x, z = m(u, 0)
-            g.set(x, l - 1, z, floor_block)
+        x, z = m(3, 0)
+        g.set(x, l - 1, z, floor_block)
         if l in virtual:
             # the quarter landing hangs in the storey: a ledge and a rail along its open sides
             for (u, v) in [(-1, v) for v in range(0, 4)] + [(u, -1) for u in range(0, 7)]:
@@ -361,8 +360,10 @@ def dogleg_stair(g, x0, z0, y_start, y_end, step_block, core_block, floor_block,
         g.fill(x, y_start - 1, z, x, y_end + 1, z, core_block)
     for ya, yb in zip(lv, lv[1:]):
         h = yb - ya
-        # the top tread of flight A needs two clear above it under the next storey's lane A floor
-        na = max(0, min(4, h - 3))
+        # flight A is two to four steps: its top tread needs two clear under the next storey's lane A floor,
+        # and flight B's footing must clear the flight below it. Flight B may run five, its last tread
+        # flush with the floor in the row before the well.
+        na = max(2, min(4, h - 3))
         nb = h - na
         yl = ya + na
         # flight A: up lane A
@@ -390,9 +391,9 @@ def dogleg_stair(g, x0, z0, y_start, y_end, step_block, core_block, floor_block,
             v = 3 - j
             for u in range(4, 7):
                 x, z = m(u, v)
-                if v >= 0:
+                if v >= -1:
                     g.set(x, yl + j, z, f"{step_block}[facing={down},half=bottom]")
-                    if j > 0:
+                    if j > 0 and v >= 0:
                         g.fill(x, max(yl, yl + j - 2), z, x, yl + j - 1, z, core_block)
         # a light on the spine at the landing
         x, z = m(3, 3)

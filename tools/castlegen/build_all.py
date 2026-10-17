@@ -31,12 +31,13 @@ LAYOUT_DIR = os.path.join(ROOT, "src/main/resources/data/stormhold/castle_layout
 
 
 LAYOUTS = (castle.great_castle_a, castle2.great_castle_b, castle2.great_castle_c,
-           castle.holdfast_a, castle2.holdfast_b, castle.watchtower_a, castle2.watchtower_b, city.great_city, city2.canal_city,
+           castle.holdfast_a, castle2.holdfast_b, castle2.holdfast_c, castle.watchtower_a, castle2.watchtower_b, castle2.watchtower_c, city.great_city, city2.canal_city,
            market_town.town_walled, market_town.town_cross, market_town.town_green)
 # A second build of each castle with a different seed, roof style and temper, so two castles of the same
 # plan don't read as copies. The city is one of a kind.
 VARIANTS = {"great_castle_a": ("hoard", 2), "great_castle_b": ("spire", 3), "great_castle_c": ("low", 1),
-            "holdfast_a": ("pyramid", 4), "holdfast_b": ("hoard", 2), "watchtower_a": ("flat", 3), "watchtower_b": ("spire", 1)}
+            "holdfast_a": ("pyramid", 4), "holdfast_b": ("hoard", 2), "holdfast_c": ("spire", 3),
+            "watchtower_a": ("flat", 3), "watchtower_b": ("spire", 1), "watchtower_c": ("hoard", 2)}
 
 
 def builds():

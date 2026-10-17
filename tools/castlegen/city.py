@@ -415,12 +415,12 @@ def keep(g, GL3):
     tx0, tz0, tx1, tz1 = 146, 28, 164, 46
     dtop = GL3 + 56
     floors = tuple(range(GL3 + 10, dtop - 6, 10))
-    square_tower(g, tx0, tz0, tx1, tz1, dtop, GL3, floors=floors, spiral_at=(152, 34), t=4,
+    square_tower(g, tx0, tz0, tx1, tz1, dtop, GL3, floors=floors, stair="north", t=4,
                  banner_sides=("north", "south", "east", "west"))
     for (cx2, cz2) in ((tx0 - 1, tz0 - 1), (tx1 + 1, tz0 - 1), (tx0 - 1, tz1 + 1), (tx1 + 1, tz1 + 1)):
         bartizan(g, cx2, cz2, dtop + 1, r=3)
-    carve(g, 150, dtop, 32, 160, dtop + 1, 42, STONE)                  # stage plinth, clear of the stair head
-    stepped_top(g, 155, 37, 8, dtop + 1, stages=2, cone=True, posts="crossbowman")
+    carve(g, 147, dtop, 29, 163, dtop, 45, STONE)                      # stage plinth, one step up, clear of the stair hall
+    stepped_top(g, 155, 37, 9, dtop + 1, stages=2, cone=True, posts="crossbowman")
     g.fill(tx0 - 1, GL3, 38, tx0 + 3, GL3 + 2, 40, AIR)                 # the door, through the whole wall
     for fy in floors:
         g.fill(tx0, fy + 1, 30, tx0, fy + 2, 34, AIR) if False else None
@@ -435,13 +435,15 @@ def keep(g, GL3):
     g.mark("banner_stand", 162, dtop, 44)
     for (x, z) in ((149, 31), (161, 31), (149, 44)):
         g.mark("crossbowman", x, dtop, z)
+    # the treasury keeps clear of the stair hall in the north-east corner
     for z in range(33, 44, 3):
-        g.chest(tx1 - 5, floors[0] + 1, z, "west", LOOT + "castle_treasury")
         g.chest(tx0 + 5, floors[0] + 1, z, "east", LOOT + "castle_treasury")
-    g.fill(156, floors[0] + 1, 38, 160, floors[0] + 1, 42, "minecraft:gold_block")
-    g.fill(157, floors[0] + 2, 39, 159, floors[0] + 2, 41, "minecraft:gold_block")
+    for x in range(tx0 + 5, tx0 + 9):
+        g.chest(x, floors[0] + 1, tz1 - 4, "north", LOOT + "castle_treasury")
+    g.fill(150, floors[0] + 1, 40, 153, floors[0] + 1, 43, "minecraft:gold_block")
+    g.fill(151, floors[0] + 2, 41, 152, floors[0] + 2, 42, "minecraft:gold_block")
     for z in range(33, 44, 4):
-        g.bed(tx1 - 6, floors[1] + 1, z, "east", "red"); g.bed(tx0 + 7, floors[2] + 1, z, "west", "purple")
+        g.bed(tx0 + 6, floors[1] + 1, z, "west", "red"); g.bed(tx0 + 7, floors[2] + 1, z, "west", "purple")
     # the Tower of the Hand: slender, taller than the walls
     ring_tower(g, 154, 55, 6, GL3 + 40, GL3, stages=1, cone=True, posts="archer", doors=((0, 1, GL3),))
     # godswood, kitchens, stables, a well
@@ -769,11 +771,12 @@ def great_city(seed=77):
         for z in range(104, 119, 4):
             g.set(x0 - 1, GL + 3, z, "minecraft:lantern[hanging=true]") if g.get(x0 - 1, GL + 4, z) != AIR else None
     for x in (110, 146):
-        square_tower(g, x, 108, x + 9, 117, iw + 6, GL2, floors=(GL2 + 8, iw - 1), spiral_at=(x + 4, 112))
-        g.fill(x, iw, 111, x + 2, iw + 1, 113, AIR); g.fill(x + 7, iw, 111, x + 9, iw + 1, 113, AIR)
-        g.fill(x, iw - 1, 111, x + 2, iw - 1, 113, STONE); g.fill(x + 7, iw - 1, 111, x + 9, iw - 1, 113, STONE)
-        g.fill(x + 4, GL2, 107, x + 5, GL2 + 2, 109, AIR)                 # door from the upper city
-        g.fill(x + 4, GL2 - 1, 107, x + 5, GL2 - 1, 109, FLOOR_STONE)
+        # fourteen square, so the stair inside runs two wide
+        square_tower(g, x - 2, 106, x + 11, 119, iw + 6, GL2, floors=(GL2 + 8, iw - 1), spiral_at=(x + 5, 113))
+        g.fill(x - 2, iw, 111, x + 1, iw + 1, 113, AIR); g.fill(x + 8, iw, 111, x + 11, iw + 1, 113, AIR)
+        g.fill(x - 2, iw - 1, 111, x + 1, iw - 1, 113, STONE); g.fill(x + 8, iw - 1, 111, x + 11, iw - 1, 113, STONE)
+        g.fill(x + 4, GL2, 105, x + 5, GL2 + 2, 109, AIR)                 # door from the upper city
+        g.fill(x + 4, GL2 - 1, 105, x + 5, GL2 - 1, 109, FLOOR_STONE)
         g.mark("crossbowman", x + 4, iw + 6, 112)
     # inner gate on the avenue: a barbican with the grand stair climbing to it
     g.fill(119, 0, 104, 136, iw + 4, 114, STONE)

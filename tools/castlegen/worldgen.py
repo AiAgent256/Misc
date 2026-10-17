@@ -8,14 +8,14 @@ TIERS = {
     "great_castle": {"layouts": ["great_castle_a", "great_castle_b", "great_castle_c",
                                  "great_castle_a2", "great_castle_b2", "great_castle_c2"],
                      "spacing": 64, "separation": 28, "salt": 718213044},
-    "holdfast": {"layouts": ["holdfast_a", "holdfast_b", "holdfast_a2", "holdfast_b2"], "spacing": 44, "separation": 18, "salt": 515870611},
-    "watchtower": {"layouts": ["watchtower_a", "watchtower_b", "watchtower_a2", "watchtower_b2"], "spacing": 30, "separation": 12, "salt": 93011254},
+    "holdfast": {"layouts": ["holdfast_a", "holdfast_b", "holdfast_c", "holdfast_a2", "holdfast_b2", "holdfast_c2"], "spacing": 44, "separation": 18, "salt": 515870611},
+    "watchtower": {"layouts": ["watchtower_a", "watchtower_b", "watchtower_c", "watchtower_a2", "watchtower_b2", "watchtower_c2"], "spacing": 30, "separation": 12, "salt": 93011254},
     # the market towns between the castles: commoner, closer together, on flat ground
     "town": {"layouts": ["town_walled", "town_cross", "town_green"], "spacing": 36, "separation": 14, "salt": 611290377},
     # one capital per house region (1536 blocks); it levels a lot of ground, so it tolerates rough terrain
     "great_city": {"layouts": ["great_city", "canal_city"], "spacing": 96, "separation": 48, "salt": 402911733, "max_slope": 36},
     # the Nether holdfast: the holdfast plans in blackstone and nether brick, sited on the floor of the Nether
-    "nether_holdfast": {"layouts": ["holdfast_a", "holdfast_b", "holdfast_a2", "holdfast_b2"], "spacing": 40, "separation": 16,
+    "nether_holdfast": {"layouts": ["holdfast_a", "holdfast_b", "holdfast_c", "holdfast_a2", "holdfast_b2", "holdfast_c2"], "spacing": 40, "separation": 16,
                         "salt": 884120977, "themes": ["nether"], "nether": True, "max_slope": 24},
 }
 # Castles keep clear of these (and smaller castles keep clear of bigger ones). Siting shifts a castle
