@@ -82,7 +82,7 @@ def great_castle_a(seed=7):
     # ---------------- D-towers along the curtain ----------------
     for side in ("north", "south", "west", "east"):
         for pos in (36, 91):
-            d_tower(g, side, pos, a, b, walk, GL)
+            d_tower(g, side, pos, a, b, walk, GL, r=7)
 
     # ---------------- corner towers ----------------
     ttop = walk + 12
@@ -91,11 +91,11 @@ def great_castle_a(seed=7):
                          (a + 3, b - 3, ((-0.7, 0.7),)), (b - 3, b - 3, ((0.7, 0.7),))):
         sx = 1 if cx < W / 2 else -1
         sz = 1 if cz < W / 2 else -1
-        round_tower(g, cx, cz, 9, ttop, GL, floors=tfloors,
+        round_tower(g, cx, cz, 11, ttop, GL, floors=tfloors,
                     doors=((sx, 0, walk), (0, sz, walk), (sx, 0, GL + 9), (0, sz, GL + 9), (sx * 0.7, sz * 0.7, GL)),
-                    banner_dirs=bd, wide=False)      # the stair turret above sits on a wide shaft's corner
-        # stair turret rising above the roof platform on the outer side
-        tx, tz = cx - 4 * sx, cz - 4 * sz
+                    banner_dirs=bd)
+        # stair turret rising above the roof platform on the outer corner, clear of the stair shaft below
+        tx, tz = cx - 6 * sx, cz - 6 * sz
         g.fill_mask(disk(g, tx, tz, 3), ttop, ttop + 7, STONE)
         g.fill_mask(disk(g, tx, tz, 2), ttop, ttop + 6, "minecraft:air")
         g.fill(tx + sx * 2, ttop, tz, tx + sx * 3, ttop + 1, tz, "minecraft:air")
@@ -104,28 +104,28 @@ def great_castle_a(seed=7):
         cone_roof(g, tx, tz, 3, ttop + 8, ROOF)
         for k in range(8):
             ang = k * np.pi / 4
-            px, pz = int(round(cx + 6 * np.cos(ang))), int(round(cz + 6 * np.sin(ang)))
+            px, pz = int(round(cx + 8 * np.cos(ang))), int(round(cz + 8 * np.sin(ang)))
             if (px - tx) ** 2 + (pz - tz) ** 2 > 16:
                 g.mark("archer", px, ttop, pz)
 
     # ---------------- mid towers (W, E, N) ----------------
     mtop = walk + 8
     mf = (GL + 8, GL + 16, walk - 1)
-    for (x0, z0, x1, z1, sp, bs) in ((a - 4, 57, a + 8, 69, (a + 3, 63), ("west",)),
-                                     (b - 8, 57, b + 4, 69, (b - 3, 63), ("east",)),
-                                     (57, a - 4, 69, a + 8, (63, a + 3), ("north",))):
+    for (x0, z0, x1, z1, sp, bs) in ((a - 8, 55, a + 8, 71, (a, 63), ("west",)),
+                                     (b - 8, 55, b + 8, 71, (b, 63), ("east",)),
+                                     (55, a - 8, 71, a + 8, (63, a), ("north",))):
         square_tower(g, x0, z0, x1, z1, mtop, GL, floors=mf, spiral_at=sp, banner_sides=bs)
         # doors onto the wall walk and gallery on both sides
         if x0 < W / 2 and z0 > 20:  # west
             for (za, zb) in ((z0, z0 + 2), (z1 - 2, z1)):
                 for y in (walk, GL + 9):
                     g.fill(a + 1, y, za, a + 4, y + 1, zb, "minecraft:air")
-            g.fill(a + 6, GL, 62, a + 8, GL + 2, 64, "minecraft:air")
+            g.fill(a + 5, GL, 61, a + 8, GL + 2, 64, "minecraft:air")
         elif x0 > W / 2:  # east
             for (za, zb) in ((z0, z0 + 2), (z1 - 2, z1)):
                 for y in (walk, GL + 9):
                     g.fill(b - 4, y, za, b - 1, y + 1, zb, "minecraft:air")
-            g.fill(b - 8, GL, 62, b - 6, GL + 2, 64, "minecraft:air")
+            g.fill(b - 8, GL, 61, b - 5, GL + 2, 64, "minecraft:air")
         else:  # north
             for (xa, xb) in ((x0, x0 + 2), (x1 - 2, x1)):
                 for y in (walk, GL + 9):
@@ -202,20 +202,20 @@ def great_castle_a(seed=7):
         g.mark("archer", x, iwalk, iw_z1 - 1)
     # corner towers of the inner ward
     for cx in (iw_x0 + 1, iw_x1 - 1):
-        round_tower(g, cx, iw_z1 - 1, 5, iwalk + 6, GL, floors=(iwalk - 1,), spiral=False, cone=True,
+        round_tower(g, cx, iw_z1 - 1, 6, iwalk + 6, GL, floors=(iwalk - 1,), spiral=False, cone=True,
                     doors=((1 if cx < 64 else -1, 0, iwalk), (0, -1, iwalk)))
     # inner gatehouse
     igx0, igx1 = 62, 66
-    for (x0, x1) in ((53, 61), (67, 75)):
-        square_tower(g, x0, iw_z1 - 6, x1, iw_z1 + 4, iwalk + 7, GL, floors=(iwalk - 1,),
+    for (x0, x1) in ((49, 61), (67, 79)):
+        square_tower(g, x0, iw_z1 - 6, x1, iw_z1 + 6, iwalk + 7, GL, floors=(iwalk - 1,),
                      spiral_at=((x0 + x1) // 2, iw_z1 - 1), banner_sides=("south",))
         g.mark("crossbowman", x0 + 1, iwalk + 7, iw_z1 + 3)
         g.mark("crossbowman", x1 - 1, iwalk + 7, iw_z1 + 3)
         # door from the tower onto the inner wall-walk
         if x0 < 64:
-            g.fill(x0, iwalk, iw_z1 - 2, x0 + 1, iwalk + 1, iw_z1 - 1, "minecraft:air")
+            g.fill(x0 - 1, iwalk, iw_z1 - 2, x0 + 3, iwalk + 1, iw_z1 - 1, "minecraft:air")
         else:
-            g.fill(x1 - 1, iwalk, iw_z1 - 2, x1, iwalk + 1, iw_z1 - 1, "minecraft:air")
+            g.fill(x1 - 3, iwalk, iw_z1 - 2, x1 + 1, iwalk + 1, iw_z1 - 1, "minecraft:air")
     g.fill(igx0 - 1, 0, iw_z1 - 4, igx1 + 1, iwalk + 2, iw_z1 + 2, STONE)
     pointed_arch(g, igx0, igx1, GL, 7, iw_z1 - 4, iw_z1 + 2)
     portcullis_plane(g, igx0, igx1, GL, 7, iw_z1 + 2)
@@ -223,7 +223,7 @@ def great_castle_a(seed=7):
     g.mark("captain", 64, GL, iw_z1 - 6)
     g.mark("rally", 64, GL, iw_z1 - 7)
     # guardrooms: the gate passage opens sideways through both gatehouse towers into the inner ward
-    for (x0, x1) in ((52, igx0), (igx1, 76)):
+    for (x0, x1) in ((48, igx0), (igx1, 80)):
         g.fill(x0, GL, iw_z1 - 2, x1, GL + 2, iw_z1 - 1, "minecraft:air")
         g.fill(x0, GL - 1, iw_z1 - 2, x1, GL - 1, iw_z1 - 1, ROAD)
 
@@ -420,7 +420,7 @@ def great_castle_a(seed=7):
 
     # keep corner turrets with conical roofs
     for (cx, cz) in ((kx0, kz0), (kx1, kz0), (kx0, kz1), (kx1, kz1)):
-        round_tower(g, cx, cz, 4, kroof + 7, GL, floors=(kroof - 1,), spiral=False, cone=True,
+        round_tower(g, cx, cz, 5, kroof + 7, GL, floors=(kroof - 1,), spiral=False, cone=True,
                     doors=((1 if cx < 64 else -1, 0, kroof), (0, 1 if cz < 40 else -1, kroof)), t=2)
 
     # slate roof over the great hall block (wings stay as walkable terraces)
@@ -432,7 +432,7 @@ def great_castle_a(seed=7):
     tx0, tz0, tx1, tz1 = 56, 18, 71, 33
     gtop2 = GL + 54
     square_tower(g, tx0, tz0, tx1, tz1, gtop2, GL, floors=(F2, F3, kroof - 1, GL + 38, GL + 46),
-                 spiral_at=(61, 23), banner_sides=("north", "east", "west", "south"))
+                 spiral_at=(62, 24), banner_sides=("north", "east", "west", "south"))
     for (cx, cz) in ((tx0 - 1, tz0 - 1), (tx1 + 1, tz0 - 1), (tx0 - 1, tz1 + 1), (tx1 + 1, tz1 + 1)):
         bartizan(g, cx, cz, gtop2 + 1)
     # doors: hall -> tower, roof -> tower, F2/F3 -> tower

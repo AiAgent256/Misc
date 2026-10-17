@@ -246,7 +246,8 @@ def round_tower(g, cx, cz, r, top, GL, floors=(), spiral=True, cone=False, t=3,
     for (dx, dz, y) in doors:
         # a ground door also cuts through the plinth outside the wall, and gets a sill to step on
         lo = -2 if y <= GL + 2 else 0
-        for k in range(lo, t + 1):
+        # a diagonal cut loses ground to rounding: go two steps further so it opens into the room
+        for k in range(lo, t + 1 + (2 if dx and dz else 0)):
             x = cx + int(round(dx * (r - k)))
             z = cz + int(round(dz * (r - k)))
             if dx and dz:

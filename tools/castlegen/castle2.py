@@ -142,7 +142,7 @@ def great_castle_b(seed=21):
     g.fill(62, GL - 1, 80, 66, GL - 1, 88, ROAD)
     portcullis_plane(g, 62, 66, GL, 7, 86)
     for tx in (57, 71):
-        round_tower(g, tx, 85, 4, swalk + 6, GL, floors=(swalk - 1,), spiral=False, cone=True, t=2,
+        round_tower(g, tx, 85, 5, swalk + 6, GL, floors=(swalk - 1,), spiral=False, cone=True, t=2,
                     doors=((1, 0, swalk), (-1, 0, swalk), (0, -1, GL)))
         # ladder from the ground floor up to the shell walk and on through a hatch to the roof
         for y in range(GL, swalk + 6):
@@ -164,7 +164,7 @@ def great_castle_b(seed=21):
     tree_weirwood(g, 73, 72, GL)
 
     # ---- donjon (round) ----
-    dx, dz, dr = 64, 56, 11
+    dx, dz, dr = 64, 56, 12
     dtop = GL + 52
     F2, F3 = GL + 11, GL + 21
     round_tower(g, dx, dz, dr, dtop, GL, floors=(F2, F3, GL + 31, GL + 41), spiral=False,
@@ -174,13 +174,13 @@ def great_castle_b(seed=21):
         g.set(x, dtop, z, RAIL)
     for k in range(4):
         ang = np.pi / 4 + k * np.pi / 2
-        bartizan(g, int(round(dx + 9.5 * np.cos(ang))), int(round(dz + 9.5 * np.sin(ang))), dtop + 1)
-    g.fill(dx - 7, GL - 1, dz - 7, dx + 7, GL - 1, dz + 7, FLOOR_STONE)
-    for x in range(dx - 8, dx + 9):
-        for z in range(dz - 8, dz + 9):
-            if (x - dx) ** 2 + (z - dz) ** 2 <= 64 and g.get(x, GL - 1, z) != AIR:
+        bartizan(g, int(round(dx + 10.5 * np.cos(ang))), int(round(dz + 10.5 * np.sin(ang))), dtop + 1)
+    g.fill(dx - 8, GL - 1, dz - 8, dx + 8, GL - 1, dz + 8, FLOOR_STONE)
+    for x in range(dx - 9, dx + 10):
+        for z in range(dz - 9, dz + 10):
+            if (x - dx) ** 2 + (z - dz) ** 2 <= 81 and g.get(x, GL - 1, z) != AIR:
                 g.set(x, GL - 1, z, "minecraft:polished_deepslate" if (x + z) % 2 else "minecraft:polished_andesite")
-    hall_furnish(g, 60, 68, 48, 64, GL)
+    hall_furnish(g, 62, 70, 48, 64, GL)
     g.lantern(dx + 3, F2 - 1, dz); g.lantern(dx - 1, F2 - 1, dz + 5)
     for (x, z) in ((dx + 6, dz - 3), (dx + 6, dz + 3), (dx + 4, dz + 6), (dx - 2, dz + 7)):
         g.chest(x, F2 + 1, z, "west", LOOT + "castle_treasury")
@@ -206,20 +206,20 @@ def great_castle_b(seed=21):
         ang = np.radians(deg)
         cx, cz = int(round(c + 52 * np.cos(ang))), int(round(c + 52 * np.sin(ang)))
         tx, tz = -np.sin(ang), np.cos(ang)
-        round_tower(g, cx, cz, 7, ttop, GL, floors=(GL + 8, GL + 16, walk - 1), spiral=True,
+        round_tower(g, cx, cz, 9, ttop, GL, floors=(GL + 8, GL + 16, walk - 1), spiral=True,
                     cone=(k % 2 == 1), doors=((tx, tz, walk), (-tx, -tz, walk), (tx, tz, GL + 9), (-tx, -tz, GL + 9),
                                              (-np.cos(ang), -np.sin(ang), GL)),
                     banner_dirs=((round(np.cos(ang), 2), round(np.sin(ang), 2)),))
         if k % 2 == 0:
             for j in range(6):
                 a2 = j * np.pi / 3
-                g.mark("archer", int(round(cx + 4.5 * np.cos(a2))), ttop, int(round(cz + 4.5 * np.sin(a2))))
+                g.mark("archer", int(round(cx + 6.5 * np.cos(a2))), ttop, int(round(cz + 6.5 * np.sin(a2))))
 
     # ---- main gatehouse (south) ----
     gtop = walk + 6
     g.fill(58, 0, 106, 70, gtop - 1, 122, STONE)
     for tx in (55, 73):
-        round_tower(g, tx, 115, 6, gtop + 4, GL, floors=(GL + 8, walk - 1), spiral=False, cone=True,
+        round_tower(g, tx, 115, 7, gtop + 4, GL, floors=(GL + 8, walk - 1), spiral=False, cone=True,
                     doors=((0, -1, walk), (1 if tx < 64 else -1, 0, gtop), (1, 0, walk), (-1, 0, walk)))
     pointed_arch(g, 61, 67, GL, 10, 104, 122)
     g.fill(61, GL - 1, 88, 67, GL - 1, 122, ROAD)
@@ -352,7 +352,7 @@ def great_castle_c(seed=33):
     straight_wall(g, 56, az + thick, 58, 46, kw, "west", GL)
     straight_wall(g, 101, az + thick, 103, 46, kw, "east", GL)
     straight_wall(g, 56, 44, 103, 46, kw, "south", GL)
-    for (x0, x1) in ((70, 76), (83, 89)):
+    for (x0, x1) in ((68, 76), (83, 91)):
         square_tower(g, x0, 41, x1, 48, kw + 6, GL, floors=(kw - 1,), banner_sides=("south",))
         g.mark("crossbowman", x0 + 2, kw + 6, 46); g.mark("crossbowman", x1 - 2, kw + 6, 46)
         # door from the yard, a ladder up the inside to the walk floor and on to the roof, doors onto the walk
@@ -424,15 +424,15 @@ def great_castle_c(seed=33):
         round_tower(g, cx, cz, 4, kroof + 8, GL, floors=(kroof - 1,), spiral=False, cone=True, t=2,
                     doors=((1 if cx < 80 else -1, 0, kroof),))
     # donjon
-    tx0, tz0, tx1, tz1 = 74, 15, 85, 26
+    tx0, tz0, tx1, tz1 = 72, 15, 87, 26
     dtop = GL + 48
     square_tower(g, tx0, tz0, tx1, tz1, dtop, GL, floors=(F2, F3, kroof - 1, GL + 38), spiral_at=(79, 20),
                  banner_sides=("north", "south", "east", "west"))
     for (cx, cz) in ((tx0 - 1, tz0 - 1), (tx1 + 1, tz0 - 1), (tx0 - 1, tz1 + 1), (tx1 + 1, tz1 + 1)):
         bartizan(g, cx, cz, dtop + 1)
-    g.fill(82, GL, 24, 82, GL + 2, 26, AIR)
+    g.fill(84, GL, 24, 87, GL + 2, 26, AIR)
     for y in (F2 + 1, F3 + 1, kroof):
-        g.fill(82, y, 24, 82, y + 1, 26, AIR)
+        g.fill(84, y, 24, 87, y + 1, 26, AIR)
     g.mark("banner_stand", 82, dtop, 23)
     for (x, z) in ((83, 18), (77, 23)):
         g.mark("crossbowman", x, dtop, z)
@@ -458,9 +458,9 @@ def great_castle_c(seed=33):
     d, along, out = curtain(g, ax, bx, thick, walk, GL, az=az, bz=bz, banners_every=16)
     posts_on_walk(g, d, along, walk, "archer", dsel=1, every=6, offset=1)
     ctop = walk + 9
-    for (x0, z0, sx, sz) in ((ax - 3, az - 3, 1, 1), (bx - 9, az - 3, -1, 1), (ax - 3, bz - 9, 1, -1), (bx - 9, bz - 9, -1, -1)):
-        x1, z1 = x0 + 12, z0 + 12
-        square_tower(g, x0, z0, x1, z1, ctop, GL, floors=(GL + 8, walk - 1), spiral_at=(x0 + 6, z0 + 6))
+    for (x0, z0, sx, sz) in ((ax - 3, az - 3, 1, 1), (bx - 13, az - 3, -1, 1), (ax - 3, bz - 13, 1, -1), (bx - 13, bz - 13, -1, -1)):
+        x1, z1 = x0 + 16, z0 + 16
+        square_tower(g, x0, z0, x1, z1, ctop, GL, floors=(GL + 8, walk - 1), spiral_at=(x0 + 8, z0 + 8))
         for (cx, cz) in ((x0 - 1, z0 - 1), (x1 + 1, z0 - 1), (x0 - 1, z1 + 1), (x1 + 1, z1 + 1)):
             bartizan(g, cx, cz, ctop + 1)
         for y in (walk, GL + 9):
@@ -468,18 +468,22 @@ def great_castle_c(seed=33):
         # doors toward both wall walks
         wxa, wxb = (x1 - 2, x1) if sx > 0 else (x0, x0 + 2)
         wza, wzb = (z1 - 2, z1) if sz > 0 else (z0, z0 + 2)
+        dza, dzb = (z0 + 5, z0 + 9) if sz > 0 else (z1 - 9, z1 - 5)      # where the curtain meets the tower
+        dxa, dxb = (x0 + 5, x0 + 9) if sx > 0 else (x1 - 9, x1 - 5)
         for y in (walk, GL + 9):
-            g.fill(wxa, y, z0 + 5, wxb, y + 1, z0 + 7, AIR)
-            g.fill(x0 + 5, y, wza, x0 + 7, y + 1, wzb, AIR)
+            g.fill(wxa, y, dza, wxb, y + 1, dzb, AIR)
+            g.fill(dxa, y, wza, dxb, y + 1, wzb, AIR)
         # the ground door is a notch cut from the tower's inner corner, the only face on the yard
         nx0, nx1 = (x1 - 3, x1) if sx > 0 else (x0, x0 + 3)
         nz0, nz1 = (z1 - 3, z1) if sz > 0 else (z0, z0 + 3)
-        g.fill(nx0, GL, nz0, nx1, GL + 2, nz1, AIR)
-        g.fill(nx0, GL - 1, nz0, nx1, GL - 1, nz1, FLOOR_STONE)
+        ex0, ex1 = (nx0, nx1 + 1) if sx > 0 else (nx0 - 1, nx1)
+        ez0, ez1 = (nz0, nz1 + 1) if sz > 0 else (nz0 - 1, nz1)
+        g.fill(ex0, GL, ez0, ex1, GL + 2, ez1, AIR)            # through the plinth too: an open porch, not a closet
+        g.fill(ex0, GL - 1, ez0, ex1, GL - 1, ez1, FLOOR_STONE)
         g.mark("archer", x0 + 3, ctop, z0 + 3); g.mark("archer", x1 - 3, ctop, z1 - 3)
     for xpos in (44, 116):
         for (cz, sgn) in ((az + 1, 1), (bz - 1, -1)):
-            round_tower(g, xpos, cz, 6, walk + 6, GL, floors=(GL + 8, walk - 1), spiral=False,
+            round_tower(g, xpos, cz, 7, walk + 6, GL, floors=(GL + 8, walk - 1), spiral=False,
                         doors=((1, 0, walk), (-1, 0, walk), (1, 0, GL + 9), (-1, 0, GL + 9)))
             for y in range(walk, walk + 6):
                 g.set(xpos + 2, y, cz, "minecraft:ladder[facing=west]")
@@ -492,7 +496,7 @@ def great_castle_c(seed=33):
         bx0, bx1 = (gx - 6, gx + 8) if sgn < 0 else (gx - 8, gx + 6)
         g.fill(bx0, 0, cz_mid - 7, bx1, gtop - 1, cz_mid + 7, STONE)
         for tz in (cz_mid - 9, cz_mid + 9):
-            round_tower(g, gx + sgn * 1, tz, 6, gtop + 4, GL, floors=(GL + 8, walk - 1), spiral=False, cone=True,
+            round_tower(g, gx + sgn * 1, tz, 7, gtop + 4, GL, floors=(GL + 8, walk - 1), spiral=False, cone=True,
                         doors=((-sgn, 0, walk), (0, -1 if tz > cz_mid else 1, gtop)))
             # the wall-walk runs straight through the tower
             px0, px1 = (gx + 2, gx + 3) if sgn < 0 else (gx - 3, gx - 2)
