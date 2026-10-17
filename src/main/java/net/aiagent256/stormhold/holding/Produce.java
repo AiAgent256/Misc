@@ -56,6 +56,9 @@ public final class Produce {
     /** A mine's working face: where the next slice goes, which way the tunnel runs, and how far it has gone. */
     public static final class Dig {
         public BlockPos next;
+        /** The base of the last slice actually cut; turns are measured from it. */
+        @Nullable
+        public BlockPos last;
         public int dx, dz, sx, sz;
         public int dug, run, turns, fails, down;
         public boolean done;
@@ -71,6 +74,7 @@ public final class Produce {
         public CompoundTag save() {
             CompoundTag t = new CompoundTag();
             t.put("Next", NbtUtils.writeBlockPos(next));
+            if (last != null) t.put("Last", NbtUtils.writeBlockPos(last));
             t.putIntArray("V", new int[]{dx, dz, sx, sz, dug, run, turns, fails, done ? 1 : 0, down});
             return t;
         }
@@ -78,6 +82,7 @@ public final class Produce {
         public static Dig load(CompoundTag t) {
             int[] v = t.getIntArray("V");
             Dig d = new Dig(NbtUtils.readBlockPos(t.getCompound("Next")), v[0], v[1], v[2], v[3]);
+            if (t.contains("Last")) d.last = NbtUtils.readBlockPos(t.getCompound("Last"));
             d.dug = v[4];
             d.run = v[5];
             d.turns = v[6];
@@ -232,6 +237,24 @@ public final class Produce {
         if (item != null) made.merge(item, n, Integer::sum);
     }
 
+    /** Can a slice be cut at base, two wide along (sx, sz)? Loaded, a roof of rock overhead, no water or lava, nothing anybody built. */
+    private static boolean cuttable(ServerLevel level, BlockPos base, int sx, int sz) {
+        for (BlockPos c : new BlockPos[]{base, base.offset(sx, 0, sz)}) {
+            if (!level.isLoaded(c)) return false;
+            BlockState roof = level.getBlockState(c.above(3));
+            if (roof.isAir() || !roof.getFluidState().isEmpty()) return false;
+            for (int y = 0; y < 3; y++) {
+                BlockPos p = c.above(y);
+                BlockState s = level.getBlockState(p);
+                if (!s.getFluidState().isEmpty() || !diggable(s)) return false;
+                for (BlockPos n : new BlockPos[]{p.north(), p.south(), p.east(), p.west(), p.above()}) {
+                    if (!level.getBlockState(n).getFluidState().isEmpty()) return false;
+                }
+            }
+        }
+        return true;
+    }
+
     /** Drive the tunnel one slice forward. False if the miners had to turn or are done. */
     public static boolean slice(ServerLevel level, Dig d, Map<String, Integer> made) {
         if (d.done) return false;
@@ -240,21 +263,9 @@ public final class Produce {
             return false;
         }
         BlockPos base = d.next;
+        if (!level.isLoaded(base)) return false;
+        if (!cuttable(level, base, d.sx, d.sz)) return turn(level, d, true);
         BlockPos[] cols = {base, base.offset(d.sx, 0, d.sz)};
-        // can we cut here? loaded, a roof of rock overhead, no water or lava, nothing anybody built
-        for (BlockPos c : cols) {
-            if (!level.isLoaded(c)) return false;
-            BlockState roof = level.getBlockState(c.above(3));
-            if (roof.isAir() || !roof.getFluidState().isEmpty()) return turn(d, true);
-            for (int y = 0; y < 3; y++) {
-                BlockPos p = c.above(y);
-                BlockState s = level.getBlockState(p);
-                if (!s.getFluidState().isEmpty() || !diggable(s)) return turn(d, true);
-                for (BlockPos n : new BlockPos[]{p.north(), p.south(), p.east(), p.west(), p.above()}) {
-                    if (!level.getBlockState(n).getFluidState().isEmpty()) return turn(d, true);
-                }
-            }
-        }
         for (BlockPos c : cols) {
             for (int y = 0; y < 3; y++) {
                 BlockPos p = c.above(y);
@@ -298,41 +309,45 @@ public final class Produce {
         // ramp down to working depth: a step every other slice, so men and carts can climb it
         boolean step = d.down < DEPTH && d.dug % 2 == 1;
         if (step) d.down++;
+        d.last = base;
         d.next = base.offset(d.dx, step ? -1 : 0, d.dz);
         d.dug++;
         d.fails = 0;
-        if (++d.run >= RUN) turn(d, false);
+        if (++d.run >= RUN) turn(level, d, false);
         return true;
     }
 
     /**
-     * Turn the tunnel a quarter. A turn at the end of a run alternates sides so the tunnel snakes onward
-     * instead of circling back; a turn forced by rock the men can't cut (open air, water, something built)
-     * always goes the same way round, so four of them try every heading before the mine gives up.
+     * Turn the tunnel a quarter, from the last slice cut. At the end of a run the sides alternate so the tunnel
+     * snakes onward instead of circling back; when the face is blocked (open air, water, something built) the
+     * men try one side, then the other, and give up only when both are rock they can't cut.
      */
-    private static boolean turn(Dig d, boolean blocked) {
-        BlockPos last = d.next.offset(-d.dx, 0, -d.dz);
-        boolean right = blocked || d.turns % 2 == 0;
-        int ndx, ndz;
-        BlockPos next;
-        if (right) {
-            ndx = d.sx;
-            ndz = d.sz;
-            next = last.offset(2 * d.sx, 0, 2 * d.sz);
-        } else {
-            ndx = -d.sx;
-            ndz = -d.sz;
-            next = last.offset(-d.sx, 0, -d.sz);
+    private static boolean turn(ServerLevel level, Dig d, boolean blocked) {
+        BlockPos last = d.last != null ? d.last : d.next.offset(-d.dx, 0, -d.dz);
+        if (d.next.getY() < last.getY() && d.down > 0) d.down--;     // the step down that was never cut
+        boolean rightFirst = blocked ? d.fails % 2 == 0 : d.turns % 2 == 0;
+        int[][] options = rightFirst ? new int[][]{{1}, {-1}} : new int[][]{{-1}, {1}};
+        for (int[] o : options) {
+            boolean right = o[0] > 0;
+            int ndx = right ? d.sx : -d.sx, ndz = right ? d.sz : -d.sz;
+            int nsx = -d.dx, nsz = -d.dz;
+            BlockPos next = right ? last.offset(2 * d.sx, 0, 2 * d.sz) : last.offset(-d.sx, 0, -d.sz);
+            if (!cuttable(level, next, nsx, nsz)) continue;
+            d.dx = ndx;
+            d.dz = ndz;
+            d.sx = nsx;
+            d.sz = nsz;
+            d.next = next;
+            d.run = 0;
+            d.turns++;
+            if (blocked && ++d.fails >= 6) d.done = true;
+            return false;
         }
-        int nsx = -d.dx, nsz = -d.dz;
-        d.dx = ndx;
-        d.dz = ndz;
-        d.sx = nsx;
-        d.sz = nsz;
-        d.next = next;
-        d.run = 0;
-        d.turns++;
-        if (blocked && ++d.fails >= 4) d.done = true;
+        if (blocked) {
+            d.done = true;      // walled in on every side
+        } else {
+            d.run = 0;          // neither side will cut: carry straight on
+        }
         return false;
     }
 
