@@ -432,9 +432,9 @@ def keep(g, GL3):
         for x in (tx0, tx1):
             for z in (tz0 + 6, tz0 + 10, tz0 + 14):
                 g.fill(x, fy + 2, z, x, fy + 5, z, GLASS)
-    g.mark("banner_stand", 162, dtop, 44)
+    g.mark("banner_stand", 162, dtop + 1, 44)                              # on the stage plinth
     for (x, z) in ((149, 31), (161, 31), (149, 44)):
-        g.mark("crossbowman", x, dtop, z)
+        g.mark("crossbowman", x, dtop + 1, z)
     # the treasury keeps clear of the stair hall in the north-east corner
     for z in range(33, 44, 3):
         g.chest(tx0 + 5, floors[0] + 1, z, "east", LOOT + "castle_treasury")

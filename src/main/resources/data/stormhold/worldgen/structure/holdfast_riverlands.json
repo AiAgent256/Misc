@@ -21,6 +21,13 @@
    "weight": 1
   },
   {
+   "name": "holdfast_c",
+   "size_x": 72,
+   "size_z": 72,
+   "ground": 5,
+   "weight": 1
+  },
+  {
    "name": "holdfast_a2",
    "size_x": 80,
    "size_z": 80,
@@ -29,6 +36,13 @@
   },
   {
    "name": "holdfast_b2",
+   "size_x": 72,
+   "size_z": 72,
+   "ground": 5,
+   "weight": 1
+  },
+  {
+   "name": "holdfast_c2",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
