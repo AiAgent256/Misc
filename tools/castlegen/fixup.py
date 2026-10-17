@@ -67,3 +67,27 @@ def drop_buried_markers(g, keep=("gate", "lord", "war_table", "banner_stand", "r
                 n += 1
         g.markers[role] = good
     return n
+
+
+def light_rooms(g, GL):
+    """Every room gets a light: a lantern hung from the ceiling over its middle, where one is missing."""
+    import furnish
+    from scale_audit import LIGHT
+    n = 0
+    for r in furnish.find_rooms(g, GL, set()):
+        lit = any(any(k in g.get(x, yy, z) for k in LIGHT) for (x, z) in r.cells for yy in range(r.y, min(g.Y, r.y + 8)))
+        if lit:
+            continue
+        cx, cz = (r.x0 + r.x1) // 2, (r.z0 + r.z1) // 2
+        if (cx, cz) not in r.cells:
+            cx, cz = next(iter(sorted(r.cells)))
+        yy = r.y + 2
+        while yy + 1 < g.Y and g.get(cx, yy + 1, cz) == "minecraft:air":
+            yy += 1
+        if g.is_solid(cx, yy + 1, cz) and yy >= r.y + 2:
+            # a tall room gets its lantern on a chain, so the light is down where the people are
+            ly = min(yy, r.y + 5)
+            g.fill(cx, ly + 1, cz, cx, yy, cz, "minecraft:chain[axis=y]") if yy > ly else None
+            g.set(cx, ly, cz, "minecraft:lantern[hanging=true]")
+            n += 1
+    return n

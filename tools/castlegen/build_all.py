@@ -20,6 +20,7 @@ import parts
 import furnish
 import rooms
 import scale
+import scale_audit
 import render
 import themes
 import walk
@@ -38,6 +39,26 @@ LAYOUTS = (castle.great_castle_a, castle2.great_castle_b, castle2.great_castle_c
 VARIANTS = {"great_castle_a": ("hoard", 2), "great_castle_b": ("spire", 3), "great_castle_c": ("low", 1),
             "holdfast_a": ("pyramid", 4), "holdfast_b": ("hoard", 2), "holdfast_c": ("spire", 3),
             "watchtower_a": ("flat", 3), "watchtower_b": ("spire", 1), "watchtower_c": ("hoard", 2)}
+
+
+# What a plan may get away with before the build is refused. Round towers too small for a two-wide spiral
+# and the gate halls' spirals are the narrow stairs still allowed; passages are the one-wide slots the
+# doorway widener could not open (between a window and a buttress, say).
+# The big plans carry a backlog the audit found on its first run (quay stairs in the cities, a few one-wide
+# gaps on their walks, tower rooms the lamplighter can't reach); their limits sit at those counts so a new
+# cramped spot fails the build while the old ones wait their turn.
+SCALE_LIMITS = {"*": {"narrow_stairs": 0, "pinches": 3, "dark_rooms": 0},
+                "great_castle_a": {"narrow_stairs": 0, "pinches": 8, "dark_rooms": 0},
+                "great_castle_a2": {"narrow_stairs": 0, "pinches": 8, "dark_rooms": 0},
+                "great_castle_b": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
+                "great_castle_b2": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
+                "great_castle_c": {"narrow_stairs": 1, "pinches": 6, "dark_rooms": 0},
+                "great_castle_c2": {"narrow_stairs": 1, "pinches": 6, "dark_rooms": 0},
+                "town_walled": {"narrow_stairs": 0, "pinches": 7, "dark_rooms": 1},
+                "town_cross": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 1},
+                "town_green": {"narrow_stairs": 0, "pinches": 5, "dark_rooms": 1},
+                "great_city": {"narrow_stairs": 6, "pinches": 20, "dark_rooms": 8},
+                "canal_city": {"narrow_stairs": 6, "pinches": 70, "dark_rooms": 9}}
 
 
 def builds():
@@ -79,6 +100,7 @@ def main():
             if cr is None:
                 raise SystemExit(f"{name}: no room for a crypt under the keep")
             kinds.update(cr)
+        kinds["lit"] = fixup.light_rooms(g, meta["GL"])
         opened = fixup.clear_blocked_doorways(g, meta["GL"], tuple(meta.get("levels", ())))
         dropped = fixup.drop_buried_markers(g)
         bad, checked = walk.audit(g, meta)
@@ -90,6 +112,15 @@ def main():
             for k, v in bad.items():
                 print(f"    {k}: {v[:6]}")
             raise SystemExit(f"{name}: {unreachable} posts cannot be walked to from the gate")
+        sc = scale_audit.audit(g, meta)
+        print(f"  scale: {scale_audit.summary(sc)}")
+        for k, v in sc.items():
+            if v:
+                print(f"    {k}: {sorted(v)[:5]}")
+        limit = SCALE_LIMITS.get(name, SCALE_LIMITS["*"])
+        over = [k for k in ("narrow_stairs", "pinches", "dark_rooms") if len(sc[k]) > limit[k]]
+        if over:
+            raise SystemExit(f"{name}: cramped: " + ", ".join(f"{k} {len(sc[k])} > {limit[k]}" for k in over))
         if kinds["beds"] < kinds["men"]:
             raise SystemExit(f"{name}: {kinds['beds']} beds for {kinds['men']} men")
         if not args.no_export:

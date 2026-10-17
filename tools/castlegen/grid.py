@@ -236,6 +236,10 @@ def spiral_stair(g, cx, cz, y_start, y_end, step_block, core_block, clear=True, 
     g.fill(cx - 1, y_start - 1, cz - 1, cx + 1, y_end + 2, cz + 1, core_block)
     # the shaft is nobody's room: furnishing keeps out of it
     g.__dict__.setdefault("protected_xz", set()).update((x, z) for x in range(cx - R, cx + R + 1) for z in range(cz - R, cz + R + 1))
+    g.__dict__.setdefault("spiral_cells", set()).update((x, z) for x in range(cx - R, cx + R + 1) for z in range(cz - R, cz + R + 1))
+    g.__dict__.setdefault("narrow_spirals", 0)
+    if not wide:
+        g.narrow_spirals += 1
     i = 0
     y = y_start
     flat_left = 0

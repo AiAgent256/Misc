@@ -566,11 +566,13 @@ def holdfast_b(seed=13):
                     doors=((1 if cx < c else -1, 0, wtop), (0, 1 if cz < c else -1, wtop)))
     # stairs up to the wall walk, along the inner face of the south wall, landing onto the walk
     sz = o - 2
-    for k in range(wtop - GL):
-        g.stair(10 + k, GL + k, sz, STONE_STAIR, "east")
-        g.fill(10 + k, GL, sz, 10 + k, GL + k - 1, sz, STONE)
-    g.fill(10 + wtop - GL, GL, sz, 11 + wtop - GL, wtop - 1, sz, STONE)
-    g.fill(10 + wtop - GL, wtop, sz, 11 + wtop - GL, wtop + 1, sz + 1, AIR)
+    for zz in (sz, sz - 1):
+        for k in range(wtop - GL):
+            g.stair(10 + k, GL + k, zz, STONE_STAIR, "east")
+            g.fill(10 + k, GL, zz, 10 + k, GL + k - 1, zz, STONE)
+            g.fill(10 + k, GL + k + 1, zz, 10 + k, GL + k + 3, zz, AIR)
+        g.fill(10 + wtop - GL, GL, zz, 11 + wtop - GL, wtop - 1, zz, STONE)
+    g.fill(10 + wtop - GL, wtop, sz - 1, 11 + wtop - GL, wtop + 1, sz + 1, AIR)
     # gatehouse
     gx0, gx1 = c - 5, c + 4
     g.fill(gx0, 0, o - 5, gx1, wtop + 5, o + 2, STONE)
@@ -582,10 +584,11 @@ def holdfast_b(seed=13):
     for x in (gx0 + 1, gx1 - 1):
         g.mark("crossbowman", x, wtop + 6, o + 1)
     # a stair cut up through the gatehouse from the west wall-walk to its roof
-    for k in range(6):
-        g.stair(gx0 + k, wtop + k, o - 1, STONE_STAIR, "east")
-        g.fill(gx0 + k, wtop + k + 1, o - 1, gx0 + k, wtop + k + 3, o - 1, AIR)
-    g.fill(gx0 + 6, wtop + 6, o - 1, gx0 + 6, wtop + 8, o - 1, AIR)
+    for zz in (o - 1, o - 2):
+        for k in range(6):
+            g.stair(gx0 + k, wtop + k, zz, STONE_STAIR, "east")
+            g.fill(gx0 + k, wtop + k + 1, zz, gx0 + k, wtop + k + 3, zz, AIR)
+        g.fill(gx0 + 6, wtop + 6, zz, gx0 + 6, wtop + 8, zz, AIR)
     g.mark("gate", c - 1, GL, W - 1)
     # tower house: twenty-eight by twenty-two, five floors
     hx0, hz0, hx1, hz1 = c - 18, 10, c + 9, 31
@@ -696,7 +699,7 @@ def watchtower_b(seed=9):
     portcullis_plane(g, gx0, gx1, GL, 5, W - 3)
     g.mark("gate", c, GL, W - 1)
     # steps up to the platform either side of the gate passage, straight flights out of the yard
-    for sx in (gx0 - 4, gx1 + 4):
+    for sx in (gx0 - 5, gx0 - 4, gx1 + 4, gx1 + 5):
         for k in range(3):
             z = W - 8 + k
             g.stair(sx, GL + k, z, "minecraft:spruce_stairs", "south")
@@ -884,7 +887,7 @@ def watchtower_c(seed=19):
     g.fill(gx0, GL + 5, W - 4, gx1, GL + 6, W - 4, "minecraft:spruce_planks")
     portcullis_plane(g, gx0, gx1, GL, 5, W - 3)
     g.mark("gate", c, GL, W - 1)
-    for sx in (gx0 - 4, gx1 + 4):
+    for sx in (gx0 - 5, gx0 - 4, gx1 + 4, gx1 + 5):
         for k in range(3):
             z = W - 8 + k
             g.stair(sx, GL + k, z, "minecraft:spruce_stairs", "south")

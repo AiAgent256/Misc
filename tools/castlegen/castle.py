@@ -465,7 +465,8 @@ def great_castle_a(seed=7):
     g.spiral = None
     g.fill(27, GL, 102, 30, GL + 4, 105, "minecraft:air")
     for k in range(5):
-        g.stair(30 - k if k < 4 else 26, GL + k, 104, "minecraft:spruce_stairs", "west")
+        for zz in (104, 103):
+            g.stair(30 - k if k < 4 else 26, GL + k, zz, "minecraft:spruce_stairs", "west")
     g.fill(26, GL + 4, 102, 30, GL + 4, 105, "minecraft:air")
     for z in range(76, 104, 8):
         g.mark("knight", 26, GL, z)
@@ -624,9 +625,10 @@ def holdfast_a(seed=11):
     # stairs from both wall-walks up onto the gatehouse roof
     for k in range(3):
         for (x, f) in ((gx0 + k, "east"), (gx1 - k, "west")):
-            g.stair(x, walk + k, b - 1, STONE_STAIR, f)
-            g.fill(x, walk + k + 1, b - 1, x, walk + k + 3, b - 1, "minecraft:air")
-    g.fill(gx0 + 3, walk + 3, b - 1, gx1 - 3, walk + 5, b - 1, "minecraft:air")
+            for zz in (b - 1, b - 2):
+                g.stair(x, walk + k, zz, STONE_STAIR, f)
+                g.fill(x, walk + k + 1, zz, x, walk + k + 3, zz, "minecraft:air")
+    g.fill(gx0 + 3, walk + 3, b - 2, gx1 - 3, walk + 5, b - 1, "minecraft:air")
     g.wall_banner(c - 5, GL + 10, b + 5, "south"); g.wall_banner(c + 4, GL + 10, b + 5, "south")
     g.mark("gate", c - 1, GL, W - 2)
     g.mark("knight", c - 3, GL, b - 6); g.mark("knight", c + 2, GL, b - 6)
@@ -739,7 +741,7 @@ def watchtower_a(seed=5):
     # a wall-walk behind the parapet: the inner ring of the wall is a block lower, reached by two stairs
     g.fill_mask(ring(g, c, c, R - 1, R - 3), GL + 3, GL + 4, "minecraft:air")
     g.fill_mask(ring(g, c, c, R - 1, R - 3), GL + 2, GL + 2, STONE)
-    for x in (c - 7, c + 7):
+    for x in (c - 8, c - 7, c + 7, c + 8):
         for k in range(3):
             g.stair(x, GL + k, c + R - 6 + k, STONE_STAIR, "south")
             # the step's footing is a double slab, which the doorway fixer leaves alone
