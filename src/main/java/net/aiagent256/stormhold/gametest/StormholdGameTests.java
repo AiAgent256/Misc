@@ -44,6 +44,9 @@ public class StormholdGameTests {
             if (DataRegistries.layout(n) == null) throw new IllegalStateException("missing layout " + n);
             if (stm.get(CastleTilePiece.tileId(n, 0, 0)).isEmpty()) throw new IllegalStateException("missing template " + n);
             if (DataRegistries.layout(n).posts.get(Role.KNIGHT) == null) throw new IllegalStateException("no knight posts in " + n);
+            // the footprint the land is cleared over: the gate stands on it, the corner outside a round tower's box may not
+            var lay = DataRegistries.layout(n);
+            if (!lay.inside(lay.gate.getX(), lay.gate.getZ())) throw new IllegalStateException("no footprint under the gate of " + n);
         }
         for (String t : new String[]{"riverlands", "reach", "dorne", "stormlands", "nether"}) {
             if (DataRegistries.theme(t).isEmpty()) throw new IllegalStateException("missing theme " + t);

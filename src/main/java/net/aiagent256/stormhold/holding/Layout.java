@@ -25,6 +25,8 @@ public class Layout {
     public final java.util.Map<String, List<BlockPos>> extras = new java.util.HashMap<>();
     /** Each portcullis plane as {x0, y0, z0, x1, y1, z1}, so a lost gate can be put back. */
     public final List<int[]> gatePlanes = new ArrayList<>();
+    /** The columns the castle stands on (anything but structure void at ground level), row by row; null if unknown. */
+    private final java.util.BitSet footprint;
 
     private Layout(JsonObject o) {
         name = o.get("name").getAsString();
@@ -64,6 +66,22 @@ public class Layout {
                 gatePlanes.add(box);
             }
         }
+        if (o.has("footprint")) {
+            footprint = new java.util.BitSet(sizeX * sizeZ);
+            JsonArray rows = o.getAsJsonArray("footprint");
+            for (int z = 0; z < Math.min(sizeZ, rows.size()); z++) {
+                String row = rows.get(z).getAsString();
+                for (int x = 0; x < Math.min(sizeX, row.length()); x++) if (row.charAt(x) == '1') footprint.set(z * sizeX + x);
+            }
+        } else {
+            footprint = null;
+        }
+    }
+
+    /** Whether the castle stands on this column of the layout, so the land above its floor there is the castle's to clear. */
+    public boolean inside(int x, int z) {
+        if (footprint == null || x < 0 || z < 0 || x >= sizeX || z >= sizeZ) return false;
+        return footprint.get(z * sizeX + x);
     }
 
     private static BlockPos pos(JsonElement e) {

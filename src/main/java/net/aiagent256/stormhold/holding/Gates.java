@@ -164,14 +164,20 @@ public final class Gates {
     private static void tickPlane(ServerLevel level, HoldingManager mgr, Holding h, Plane plane) {
         if (!level.isLoaded(plane.blocks.get(0))) return;
         boolean friend = false, foe = false;
-        for (Entity e : level.getEntities((Entity) null, plane.area.inflate(HOLD_RANGE, 1, HOLD_RANGE))) {
+        List<Entity> about = level.getEntities((Entity) null, plane.area.inflate(HOLD_RANGE, 1, HOLD_RANGE));
+        // anyone the garrison at the gate is fighting right now is an enemy whatever their standing
+        java.util.Set<java.util.UUID> fought = new java.util.HashSet<>();
+        for (Entity e : about) {
+            if (e instanceof GarrisonEntity g && g.side().equals(h.owner) && g.getTarget() != null) fought.add(g.getTarget().getUUID());
+        }
+        for (Entity e : about) {
             if (!(e instanceof LivingEntity le) || !le.isAlive()) continue;
             if (e instanceof Player p && p.isSpectator()) continue;
             boolean creative = e instanceof Player p && p.isCreative();
             double d = distance(plane.area, e);
-            if (isFriend(mgr, h, e)) {
+            if (!fought.contains(e.getUUID()) && isFriend(mgr, h, e)) {
                 if (d <= OPEN_RANGE) friend = true;
-            } else if (!creative && isFoe(h, e)) {
+            } else if (!creative && (fought.contains(e.getUUID()) || isFoe(mgr, h, e))) {
                 foe = true;
             }
         }
@@ -230,7 +236,9 @@ public final class Gates {
     /**
      * Someone the gate opens for: the castle's own men when they're going somewhere (marching, chasing,
      * riding with a player, carrying goods; a guard posted beside the gate doesn't hold it open), their
-     * allies, and players the house likes.
+     * allies, and players. A house's gate opens to any traveller it has no quarrel with: everyone starts
+     * wary, and wary is let in. Only a player the house holds hostile, or one its men are fighting at the
+     * gate, is shut out. A player's own castle opens only for its owner.
      */
     private static boolean isFriend(HoldingManager mgr, Holding h, Entity e) {
         if (e instanceof GarrisonEntity g) {
@@ -241,16 +249,17 @@ public final class Gates {
         }
         if (e instanceof Player p) {
             if (h.owner.equals(Sides.player(p.getUUID()))) return true;
-            return h.isHouseOwned() && Standing.friendly(mgr, h.houseId, p.getUUID());
+            return h.isHouseOwned() && !Standing.hostile(mgr, h.houseId, p.getUUID());
         }
         String rs = RecruitsCompat.sideOf(e);
         return rs != null && rs.equals(h.owner);
     }
 
-    /** Someone the gate stays down for: anyone armed who isn't a friend. Villagers and animals don't count. */
-    private static boolean isFoe(Holding h, Entity e) {
+    /** Someone the gate stays down for: soldiers of another side, monsters, and players the house holds hostile
+     *  (or anyone at all, at a castle a player owns). Villagers and animals don't count. */
+    private static boolean isFoe(HoldingManager mgr, Holding h, Entity e) {
         if (e instanceof GarrisonEntity g) return !g.side().equals(h.owner);
-        if (e instanceof Player) return true;
+        if (e instanceof Player p) return !h.isHouseOwned() || Standing.hostile(mgr, h.houseId, p.getUUID());
         if (e instanceof Enemy) return true;
         return RecruitsCompat.sideOf(e) != null;
     }

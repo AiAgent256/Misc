@@ -136,7 +136,38 @@ public class CastleTilePiece extends StructurePiece {
             Stormhold.LOGGER.debug("Stormhold: no template for {} tile {},{}", layout, tx, tz);
             return;
         }
+        clearAbove(level, box);
         StructurePlaceSettings settings = settings(theme).setBoundingBox(box);
         t.get().placeInWorld(level, templatePosition, pivot, settings, random, 2);
+    }
+
+    /**
+     * Hills inside the walls come down before the castle goes up. The template only writes where it has a block;
+     * the sky over a yard, a street or a wall-walk is structure void, and the smoother only carves a dozen blocks
+     * above the floor, so a slope the siting allowed would leave a bank of earth hanging in the courtyard (and
+     * sand pouring off it into the doorways). Every column the castle stands on is cleared from its floor to the
+     * top of the template, up to the land's own surface.
+     */
+    private void clearAbove(WorldGenLevel level, BoundingBox box) {
+        Layout l = DataRegistries.layout(layout);
+        if (l == null) return;
+        int y0 = Math.max(box.minY(), templatePosition.getY() + ground);
+        int yTop = Math.min(box.maxY(), templatePosition.getY() + l.sizeY - 1);
+        if (yTop < y0) return;
+        int x0 = Math.max(box.minX(), templatePosition.getX()), x1 = Math.min(box.maxX(), templatePosition.getX() + TILE - 1);
+        int z0 = Math.max(box.minZ(), templatePosition.getZ()), z1 = Math.min(box.maxZ(), templatePosition.getZ() + TILE - 1);
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        net.minecraft.world.level.block.state.BlockState air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+        for (int x = x0; x <= x1; x++) {
+            for (int z = z0; z <= z1; z++) {
+                if (!l.inside(x - castleOrigin.getX(), z - castleOrigin.getZ())) continue;
+                int surface = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE_WG, x, z);
+                int y1 = Math.min(yTop, surface);
+                for (int y = y0; y <= y1; y++) {
+                    m.set(x, y, z);
+                    if (!level.getBlockState(m).isAir()) level.setBlock(m, air, 2);
+                }
+            }
+        }
     }
 }

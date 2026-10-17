@@ -110,6 +110,15 @@ def clean_posts(g):
     return out
 
 
+def footprint(g, GL):
+    """One string per row (z), a '1' for every column the castle stands on: anything but structure void at the
+    ground floor or the layer under it. The game clears the land above these columns before placing the castle,
+    so a hill the siting allowed doesn't hang in the yard or pour sand into the doorways."""
+    a = g.a
+    on = (a[:, :, GL] != 0) | (a[:, :, GL - 1] != 0)
+    return ["".join("1" if on[x, z] else "0" for x in range(a.shape[0])) for z in range(a.shape[1])]
+
+
 def write_layout(g, meta, tiles, path):
     X, Z, Y = g.a.shape
     posts = clean_posts(g)
@@ -129,6 +138,7 @@ def write_layout(g, meta, tiles, path):
         "posts": posts,
         "beds": meta.get("beds", 0), "gate_planes": [list(p) for p in getattr(g, "gate_planes", [])],
         "banners": [list(b) for b in g.banners if g.get(*b).endswith("wall_banner" ) or "wall_banner" in g.get(*b)],
+        "footprint": footprint(g, meta["GL"]),
     }
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
