@@ -603,6 +603,8 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     @Override
     protected void customServerAiStep() {
         super.customServerAiStep();
+        // a dragon's carcass is still "alive" to the game; the men stop hacking at it once it's down
+        if (this.tickCount % 20 == 0 && net.aiagent256.stormhold.holding.Dragons.isCarcass(this.getTarget())) this.setTarget(null);
         if (alarmTicks > 0) alarmTicks--;
         if (backOffTicks > 0) backOffTicks--;
         if (sortieTicks > 0) sortieTicks--;

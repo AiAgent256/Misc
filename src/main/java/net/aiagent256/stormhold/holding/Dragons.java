@@ -130,9 +130,29 @@ public final class Dragons {
         return id != null && id.getNamespace().equals("iceandfire") && id.getPath().endsWith("_dragon");
     }
 
-    /** A dragon nobody has tamed. */
+    /** A dragon nobody has tamed, and that is still on its feet: a carcass is not a foe. */
     public static boolean isWild(@Nullable Entity e) {
-        return isDragon(e) && !(e instanceof TamableAnimal t && t.isTame());
+        return isDragon(e) && !(e instanceof TamableAnimal t && t.isTame()) && !isCarcass(e);
+    }
+
+    private static final java.util.Map<Class<?>, java.lang.reflect.Method> MODEL_DEAD = new java.util.HashMap<>();
+
+    /**
+     * Ice and Fire keeps a slain dragon in the world as a carcass to be butchered, and the carcass answers
+     * {@code isAlive()} with yes. The men would stand round it hacking for ever; this tells them it's over.
+     */
+    public static boolean isCarcass(@Nullable Entity e) {
+        if (e == null || !isDragon(e)) return false;
+        try {
+            java.lang.reflect.Method m = MODEL_DEAD.get(e.getClass());
+            if (m == null) {
+                m = e.getClass().getMethod("isModelDead");
+                MODEL_DEAD.put(e.getClass(), m);
+            }
+            return Boolean.TRUE.equals(m.invoke(e));
+        } catch (ReflectiveOperationException | RuntimeException ex) {
+            return e.isDeadOrDying();
+        }
     }
 
     public static String name(Entity e) {
@@ -160,6 +180,7 @@ public final class Dragons {
             }
         }
         h.dragonAt = now;
+        h.damagedAt = now;
         note(mgr, dragon, h, now);
         // the garrison turns on it: the men on the walls first, since they can reach it
         List<GarrisonEntity> men = level.getEntitiesOfClass(GarrisonEntity.class, area, g -> g.isAlive() && !g.side().isEmpty());

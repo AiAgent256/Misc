@@ -170,7 +170,11 @@ public final class CommonEvents {
     public static void breakBlock(BlockEvent.BreakEvent e) {
         if (!(e.getLevel() instanceof ServerLevel level) || e.getPlayer().isCreative()) return;
         Holding h = houseHoldingAt(level, e.getPos(), e.getPlayer());
-        if (h == null || e.getState().is(SIEGE_BREAKABLE)) return;
+        if (h == null) return;
+        if (e.getState().is(SIEGE_BREAKABLE)) {
+            h.damagedAt = level.getGameTime();
+            return;
+        }
         e.setCanceled(true);
         warn(e.getPlayer(), "The walls of " + h.name + " hold. Break the gate, climb, or blast the portcullis.");
     }
@@ -192,6 +196,7 @@ public final class CommonEvents {
         e.getAffectedBlocks().removeIf(pos -> {
             Holding h = mgr.at(pos, 1);
             if (h == null) return false;
+            h.damagedAt = level.getGameTime();
             BlockState s = level.getBlockState(pos);
             return !s.is(SIEGE_BREAKABLE);
         });

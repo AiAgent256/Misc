@@ -142,7 +142,22 @@ public final class Builder {
     // ------------------------------------------------------------ the work, once a second
 
     public static void tick(ServerLevel level, HoldingManager mgr, Holding h) {
-        if (!h.isPlayerOwned() || h.work.equals(NONE)) return;
+        if (!h.isPlayerOwned()) {
+            // a house's own masons: once the castle has been quiet for a minute after taking damage, they put it back
+            if (h.work.equals(NONE)) {
+                long now = level.getGameTime();
+                if (h.damagedAt <= 0 || now - h.damagedAt < 1200 || h.dragonAt != 0 || h.layout == null) return;
+                h.damagedAt = 0;
+                h.work = REPAIR;
+                h.workQueue = null;
+                h.workDone = 0;
+                mgr.setDirty();
+            } else if (!h.work.equals(REPAIR)) {
+                h.work = NONE;
+                return;
+            }
+        }
+        if (h.work.equals(NONE)) return;
         ensureBuilder(level, h);
         if (h.workQueue == null) {
             h.workQueue = new ArrayDeque<>();
@@ -152,6 +167,8 @@ public final class Builder {
                     tell(level, h, "Master Builder " + h.builderName + " finds nothing to repair at " + h.name + ".");
                     return;
                 }
+                if (!h.isPlayerOwned() && !h.workQueue.isEmpty())
+                    HoldingEvents.announceNear(level, h.center(), 160, HoldingEvents.gold("The masons of " + h.name + " are at work on the walls."));
             } else {
                 plan(level, h, h.fortify + 1);
             }
@@ -162,7 +179,7 @@ public final class Builder {
         }
         // stone keeps the pace up; without it the men scavenge and go slowly
         int rate = RATE;
-        if (h.work.equals(REPAIR)) {
+        if (h.work.equals(REPAIR) && h.isPlayerOwned()) {
             if (stone(mgr, h) > 0) takeStone(mgr, h, 1);
             else rate = SLOW_RATE;
         }
@@ -189,7 +206,8 @@ public final class Builder {
     private static void finish(ServerLevel level, HoldingManager mgr, Holding h) {
         if (h.work.equals(REPAIR)) {
             h.gates = null;
-            tell(level, h, "The repairs at " + h.name + " are done: " + h.workDone + " blocks set back in place.");
+            if (h.isPlayerOwned()) tell(level, h, "The repairs at " + h.name + " are done: " + h.workDone + " blocks set back in place.");
+            else if (h.workDone > 0) HoldingEvents.announceNear(level, h.center(), 160, HoldingEvents.gold("The walls of " + h.name + " stand whole again."));
         } else {
             h.fortify = Math.min(MAX_FORTIFY, h.fortify + 1);
             tell(level, h, "Master Builder " + h.builderName + " has finished " + stageName(h.fortify) + " at " + h.name

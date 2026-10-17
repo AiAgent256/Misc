@@ -252,6 +252,16 @@ public class StormholdGameTests {
                     }
                 }
                 if (holes.size() < 6) throw new IllegalStateException("could not knock holes in " + id);
+                // first the house's own masons: damage noted, a minute of quiet, and the walls come back unasked
+                String houseOwner = h.owner;
+                h.damagedAt = level.getGameTime() - 1300;
+                for (int k = 0; k < 40 && !(k > 0 && h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE)); k++)
+                    net.aiagent256.stormhold.holding.Builder.tick(level, mgr, h);
+                if (!h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE)) throw new IllegalStateException("the masons never finished");
+                for (BlockPos p : holes) if (level.getBlockState(p).isAir()) throw new IllegalStateException("the masons left a hole at " + p);
+                if (h.damagedAt != 0) throw new IllegalStateException("damage not cleared after the masons");
+                // knock them out again for the player's Master Builder
+                for (BlockPos p : holes) level.setBlock(p, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
                 h.owner = Sides.player(g.makeMockPlayer().getUUID());
                 h.work = net.aiagent256.stormhold.holding.Builder.REPAIR;
                 h.addStock(new net.minecraft.resources.ResourceLocation("minecraft:cobblestone"), 64);

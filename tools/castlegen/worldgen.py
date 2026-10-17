@@ -7,11 +7,11 @@ from themes import BIOMES, OVERWORLD
 TIERS = {
     "great_castle": {"layouts": ["great_castle_a", "great_castle_b", "great_castle_c",
                                  "great_castle_a2", "great_castle_b2", "great_castle_c2"],
-                     "spacing": 46, "separation": 20, "salt": 718213044},
-    "holdfast": {"layouts": ["holdfast_a", "holdfast_b", "holdfast_a2", "holdfast_b2"], "spacing": 30, "separation": 12, "salt": 515870611},
-    "watchtower": {"layouts": ["watchtower_a", "watchtower_b", "watchtower_a2", "watchtower_b2"], "spacing": 18, "separation": 7, "salt": 93011254},
+                     "spacing": 64, "separation": 28, "salt": 718213044},
+    "holdfast": {"layouts": ["holdfast_a", "holdfast_b", "holdfast_a2", "holdfast_b2"], "spacing": 44, "separation": 18, "salt": 515870611},
+    "watchtower": {"layouts": ["watchtower_a", "watchtower_b", "watchtower_a2", "watchtower_b2"], "spacing": 30, "separation": 12, "salt": 93011254},
     # the market towns between the castles: commoner, closer together, on flat ground
-    "town": {"layouts": ["town_walled", "town_cross", "town_green"], "spacing": 22, "separation": 9, "salt": 611290377},
+    "town": {"layouts": ["town_walled", "town_cross", "town_green"], "spacing": 36, "separation": 14, "salt": 611290377},
     # one capital per house region (1536 blocks); it levels a lot of ground, so it tolerates rough terrain
     "great_city": {"layouts": ["great_city", "canal_city"], "spacing": 96, "separation": 48, "salt": 402911733, "max_slope": 36},
     # the Nether holdfast: the holdfast plans in blackstone and nether brick, sited on the floor of the Nether

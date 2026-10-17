@@ -63,6 +63,14 @@ public final class StormholdCommand {
                     else for (var line : net.aiagent256.stormhold.holding.Events.present(mgr, m)) p.sendSystemMessage(line);
                     return 1;
                 }))
+                .then(Commands.literal("guide").executes(c -> {
+                    var p = c.getSource().getPlayerOrException();
+                    var mgr = net.aiagent256.stormhold.holding.HoldingManager.get(p.serverLevel());
+                    var h = net.aiagent256.stormhold.holding.Guide.here(mgr, p);
+                    if (h == null) p.sendSystemMessage(net.minecraft.network.chat.Component.literal("No castle or town within 400 blocks. Try /stormhold find city."));
+                    else for (var line : net.aiagent256.stormhold.holding.Guide.lines(p.serverLevel(), mgr, h, p)) p.sendSystemMessage(line);
+                    return 1;
+                }))
                 .then(Commands.literal("befriend").requires(s -> s.hasPermission(2)).executes(StormholdCommand::befriend))
                 .then(Commands.literal("capture").requires(s -> s.hasPermission(2)).executes(StormholdCommand::capture))
                 .then(Commands.literal("raid").requires(s -> s.hasPermission(2)).executes(StormholdCommand::raid))

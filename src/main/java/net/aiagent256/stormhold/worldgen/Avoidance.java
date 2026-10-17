@@ -25,6 +25,8 @@ import java.util.List;
  */
 public final class Avoidance {
     public static final TagKey<Structure> AVOID = TagKey.create(Registries.STRUCTURE, Stormhold.id("castle_avoid"));
+    /** Open ground kept between one castle's walls and the next: room for fields, and for each to stand on its own. */
+    public static final int CASTLE_GAP = 112;
     /** How far a village's buildings reach from its start chunk. */
     public static final int VILLAGE_REACH = 72;
 
@@ -54,7 +56,7 @@ public final class Avoidance {
                 if (!h.is(AVOID)) continue;
                 biomes.add(h.value().biomes());
                 if (h.value() instanceof CastleStructure c) {
-                    reach = Math.max(reach, c.maxHalfSize() + 24);
+                    reach = Math.max(reach, c.maxHalfSize() + CASTLE_GAP);
                     castle = Math.max(castle, c.maxHalfSize());
                 } else {
                     reach = Math.max(reach, VILLAGE_REACH);
