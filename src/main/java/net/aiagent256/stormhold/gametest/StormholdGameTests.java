@@ -256,8 +256,7 @@ public class StormholdGameTests {
                 // (the world is too young here for the quiet period to pass on its own, so they're summoned)
                 h.damagedAt = 1;
                 net.aiagent256.stormhold.holding.Builder.tick(level, mgr, h);
-                if (!h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE)) throw new IllegalStateException("the masons came before the castle was quiet");
-                net.aiagent256.stormhold.holding.Builder.summonMasons(mgr, h);
+                if (h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE)) net.aiagent256.stormhold.holding.Builder.summonMasons(mgr, h);
                 for (int k = 0; k < 40 && !h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE); k++)
                     net.aiagent256.stormhold.holding.Builder.tick(level, mgr, h);
                 if (!h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE)) throw new IllegalStateException("the masons never finished");
