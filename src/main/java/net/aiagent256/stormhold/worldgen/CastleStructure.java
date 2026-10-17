@@ -77,6 +77,9 @@ public class CastleStructure extends Structure {
         return m;
     }
 
+    /** A site this good is taken without looking at the shifted ones (a flat rise with some water in view scores about 40). */
+    private static final double GOOD_ENOUGH = 20;
+
     private record Site(int cx, int cz, int y, double score) {
     }
 
@@ -99,21 +102,24 @@ public class CastleStructure extends Structure {
         List<Avoidance.Threat> threats = ignoreTerrain ? List.of()
                 : Avoidance.near(ctx, cp.getMiddleBlockX(), cp.getMiddleBlockZ(), 46 + own + 110, maxHalfSize());
         Site best = null;
-        // chunks only reference structure starts within 8 chunks, so a 256-block layout can shift at most one chunk
+        // chunks only reference structure starts within 8 chunks, so a 256-block layout can shift at most one chunk.
+        // Every site costs a dozen noise columns, so the chunk's own centre is tried first and the eight shifts only
+        // when it won't do: a good site there is taken as it is.
         boolean huge = Math.max(chosen.sizeX(), chosen.sizeZ()) > 200;
         int shift = huge ? 0 : 32;
-        for (int i = -1; i <= 1; i++) {
-            for (int j = -1; j <= 1; j++) {
-                if (huge && (i != 0 || j != 0)) continue;
-                int sx = cp.getMiddleBlockX() + i * shift, sz = cp.getMiddleBlockZ() + j * shift;
-                Avoidance.Threat t = Avoidance.crowds(threats, sx, sz, own);
-                if (t != null) {
-                    lastRejection = "too close to " + t.name() + " at " + t.x() + ", " + t.z();
-                    continue;
-                }
-                Site s = evaluate(ctx, sx, sz, chosen);
-                if (s != null && (best == null || s.score > best.score)) best = s;
+        int[][] order = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
+        for (int[] o : order) {
+            int i = o[0], j = o[1];
+            if (huge && (i != 0 || j != 0)) continue;
+            int sx = cp.getMiddleBlockX() + i * shift, sz = cp.getMiddleBlockZ() + j * shift;
+            Avoidance.Threat t = Avoidance.crowds(threats, sx, sz, own);
+            if (t != null) {
+                lastRejection = "too close to " + t.name() + " at " + t.x() + ", " + t.z();
+                continue;
             }
+            Site s = evaluate(ctx, sx, sz, chosen);
+            if (s != null && (best == null || s.score > best.score)) best = s;
+            if (best != null && best.score >= GOOD_ENOUGH) break;
         }
         if (best == null) return Optional.empty();
         final Variant v = chosen;
@@ -135,8 +141,8 @@ public class CastleStructure extends Structure {
         for (int a = -1; a <= 1; a++) {
             for (int b = -1; b <= 1; b++) {
                 int x = cx + a * hx, z = cz + b * hz;
-                int surface = height(ctx, x, z, Heightmap.Types.WORLD_SURFACE_WG);
-                int floor = height(ctx, x, z, Heightmap.Types.OCEAN_FLOOR_WG);
+                int[] sf = surfaceAndFloor(ctx, x, z);
+                int surface = sf[0], floor = sf[1];
                 if (surface - floor > 1) wet++;
                 hs[k++] = surface;
             }
@@ -165,10 +171,9 @@ public class CastleStructure extends Structure {
         for (int t = 0; t < 8; t++) {
             double ang = t * Math.PI / 4;
             int x = cx + (int) (Math.cos(ang) * rx), z = cz + (int) (Math.sin(ang) * rz);
-            int surface = height(ctx, x, z, Heightmap.Types.WORLD_SURFACE_WG);
-            int floor = height(ctx, x, z, Heightmap.Types.OCEAN_FLOOR_WG);
-            if (surface - floor > 1) ringWater++;
-            ring += surface;
+            int[] sf = surfaceAndFloor(ctx, x, z);
+            if (sf[0] - sf[1] > 1) ringWater++;
+            ring += sf[0];
         }
         ring /= 8.0;
         double prominence = median - ring;
@@ -226,6 +231,30 @@ public class CastleStructure extends Structure {
             return null;
         }
         return new Site(cx, cz, sorted[k / 2], -slope - missing * 4);
+    }
+
+    /**
+     * The surface (top of water or land) and the floor (top of land) at a column, from one noise column instead of
+     * two heightmap queries: each query builds a whole noise chunk, and a site asks for seventeen columns.
+     */
+    private static int[] surfaceAndFloor(GenerationContext ctx, int x, int z) {
+        NoiseColumn col = ctx.chunkGenerator().getBaseColumn(x, z, ctx.heightAccessor(), ctx.randomState());
+        int top = ctx.heightAccessor().getMaxBuildHeight() - 1, bottom = ctx.heightAccessor().getMinBuildHeight();
+        int surface = bottom, floor = bottom;
+        boolean surfaceFound = false;
+        for (int y = top; y >= bottom; y--) {
+            BlockState b = col.getBlock(y);
+            if (b.isAir()) continue;
+            if (!surfaceFound) {
+                surface = y;
+                surfaceFound = true;
+            }
+            if (b.getFluidState().isEmpty()) {
+                floor = y;
+                break;
+            }
+        }
+        return new int[]{surface, floor};
     }
 
     private static int height(GenerationContext ctx, int x, int z, Heightmap.Types type) {

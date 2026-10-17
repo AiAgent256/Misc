@@ -10,7 +10,6 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureSet;
 import net.minecraft.world.level.levelgen.structure.placement.RandomSpreadStructurePlacement;
@@ -118,7 +117,9 @@ public final class Avoidance {
     private static boolean biomeAllows(net.minecraft.world.level.chunk.ChunkGenerator gen, net.minecraft.world.level.biome.BiomeSource src,
                                        net.minecraft.world.level.levelgen.RandomState rs, net.minecraft.world.level.LevelHeightAccessor h,
                                        Watch w, int bx, int bz) {
-        int y = gen.getFirstOccupiedHeight(bx, bz, Heightmap.Types.WORLD_SURFACE_WG, h, rs);
+        // the biome a few blocks over sea level: surface biomes don't change with height, and finding the real
+        // surface would mean computing a whole noise column for every candidate, which is what made /locate crawl
+        int y = gen.getSeaLevel() + 4;
         Holder<Biome> b = src.getNoiseBiome(QuartPos.fromBlock(bx), QuartPos.fromBlock(y), QuartPos.fromBlock(bz), rs.sampler());
         for (HolderSet<Biome> hs : w.biomes()) if (hs.contains(b)) return true;
         return false;
