@@ -177,8 +177,11 @@ public class CastleStructure extends Structure {
         return new Site(cx, cz, median, score);
     }
 
-    /** Headroom a Nether castle needs over its floor: the holdfast plans are about forty tall. */
-    private static final int NETHER_HEADROOM = 44, NETHER_LOW = 32, NETHER_HIGH = 100;
+    /**
+     * Headroom a Nether castle needs over its floor. The walls are twenty blocks; the towers may clip the cave
+     * roof, which the castle carves as it is placed. Forty-four blocks of clear air is rare down there.
+     */
+    private static final int NETHER_HEADROOM = 24, NETHER_LOW = 32, NETHER_HIGH = 100;
 
     /**
      * The Nether has no surface: the floor is the lowest ledge above the lava sea with enough open air over it
@@ -200,25 +203,29 @@ public class CastleStructure extends Structure {
     private Site evaluateNether(GenerationContext ctx, int cx, int cz, Variant v) {
         int hx = Math.max(4, v.sizeX() / 2 - 4), hz = Math.max(4, v.sizeZ() / 2 - 4);
         int[] hs = new int[9];
-        int k = 0;
+        int k = 0, missing = 0;
         for (int a = -1; a <= 1; a++) {
             for (int b = -1; b <= 1; b++) {
                 int y = netherFloor(ctx, cx + a * hx, cz + b * hz);
                 if (y < 0) {
-                    lastRejection = "no floor under the roof at " + (cx + a * hx) + ", " + (cz + b * hz);
-                    return null;
+                    // a pillar or a lava pool under one corner is filled or bridged by the foundation; two are not
+                    if (++missing > 2 || (a == 0 && b == 0)) {
+                        lastRejection = "no floor under the roof at " + (cx + a * hx) + ", " + (cz + b * hz);
+                        return null;
+                    }
+                    continue;
                 }
                 hs[k++] = y;
             }
         }
-        int[] sorted = hs.clone();
+        int[] sorted = Arrays.copyOf(hs, k);
         Arrays.sort(sorted);
-        int slope = sorted[8] - sorted[0];
+        int slope = sorted[k - 1] - sorted[0];
         if (slope > maxSlope) {
             lastRejection = "nether slope " + slope;
             return null;
         }
-        return new Site(cx, cz, sorted[4], -slope);
+        return new Site(cx, cz, sorted[k / 2], -slope - missing * 4);
     }
 
     private static int height(GenerationContext ctx, int x, int z, Heightmap.Types type) {
