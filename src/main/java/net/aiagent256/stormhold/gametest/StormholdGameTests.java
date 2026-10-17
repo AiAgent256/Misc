@@ -718,18 +718,18 @@ public class StormholdGameTests {
     public static void fiefWorkIsReal(GameTestHelper g) {
         ServerLevel level = g.getLevel();
         HoldingManager mgr = HoldingManager.get(level);
-        int cx = -6000 - (int) (Math.floorMod(g.absolutePos(BlockPos.ZERO).asLong(), 7L)) * 300, cz = 6000;
+        int cx = -6000 - (int) (Math.floorMod(g.absolutePos(BlockPos.ZERO).asLong(), 7L)) * 400, cz = 6000;
         int cc = cx >> 4, ccz = cz >> 4;
-        for (int dx = -9; dx <= 9; dx++) {
-            for (int dz = -9; dz <= 9; dz++) {
+        for (int dx = -12; dx <= 12; dx++) {
+            for (int dz = -12; dz <= 12; dz++) {
                 level.setChunkForced(cc + dx, ccz + dz, true);
                 level.getChunk(cc + dx, ccz + dz);
             }
         }
         int y = 80;
         // wide enough that a mine at the far edge of the fief still has rock to tunnel into
-        for (int x = cx - 135; x <= cx + 135; x++) {
-            for (int z = cz - 135; z <= cz + 135; z++) {
+        for (int x = cx - 175; x <= cx + 175; x++) {
+            for (int z = cz - 175; z <= cz + 175; z++) {
                 for (int yy = y - 24; yy < y - 3; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(), 2);
                 for (int yy = y - 3; yy < y - 1; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), 2);
                 level.setBlock(new BlockPos(x, y - 1, z), net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(), 2);
@@ -739,8 +739,8 @@ public class StormholdGameTests {
             }
         }
         // a seam of iron for the miners to find
-        for (int x = cx - 135; x <= cx + 135; x++) {
-            for (int z = cz - 135; z <= cz + 135; z++) {
+        for (int x = cx - 175; x <= cx + 175; x++) {
+            for (int z = cz - 175; z <= cz + 175; z++) {
                 if ((x + z) % 3 != 0) continue;
                 for (int yy = y - 14; yy <= y - 10; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.IRON_ORE.defaultBlockState(), 2);
             }
@@ -750,7 +750,7 @@ public class StormholdGameTests {
         h.gatePos = new BlockPos(cx, y, cz + 8);
         h.owner = Sides.player(UUID.randomUUID());
         mgr.add(h);
-        var area = new net.minecraft.world.phys.AABB(new BlockPos(cx, y, cz)).inflate(110, 60, 110);
+        var area = new net.minecraft.world.phys.AABB(new BlockPos(cx, y, cz)).inflate(180, 60, 180);
         try {
             var minePiece = net.aiagent256.stormhold.holding.DataRegistries.fiefPiece("mine");
             var penPiece = net.aiagent256.stormhold.holding.DataRegistries.fiefPiece("pasture");
@@ -811,7 +811,7 @@ public class StormholdGameTests {
             Garrisons.discardLive(level, h.live, false);
             mgr.holdings.remove(h.id);
             mgr.byKey.remove(h.key);
-            for (int dx = -9; dx <= 9; dx++) for (int dz = -9; dz <= 9; dz++) level.setChunkForced(cc + dx, ccz + dz, false);
+            for (int dx = -12; dx <= 12; dx++) for (int dz = -12; dz <= 12; dz++) level.setChunkForced(cc + dx, ccz + dz, false);
         }
         g.succeed();
     }
