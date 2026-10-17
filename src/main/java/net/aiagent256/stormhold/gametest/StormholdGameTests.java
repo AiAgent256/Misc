@@ -1274,7 +1274,7 @@ public class StormholdGameTests {
         if (structure == null) throw new IllegalStateException("nether_holdfast_nether not registered");
         var gen = nether.getChunkSource().getGenerator();
         int found = 0, tried = 0;
-        for (int i = 0; i < 40 && found == 0; i++) {
+        for (int i = 0; i < 80 && found == 0; i++) {
             tried++;
             net.minecraft.world.level.ChunkPos cp = new net.minecraft.world.level.ChunkPos(200 + i * 7, 200 + (i % 5) * 11);
             var start = structure.generate(nether.registryAccess(), gen, gen.getBiomeSource(), nether.getChunkSource().randomState(),

@@ -213,8 +213,9 @@ public class CastleStructure extends Structure {
             for (int b = -1; b <= 1; b++) {
                 int y = netherFloor(ctx, cx + a * hx, cz + b * hz);
                 if (y < 0) {
-                    // a pillar or a lava pool under one corner is filled or bridged by the foundation; two are not
-                    if (++missing > 2 || (a == 0 && b == 0)) {
+                    // a pillar or a lava pool under a corner is filled or bridged by the foundation: with the bigger
+                    // plans the samples are seventy blocks apart, so up to four of the eight may miss; the centre may not
+                    if (++missing > 4 || (a == 0 && b == 0)) {
                         lastRejection = "no floor under the roof at " + (cx + a * hx) + ", " + (cz + b * hz);
                         return null;
                     }
