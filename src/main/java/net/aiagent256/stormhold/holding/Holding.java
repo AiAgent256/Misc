@@ -252,6 +252,19 @@ public class Holding {
         return tier >= 4;
     }
 
+    /**
+     * The plans this castle was built from, if they still describe it. A layout that has since been redrawn
+     * at another size (the castle grew in a later build) is no guide to a castle already standing: repairs and
+     * gate restoration would set the new plan down over the old walls.
+     */
+    @Nullable
+    public Layout plans() {
+        Layout l = layout != null ? DataRegistries.layout(layout) : null;
+        if (l == null || box == null) return null;
+        if (box.getXSpan() != l.sizeX || box.getZSpan() != l.sizeZ) return null;
+        return l;
+    }
+
     public boolean isHouseOwned() {
         return Sides.isHouse(owner);
     }

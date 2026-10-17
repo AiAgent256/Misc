@@ -158,7 +158,7 @@ public final class Builder {
             // a house's own masons: once the castle has been quiet for a minute after taking damage, they put it back
             if (h.work.equals(NONE)) {
                 long now = level.getGameTime();
-                if (h.damagedAt <= 0 || now - h.damagedAt < QUIET || h.dragonAt != 0 || h.layout == null) return;
+                if (h.damagedAt <= 0 || now - h.damagedAt < QUIET || h.dragonAt != 0 || h.plans() == null) return;
                 summonMasons(mgr, h);
             } else if (!h.work.equals(REPAIR)) {
                 h.work = NONE;
@@ -237,7 +237,7 @@ public final class Builder {
 
     /** Everything the layout says should be there and isn't. False if this castle has no plans (a founded holding). */
     private static boolean survey(ServerLevel level, Holding h) {
-        Layout l = h.layout != null ? DataRegistries.layout(h.layout) : null;
+        Layout l = h.plans();
         if (l == null) return false;
         Map<Block, DataRegistries.Weighted> theme = DataRegistries.theme(h.theme == null ? "" : h.theme);
         var lookup = level.holderLookup(Registries.BLOCK);

@@ -65,8 +65,8 @@ public final class Gates {
      * snow and the like), never a block someone placed. Returns the blocks placed.
      */
     public static int restore(ServerLevel level, HoldingManager mgr, Holding h) {
-        Layout l = h.layout != null ? DataRegistries.layout(h.layout) : null;
-        if (l == null || l.gatePlanes.isEmpty() || h.box == null) return 0;
+        Layout l = h.plans();
+        if (l == null || l.gatePlanes.isEmpty()) return 0;
         for (Campaign c : mgr.campaigns) {
             if (c.stage != Campaign.Stage.DONE && h.id.equals(c.target)) return 0;     // not mid-siege
         }

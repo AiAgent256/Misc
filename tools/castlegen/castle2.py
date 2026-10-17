@@ -529,10 +529,11 @@ def great_castle_c(seed=33):
 
 
 def holdfast_b(seed=13):
-    """Tier 2 tower house inside a barmkin wall."""
-    W, H, GL = 56, 56, 5
+    """Tier 2 tower house inside a barmkin wall, with a yard a garrison can live in."""
+    W, H, GL = 72, 56, 5
     g = Grid(W, H, W, seed)
     xs, zs = g.xz()
+    c = W // 2
     e = np.minimum(np.minimum(xs, W - 1 - xs), np.minimum(zs, W - 1 - zs))
     g.fill_mask(e >= 2, 0, GL - 2, FOUND)
     g.fill_mask(e >= 2, GL - 1, GL - 1, PAVE)
@@ -542,42 +543,45 @@ def holdfast_b(seed=13):
     g.fill_mask(e < 2, GL, GL + 6, AIR)
     # barmkin wall
     wtop = GL + 8
-    body = rect_ring(g, 4, 4, 51, 51, 2)
+    o = W - 5          # the wall's outer line on the far side
+    body = rect_ring(g, 4, 4, o, o, 2)
     g.fill_mask(body, 0, wtop - 1, STONE)
-    g.fill_mask(rect_ring(g, 3, 3, 52, 52, 1), 0, GL + 1, DARK)
-    g.fill_mask(rect_ring(g, 4, 4, 51, 51, 1), GL + 3, GL + 3, DARK)
-    parapet_rect(g, 4, 4, 51, 51, wtop)
-    g.fill_mask(rect(g, 5, 5, 50, 50) & ~rect(g, 6, 6, 49, 49), wtop, wtop + 3, AIR)
-    for x in range(8, 49, 5):
-        g.mark("archer", x, wtop, 5); g.mark("archer", x, wtop, 50)
-    for z in range(8, 49, 5):
-        g.mark("archer", 5, wtop, z); g.mark("archer", 50, wtop, z)
-    for (cx, cz) in ((5, 5), (50, 5), (5, 50), (50, 50)):
+    g.fill_mask(rect_ring(g, 3, 3, o + 1, o + 1, 1), 0, GL + 1, DARK)
+    g.fill_mask(rect_ring(g, 4, 4, o, o, 1), GL + 3, GL + 3, DARK)
+    parapet_rect(g, 4, 4, o, o, wtop)
+    g.fill_mask(rect(g, 5, 5, o - 1, o - 1) & ~rect(g, 6, 6, o - 2, o - 2), wtop, wtop + 3, AIR)
+    for x in range(8, o - 2, 5):
+        g.mark("archer", x, wtop, 5); g.mark("archer", x, wtop, o - 1)
+    for z in range(8, o - 2, 5):
+        g.mark("archer", 5, wtop, z); g.mark("archer", o - 1, wtop, z)
+    for (cx, cz) in ((5, 5), (o - 1, 5), (5, o - 1), (o - 1, o - 1)):
         round_tower(g, cx, cz, 3, wtop + 4, GL, floors=(wtop - 1,), spiral=False, cone=True, t=1,
-                    doors=((1 if cx < 28 else -1, 0, wtop), (0, 1 if cz < 28 else -1, wtop)))
+                    doors=((1 if cx < c else -1, 0, wtop), (0, 1 if cz < c else -1, wtop)))
     # stairs up to the wall walk, along the inner face of the south wall, landing onto the walk
+    sz = o - 2
     for k in range(wtop - GL):
-        g.stair(10 + k, GL + k, 49, STONE_STAIR, "east")
-        g.fill(10 + k, GL, 49, 10 + k, GL + k - 1, 49, STONE)
-    g.fill(10 + wtop - GL, GL, 49, 11 + wtop - GL, wtop - 1, 49, STONE)
-    g.fill(10 + wtop - GL, wtop, 49, 11 + wtop - GL, wtop + 1, 50, AIR)
+        g.stair(10 + k, GL + k, sz, STONE_STAIR, "east")
+        g.fill(10 + k, GL, sz, 10 + k, GL + k - 1, sz, STONE)
+    g.fill(10 + wtop - GL, GL, sz, 11 + wtop - GL, wtop - 1, sz, STONE)
+    g.fill(10 + wtop - GL, wtop, sz, 11 + wtop - GL, wtop + 1, sz + 1, AIR)
     # gatehouse
-    g.fill(23, 0, 46, 32, wtop + 5, 53, STONE)
-    pointed_arch(g, 26, 29, GL, 6, 46, 53)
-    portcullis_plane(g, 26, 29, GL, 6, 52)
-    g.fill(26, GL - 1, 46, 29, GL - 1, W - 1, ROAD)
-    parapet_rect(g, 22, 45, 33, 54, wtop + 6)
-    g.fill(23, wtop + 6, 46, 32, wtop + 9, 53, AIR)
-    for x in (24, 31):
-        g.mark("crossbowman", x, wtop + 6, 52)
+    gx0, gx1 = c - 5, c + 4
+    g.fill(gx0, 0, o - 5, gx1, wtop + 5, o + 2, STONE)
+    pointed_arch(g, c - 2, c + 1, GL, 6, o - 5, o + 2)
+    portcullis_plane(g, c - 2, c + 1, GL, 6, o + 1)
+    g.fill(c - 2, GL - 1, o - 5, c + 1, GL - 1, W - 1, ROAD)
+    parapet_rect(g, gx0 - 1, o - 6, gx1 + 1, o + 3, wtop + 6)
+    g.fill(gx0, wtop + 6, o - 5, gx1, wtop + 9, o + 2, AIR)
+    for x in (gx0 + 1, gx1 - 1):
+        g.mark("crossbowman", x, wtop + 6, o + 1)
     # a stair cut up through the gatehouse from the west wall-walk to its roof
     for k in range(6):
-        g.stair(23 + k, wtop + k, 50, STONE_STAIR, "east")
-        g.fill(23 + k, wtop + k + 1, 50, 23 + k, wtop + k + 3, 50, AIR)
-    g.fill(29, wtop + 6, 50, 29, wtop + 8, 50, AIR)
-    g.mark("gate", 27, GL, W - 1)
-    # tower house
-    hx0, hz0, hx1, hz1 = 16, 10, 37, 27
+        g.stair(gx0 + k, wtop + k, o - 1, STONE_STAIR, "east")
+        g.fill(gx0 + k, wtop + k + 1, o - 1, gx0 + k, wtop + k + 3, o - 1, AIR)
+    g.fill(gx0 + 6, wtop + 6, o - 1, gx0 + 6, wtop + 8, o - 1, AIR)
+    g.mark("gate", c - 1, GL, W - 1)
+    # tower house: twenty-eight by twenty-two, five floors
+    hx0, hz0, hx1, hz1 = c - 18, 10, c + 9, 31
     top = GL + 36
     floors = [GL + 8, GL + 15, GL + 22, GL + 29]
     g.fill(hx0, 0, hz0, hx1, top - 1, hz1, STONE)
@@ -585,7 +589,7 @@ def holdfast_b(seed=13):
     g.fill(hx0 + 3, GL - 1, hz0 + 3, hx1 - 3, GL - 1, hz1 - 3, FLOOR_STONE)
     for fy in floors:
         g.fill(hx0 + 3, fy, hz0 + 3, hx1 - 3, fy, hz1 - 3, PLANK)
-        g.lantern(26, fy - 1, 18); g.lantern(32, fy - 1, 22)
+        g.lantern(c - 4, fy - 1, 18); g.lantern(c + 4, fy - 1, 24)
     g.fill(hx0, top - 1, hz0, hx1, top - 1, hz1, STONE)
     for x in range(hx0 - 1, hx1 + 2):
         for z, f in ((hz0 - 1, "south"), (hz1 + 1, "north")):
@@ -609,86 +613,135 @@ def holdfast_b(seed=13):
         for z in (hz0, hz1):
             for fy in floors:
                 g.fill(x, fy + 2, z, x, fy + 3, z, GLASS)
-    g.fill(25, GL, hz1 - 2, 27, GL + 3, hz1, AIR)
-    spiral_stair(g, 21, 15, GL, top - 1, STONE_STAIR, STONE)
+    g.fill(c - 2, GL, hz1 - 2, c + 1, GL + 3, hz1, AIR)
+    spx, spz = hx0 + 5, hz0 + 5
+    spiral_stair(g, spx, spz, GL, top - 1, STONE_STAIR, STONE)
     # caphouse over the stair head
-    g.fill(18, top, 12, 24, top + 4, 18, STONE)
-    g.fill(19, top, 13, 23, top + 3, 17, AIR)
-    g.fill(24, top, 14, 24, top + 2, 16, AIR)
-    gable_roof(g, 18, 12, 24, 18, top + 5, "z", ROOF_STAIR, STONE)
-    spiral_stair(g, 21, 15, GL, top - 1, STONE_STAIR, STONE, clear=False)
-    g.wall_banner(hx0 - 2, top - 6, 18, "west"); g.wall_banner(hx1 + 2, top - 6, 18, "east")
-    g.wall_banner(26, top - 6, hz1 + 2, "south")
-    hall_furnish(g, 21, 34, 13, 24, GL)
-    for z in range(13, 24, 3):
-        g.chest(34, floors[0] + 1, z, "west", LOOT + "holdfast_treasury")
-    for z in range(13, 24, 3):
-        g.bed(32, floors[1] + 1, z, "east", "gray"); g.bed(32, floors[2] + 1, z, "east", "red")
-    g.mark("banner_stand", 33, top, 23)
-    for (x, z) in ((30, 12), (35, 25), (28, 25)):
+    g.fill(spx - 4, top, spz - 4, spx + 4, top + 4, spz + 4, STONE)
+    g.fill(spx - 3, top, spz - 3, spx + 3, top + 3, spz + 3, AIR)
+    g.fill(spx + 4, top, spz - 1, spx + 4, top + 2, spz + 1, AIR)
+    gable_roof(g, spx - 4, spz - 4, spx + 4, spz + 4, top + 5, "z", ROOF_STAIR, STONE)
+    spiral_stair(g, spx, spz, GL, top - 1, STONE_STAIR, STONE, clear=False)
+    g.wall_banner(hx0 - 2, top - 6, 20, "west"); g.wall_banner(hx1 + 2, top - 6, 20, "east")
+    g.wall_banner(c - 1, top - 6, hz1 + 2, "south")
+    hall_furnish(g, hx0 + 5, hx1 - 5, hz0 + 3, hz1 - 3, GL)
+    for z in range(hz0 + 3, hz1 - 3, 3):
+        g.chest(hx1 - 3, floors[0] + 1, z, "west", LOOT + "holdfast_treasury")
+    for z in range(hz0 + 3, hz1 - 3, 3):
+        g.bed(hx1 - 5, floors[1] + 1, z, "east", "gray"); g.bed(hx1 - 5, floors[2] + 1, z, "east", "red")
+    g.mark("banner_stand", hx1 - 4, top, hz1 - 4)
+    for (x, z) in ((c - 2, hz0 + 2), (hx1 - 4, hz1 - 2), (hx0 + 12, hz1 - 2)):
         g.mark("archer", x, top, z)
-    for (x, z) in ((30, 22), (24, 22)):
+    for (x, z) in ((c, hz1 - 7), (c - 10, hz1 - 7)):
         g.mark("knight", x, GL, z)
-    g.mark("captain", 26, GL, hz1 + 3); g.mark("rally", 27, GL, 40)
-    # outbuildings
-    building(g, 7, 31, 15, 45, GL, 6, "z", door_cells=((15, 38),), chimney=(9, 33))
-    for z in range(32, 45, 3):
+    g.mark("captain", c - 1, GL, hz1 + 3); g.mark("rally", c - 1, GL, hz1 + 17)
+    # outbuildings: barracks and a lodging on the west, stable and smithy on the east, a well on the way to the gate
+    building(g, 7, 40, 16, 56, GL, 6, "z", door_cells=((16, 48),), chimney=(9, 42))
+    for z in range(42, 56, 3):
         g.bed(8, GL, z, "west", "brown")
-    g.barrel(14, GL, 44, LOOT + "castle_barracks", facing="west")
-    building(g, 41, 33, 48, 44, GL, 5, "z")
-    g.fill(41, GL, 35, 41, GL + 2, 42, AIR)
-    g.set(47, GL, 36, "minecraft:hay_block[axis=y]"); g.set(47, GL, 41, "minecraft:hay_block[axis=y]")
-    g.fill(30, GL - 3, 36, 32, GL - 1, 38, "minecraft:stone_bricks")
-    g.set(31, GL - 1, 37, "minecraft:water"); g.set(31, GL - 2, 37, "minecraft:water")
-    for (x, z) in ((20, 36), (35, 36), (24, 42), (36, 44), (12, 28), (44, 28)):
+    g.barrel(15, GL, 55, LOOT + "castle_barracks", facing="west")
+    building(g, 7, 10, 14, 22, GL, 5, "z", door_cells=((14, 16),), chimney=(9, 12))
+    for z in range(12, 21, 3):
+        g.bed(8, GL, z, "west", "brown")
+    building(g, o - 12, 42, o - 3, 54, GL, 5, "z")
+    g.fill(o - 12, GL, 44, o - 12, GL + 2, 52, AIR)
+    g.set(o - 4, GL, 46, "minecraft:hay_block[axis=y]"); g.set(o - 4, GL, 51, "minecraft:hay_block[axis=y]")
+    building(g, o - 14, 10, o - 5, 20, GL, 5, "x", door_cells=((o - 14, 15),), chimney=(o - 7, 12))
+    g.set(o - 12, GL, 12, "minecraft:anvil[facing=north]"); g.set(o - 12, GL, 18, "minecraft:blast_furnace[facing=north]")
+    g.set(o - 9, GL, 12, "minecraft:grindstone[face=floor,facing=north]")
+    g.fill(c + 2, GL - 3, 44, c + 4, GL - 1, 46, "minecraft:stone_bricks")
+    g.set(c + 3, GL - 1, 45, "minecraft:water"); g.set(c + 3, GL - 2, 45, "minecraft:water")
+    g.set(c + 3, GL, 45, "minecraft:oak_fence"); g.set(c + 3, GL + 1, 45, "minecraft:oak_fence")
+    g.set(c + 3, GL + 2, 45, "minecraft:dark_oak_slab[type=bottom]")
+    for (x, z) in ((c - 12, 44), (c + 9, 44), (c - 6, 52), (c + 8, 56), (12, 34), (o - 11, 34), (12, 26), (o - 11, 26), (c - 1, 58),
+                   (c - 14, 60), (c + 12, 60)):
         g.mark("knight", x, GL, z)
-    lamp_post(g, 22, 40, GL); lamp_post(g, 33, 40, GL)
+    lamp_post(g, c - 8, 50, GL); lamp_post(g, c + 7, 50, GL)
+    lamp_post(g, c - 8, 36, GL); lamp_post(g, c + 7, 36, GL)
     return g, {"name": "holdfast_b", "tier": 2, "GL": GL}
 
 
 def watchtower_b(seed=9):
-    """Tier 1 square peel tower inside a timber palisade."""
-    W, H, GL = 34, 46, 4
+    """Tier 1 square peel tower inside a timber palisade, with a fighting platform behind the stakes."""
+    W, H, GL = 48, 46, 4
     g = Grid(W, H, W, seed)
     xs, zs = g.xz()
+    c = W // 2
     g.fill(0, 0, 0, W - 1, GL - 2, W - 1, FOUND)
     g.fill(0, GL - 1, 0, W - 1, GL - 1, W - 1, Mix(("minecraft:grass_block", 50), ("minecraft:coarse_dirt", 25),
                                                      ("minecraft:dirt_path", 15), ("minecraft:gravel", 10)))
     g.fill(0, GL, 0, W - 1, GL + 8, W - 1, AIR)
-    pal = rect_ring(g, 2, 2, 31, 31, 1)
-    g.fill_mask(pal, GL, GL + 2, "minecraft:spruce_log[axis=y]")
+    # the palisade: a double row of stakes, five high, pointed with fence on top
+    pal = rect_ring(g, 2, 2, W - 3, W - 3, 1)
+    g.fill_mask(pal, GL - 1, GL + 4, "minecraft:spruce_log[axis=y]")
     xs2, zs2 = g.xz()
-    g.fill_mask(pal & (np.mod(xs2 + zs2, 2) == 0), GL + 3, GL + 3, "minecraft:spruce_fence")
-    g.fill(15, GL, 31, 18, GL + 3, 31, AIR)
-    g.fill(15, GL - 1, 28, 18, GL - 1, W - 1, "minecraft:dirt_path")
-    for x in (14, 19):
-        g.fill(x, GL, 31, x, GL + 5, 31, "minecraft:spruce_log[axis=y]")
-    g.fill(14, GL + 6, 31, 19, GL + 6, 31, "minecraft:spruce_log[axis=x]")
-    portcullis_plane(g, 15, 18, GL, 6, 31)
-    g.mark("gate", 16, GL, W - 1)
+    g.fill_mask(pal & (np.mod(xs2 + zs2, 2) == 0), GL + 5, GL + 5, "minecraft:spruce_fence")
+    # the fighting platform behind it: two planks wide, three up, on posts, with a step up by the gate
+    plat = rect_ring(g, 3, 3, W - 4, W - 4, 2)
+    g.fill_mask(plat, GL + 2, GL + 2, "minecraft:spruce_planks")
+    g.fill_mask(plat & (np.mod(xs2, 4) == 0) & (np.mod(zs2, 4) == 0), GL, GL + 1, "minecraft:spruce_fence")
+    g.fill_mask(rect_ring(g, 5, 5, W - 6, W - 6, 1), GL + 3, GL + 3, "minecraft:spruce_fence")
+    # gate in the south stakes
+    gx0, gx1 = c - 2, c + 1
+    g.fill(gx0, GL - 1, W - 3, gx1, GL + 5, W - 3, AIR)
+    g.fill(gx0, GL, W - 6, gx1, GL + 4, W - 4, AIR)             # the platform breaks for the gate passage
+    g.fill(gx0 - 1, GL, W - 6, gx1 + 1, GL + 3, W - 4, AIR)
+    g.fill(gx0, GL - 1, W - 8, gx1, GL - 1, W - 1, "minecraft:dirt_path")
+    g.fill(gx0, GL - 1, W - 3, gx1, GL - 1, W - 3, "minecraft:dirt_path")
+    for x in (gx0 - 1, gx1 + 1):
+        g.fill(x, GL - 1, W - 4, x, GL + 6, W - 3, "minecraft:spruce_log[axis=y]")
+    g.fill(gx0 - 1, GL + 7, W - 4, gx1 + 1, GL + 7, W - 3, "minecraft:spruce_log[axis=x]")
+    g.fill(gx0, GL + 5, W - 4, gx1, GL + 6, W - 4, "minecraft:spruce_planks")
+    portcullis_plane(g, gx0, gx1, GL, 5, W - 3)
+    g.mark("gate", c, GL, W - 1)
+    # steps up to the platform either side of the gate passage, straight flights out of the yard
+    for sx in (gx0 - 4, gx1 + 4):
+        for k in range(3):
+            z = W - 8 + k
+            g.stair(sx, GL + k, z, "minecraft:spruce_stairs", "south")
+            g.fill(sx, GL - 1, z, sx, GL + k - 1, z, "minecraft:spruce_log[axis=y]") if k > 0 else None
+            g.fill(sx, GL + k + 1, z, sx, GL + 5, z, AIR)
+        g.set(sx, GL + 3, W - 6, AIR)
+    for (x, z) in ((8, 4), (c, 4), (W - 9, 4), (4, 12), (4, c), (4, W - 12), (W - 5, 12), (W - 5, c), (W - 5, W - 12),
+                   (10, W - 5), (W - 11, W - 5)):
+        g.mark("archer", x, GL + 3, z)
+    # the peel tower: eighteen across, four floors, a stair two men wide
+    tx0, tz0, tx1, tz1 = c - 10, 8, c + 7, 25
     top = GL + 28
-    square_tower(g, 10, 7, 23, 20, top, GL, floors=(GL + 7, GL + 14, GL + 21), spiral_at=(15, 12),
+    square_tower(g, tx0, tz0, tx1, tz1, top, GL, floors=(GL + 7, GL + 14, GL + 21), spiral_at=(tx0 + 6, tz0 + 6),
                  banner_sides=("south", "east", "west"))
-    for (cx, cz) in ((9, 6), (24, 6), (9, 21), (24, 21)):
+    for (cx, cz) in ((tx0 - 1, tz0 - 1), (tx1 + 1, tz0 - 1), (tx0 - 1, tz1 + 1), (tx1 + 1, tz1 + 1)):
         bartizan(g, cx, cz, top + 1)
-    g.fill(18, GL, 17, 19, GL + 2, 21, AIR)        # the door, right through the wall and the plinth
-    g.mark("banner_stand", 19, top, 15)
-    g.mark("lord", 18, GL + 7 + 1, 16) if False else None
-    g.mark("lord", 18, GL + 15, 16)
-    g.mark("war_table", 19, GL + 15, 12)
-    g.chest(20, GL + 15, 17, "west", LOOT + "watchtower_treasury")
-    g.chest(20, GL + 15, 11, "west", LOOT + "watchtower_treasury")
-    for (x, z) in ((12, 9), (21, 18), (21, 9), (12, 18)):
+    g.fill(tx1 - 6, GL, tz1 - 3, tx1 - 5, GL + 2, tz1 + 1, AIR)        # the door, right through the wall and the plinth
+    g.mark("banner_stand", tx1 - 4, top, tz0 + 9)
+    g.mark("lord", tx1 - 5, GL + 15, tz0 + 10)
+    g.stair(tx1 - 4, GL + 15, tz0 + 10, "minecraft:dark_oak_stairs", "west")
+    g.mark("war_table", tx1 - 5, GL + 15, tz0 + 5)
+    g.chest(tx1 - 3, GL + 15, tz0 + 12, "west", LOOT + "watchtower_treasury")
+    g.chest(tx1 - 3, GL + 15, tz0 + 4, "west", LOOT + "watchtower_treasury")
+    for (x, z) in ((tx0 + 4, tz0 + 4), (tx1 - 4, tz1 - 4), (tx1 - 4, tz0 + 4), (tx0 + 4, tz1 - 4)):
         g.mark("archer", x, top, z)
-    building(g, 4, 23, 11, 29, GL, 5, "x", door_cells=((11, 26),), chimney=(5, 24))
-    g.bed(5, GL, 27, "north", "brown")
-    g.barrel(10, GL, 24, LOOT + "castle_barracks")
-    g.set(26, GL, 26, "minecraft:campfire[lit=true,signal_fire=false]")
-    for (x, z) in ((27, 26), (25, 26), (26, 27)):
+    # the yard: a barracks, a stable, a well, a smithy's lean-to, a campfire
+    building(g, 7, 29, 16, 40, GL, 5, "x", door_cells=((16, 34),), chimney=(8, 30))
+    for z in range(31, 40, 3):
+        g.bed(8, GL, z, "west", "brown")
+    g.barrel(15, GL, 39, LOOT + "castle_barracks", facing="west")
+    building(g, W - 16, 29, W - 7, 38, GL, 5, "z", door_cells=((W - 16, 33),))
+    g.fill(W - 16, GL, 31, W - 16, GL + 2, 35, AIR)
+    for z in (31, 35):
+        g.set(W - 8, GL, z, "minecraft:hay_block[axis=y]")
+    g.fill(c + 11, GL - 3, 12, c + 13, GL - 1, 14, "minecraft:stone_bricks")
+    g.set(c + 12, GL - 1, 13, "minecraft:water"); g.set(c + 12, GL - 2, 13, "minecraft:water")
+    g.set(c + 12, GL, 13, "minecraft:oak_fence"); g.set(c + 12, GL + 1, 13, "minecraft:oak_fence")
+    g.set(c + 12, GL + 2, 13, "minecraft:dark_oak_slab[type=bottom]")
+    g.set(c - 14, GL, 15, "minecraft:campfire[lit=true,signal_fire=false]")
+    for (x, z) in ((c - 15, 15), (c - 13, 15), (c - 14, 16)):
         g.stair(x, GL, z, "minecraft:spruce_stairs", "north")
-    g.fill(26, GL, 5, 28, GL + 1, 7, "minecraft:hay_block[axis=y]")
-    for (x, z) in ((6, 10), (27, 12), (16, 25), (24, 28), (6, 18)):
+    g.fill(c + 10, GL, 18, c + 12, GL + 1, 20, "minecraft:hay_block[axis=y]")
+    g.set(c + 14, GL, 20, "minecraft:anvil[facing=north]"); g.set(c + 14, GL, 22, "minecraft:blast_furnace[facing=west]")
+    for (x, z) in ((9, 12), (c + 15, 9), (c - 5, 30), (c + 6, 30), (8, 24), (W - 9, 26), (c, 36), (c - 8, 40), (c + 8, 40)):
         g.mark("knight", x, GL, z)
-    g.mark("captain", 16, GL, 23); g.mark("rally", 16, GL, 25)
-    lamp_post(g, 13, 29, GL); lamp_post(g, 20, 29, GL)
+    g.mark("captain", c, GL, 31); g.mark("rally", c, GL, 34)
+    lamp_post(g, c - 4, W - 8, GL); lamp_post(g, c + 3, W - 8, GL)
+    lamp_post(g, c - 12, 26, GL); lamp_post(g, c + 10, 26, GL)
     return g, {"name": "watchtower_b", "tier": 1, "GL": GL}

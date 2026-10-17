@@ -8,29 +8,29 @@
  "layouts": [
   {
    "name": "watchtower_a",
-   "size_x": 36,
-   "size_z": 36,
+   "size_x": 48,
+   "size_z": 48,
    "ground": 4,
    "weight": 1
   },
   {
    "name": "watchtower_b",
-   "size_x": 34,
-   "size_z": 34,
+   "size_x": 48,
+   "size_z": 48,
    "ground": 4,
    "weight": 1
   },
   {
    "name": "watchtower_a2",
-   "size_x": 36,
-   "size_z": 36,
+   "size_x": 48,
+   "size_z": 48,
    "ground": 4,
    "weight": 1
   },
   {
    "name": "watchtower_b2",
-   "size_x": 34,
-   "size_z": 34,
+   "size_x": 48,
+   "size_z": 48,
    "ground": 4,
    "weight": 1
   }
