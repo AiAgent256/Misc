@@ -196,7 +196,7 @@ def cap_roof(g, cx, cz, r, top, square=None):
 
 
 def round_tower(g, cx, cz, r, top, GL, floors=(), spiral=True, cone=False, t=3,
-                doors=(), banner_dirs=(), lantern_floors=True):
+                doors=(), banner_dirs=(), lantern_floors=True, wide=None):
     """Round tower from y=0. Roof platform standing level = top. Returns spiral ring."""
     full = disk(g, cx, cz, r)
     shell = ring(g, cx, cz, r, r - t)
@@ -236,10 +236,10 @@ def round_tower(g, cx, cz, r, top, GL, floors=(), spiral=True, cone=False, t=3,
     g.fill_mask(proj, top, top, STONE)
     sp = None
     if spiral and r - t >= 3:
-        sp = spiral_stair(g, cx, cz, GL, top - 1, STONE_STAIR, STONE, landings=tuple(fy + 1 for fy in floors))
+        sp = spiral_stair(g, cx, cz, GL, top - 1, STONE_STAIR, STONE, landings=tuple(fy + 1 for fy in floors), wide=wide)
         # rail around the shaft at roof level, leaving the exit open
         last = g.spiral_last
-        exit_cells = {sp[(last + k) % 16][:2] for k in range(-3, 2)}
+        exit_cells = {sp[(last + k) % len(sp)][:2] for k in range(-3, 2)}
         for (x, z, _) in sp:
             if (x, z) not in exit_cells:
                 g.set(x, top, z, RAIL)
@@ -282,7 +282,7 @@ def round_tower(g, cx, cz, r, top, GL, floors=(), spiral=True, cone=False, t=3,
 
 
 def square_tower(g, x0, z0, x1, z1, top, GL, floors=(), spiral_at=None, t=3, cone=False,
-                 banner_sides=()):
+                 banner_sides=(), wide=None):
     full = rect(g, x0, z0, x1, z1)
     inner = rect(g, x0 + t, z0 + t, x1 - t, z1 - t)
     g.fill_mask(full, 0, top - 1, STONE)
@@ -322,9 +322,9 @@ def square_tower(g, x0, z0, x1, z1, top, GL, floors=(), spiral_at=None, t=3, con
     sp = None
     if spiral_at:
         cx, cz = spiral_at
-        sp = spiral_stair(g, cx, cz, GL, top - 1, STONE_STAIR, STONE, landings=tuple(fy + 1 for fy in floors))
+        sp = spiral_stair(g, cx, cz, GL, top - 1, STONE_STAIR, STONE, landings=tuple(fy + 1 for fy in floors), wide=wide)
         last = g.spiral_last
-        exit_cells = {sp[(last + k) % 16][:2] for k in range(-3, 2)}
+        exit_cells = {sp[(last + k) % len(sp)][:2] for k in range(-3, 2)}
         for (x, z, _) in sp:
             if (x, z) not in exit_cells:
                 g.set(x, top, z, RAIL)

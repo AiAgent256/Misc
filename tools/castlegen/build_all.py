@@ -19,6 +19,7 @@ import fixup
 import parts
 import furnish
 import rooms
+import scale
 import render
 import themes
 import walk
@@ -66,7 +67,9 @@ def main():
         meta["name"] = name
         character = meta.get("character") or rooms.character_for(name, seed_shift or 0)
         meta["character"] = character
+        widened = scale.widen_doorways(g, meta["GL"])
         kinds = rooms.furnish(g, meta["GL"], character, tier=meta.get("tier", 2))
+        kinds["doorways_widened"] = widened
         meta["beds"] = kinds["beds"]
         if meta.get("tier", 2) >= 2 and meta.get("kind") != "town":
             # a crypt under the keep: the city's keep stands on its top terrace

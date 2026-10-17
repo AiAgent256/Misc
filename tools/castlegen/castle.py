@@ -93,7 +93,7 @@ def great_castle_a(seed=7):
         sz = 1 if cz < W / 2 else -1
         round_tower(g, cx, cz, 9, ttop, GL, floors=tfloors,
                     doors=((sx, 0, walk), (0, sz, walk), (sx, 0, GL + 9), (0, sz, GL + 9), (sx * 0.7, sz * 0.7, GL)),
-                    banner_dirs=bd)
+                    banner_dirs=bd, wide=False)      # the stair turret above sits on a wide shaft's corner
         # stair turret rising above the roof platform on the outer side
         tx, tz = cx - 4 * sx, cz - 4 * sz
         g.fill_mask(disk(g, tx, tz, 3), ttop, ttop + 7, STONE)

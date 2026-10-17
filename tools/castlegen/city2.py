@@ -358,7 +358,7 @@ def canal_city(seed=91):
         g.fill(bx0, 0, cz_mid - 9, bx1, gtop - 1, cz_mid + 9, STONE)
         for tz in (cz_mid - 12, cz_mid + 12):
             ring_tower(g, gx + sgn, tz, 8, gtop + 6, GL, stages=1, cone=True, posts="crossbowman",
-                       doors=((-sgn, 0, walk), (0, -1 if tz > cz_mid else 1, gtop)))
+                       doors=((-sgn, 0, walk), (0, -1 if tz > cz_mid else 1, gtop)), wide=False)
         pointed_arch(g, cz_mid - 3, cz_mid + 3, GL, 11, bx0, bx1, axis="x")
         g.fill(bx0, GL - 1, cz_mid - 3, bx1, GL - 1, cz_mid + 3, ROAD)
         portcullis_plane_x(g, cz_mid - 3, cz_mid + 3, GL, 11, bx0 + 1 if sgn < 0 else bx1 - 1)
@@ -387,7 +387,7 @@ def canal_city(seed=91):
     g.fill(wg0, 0, bz - 8, wg1, gtop - 1, bz + 1, STONE)
     for tx in (wg0 - 5, wg1 + 5):
         ring_tower(g, tx, bz - 3, 8, gtop + 6, GL, stages=1, cone=True, posts="crossbowman",
-                   doors=((0, -1, walk), (1 if tx < 128 else -1, 0, gtop)))
+                   doors=((0, -1, walk), (1 if tx < 128 else -1, 0, gtop)), wide=False)
     pointed_arch(g, CANAL_X0 + 2, CANAL_X1 - 2, GL - 1, 13, bz - 8, bz + 1)
     g.fill(CANAL_X0 + 2, GL - 7, bz - 8, CANAL_X1 - 2, GL - 7, bz + 1, Mix(("minecraft:sand", 50), ("minecraft:gravel", 50)))
     g.fill(CANAL_X0 + 2, GL - 6, bz - 8, CANAL_X1 - 2, GL - 2, bz + 1, "minecraft:water")

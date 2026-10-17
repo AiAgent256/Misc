@@ -189,58 +189,110 @@ def facing_to_center_grid(g, cx, cz):
     return out
 
 
-def spiral_stair(g, cx, cz, y_start, y_end, step_block, core_block, clear=True, landings=(), flat=8):
-    """Square newel spiral in a 5x5 shaft centred on (cx, cz).
-    Steps rise one block per cell, 16 cells per turn. Last step top at y_end.
+def spiral_stair(g, cx, cz, y_start, y_end, step_block, core_block, clear=True, landings=(), flat=None, wide=False):
+    """Square newel spiral centred on (cx, cz): a 5x5 shaft with one-wide treads (16 cells a turn), or, where
+    the tower has the room, a 7x7 shaft with treads two wide (24 cells a turn, a gentler climb a man can pass
+    another on). `wide=None` picks the wide stair when the 7x7 ring is open at the foot.
+    Steps rise one block per outer cell. Last step top at y_end.
     `landings` are standing levels (a floor's y + 1): when the stair reaches one it runs flat for
     `flat` cells, a half turn of level floor, so a door at that level on any side of that half can be
     walked to from the stair. Returns the ring cells; g.spiral_last holds the index of the last step."""
+    if wide is None:
+        # the wide shaft needs the whole 7x7 column free of anything but air and the tower's own floors, from
+        # the foot to a few blocks over the head: a wall-walk, a parapet or a keep wall crossing it stays narrow
+        def free(x, z):
+            if not g.inb(x, y_start, z):
+                return False
+            for yy in range(y_start, min(g.Y, y_end + 4)):
+                if yy == y_end:
+                    continue                 # the tower's own roof slab, which the stair comes up through
+                s_ = g.get(x, yy, z)
+                if s_ not in ("minecraft:air", "<void>") and "planks" not in s_ and "lantern" not in s_:
+                    return False
+            return True
+        wide = all(free(x, z) for x in range(cx - 3, cx + 4) for z in range(cz - 3, cz + 4))
+    R = 3 if wide else 2
+    n = 8 * R
+    if flat is None:
+        # a half turn of landing for the narrow stair; all but five cells of the turn for the wide one, so a door
+        # on any side of the tower meets the landing (a turn must still rise five, or the treads after the landing bury the heads of those below)
+        flat = n - 5 if wide else n // 2
     ringcells = []
-    for x in range(cx - 2, cx + 2):
-        ringcells.append((x, cz - 2, "east"))
-    for z in range(cz - 2, cz + 2):
-        ringcells.append((cx + 2, z, "south"))
-    for x in range(cx + 2, cx - 2, -1):
-        ringcells.append((x, cz + 2, "west"))
-    for z in range(cz + 2, cz - 2, -1):
-        ringcells.append((cx - 2, z, "north"))
+    for x in range(cx - R, cx + R):
+        ringcells.append((x, cz - R, "east"))
+    for z in range(cz - R, cz + R):
+        ringcells.append((cx + R, z, "south"))
+    for x in range(cx + R, cx - R, -1):
+        ringcells.append((x, cz + R, "west"))
+    for z in range(cz + R, cz - R, -1):
+        ringcells.append((cx - R, z, "north"))
+
+    def inner_of(x, z):
+        """The tread cell between an outer ring cell and the core, for the wide stair."""
+        return (min(max(x, cx - 2), cx + 2), min(max(z, cz - 2), cz + 2))
+
     if clear:
-        g.fill(cx - 2, y_start, cz - 2, cx + 2, y_end + 3, cz + 2, "minecraft:air")
+        g.fill(cx - R, y_start, cz - R, cx + R, y_end + 3, cz + R, "minecraft:air")
     g.fill(cx - 1, y_start - 1, cz - 1, cx + 1, y_end + 2, cz + 1, core_block)
     # the shaft is nobody's room: furnishing keeps out of it
-    g.__dict__.setdefault("protected_xz", set()).update((x, z) for x in range(cx - 2, cx + 3) for z in range(cz - 2, cz + 3))
+    g.__dict__.setdefault("protected_xz", set()).update((x, z) for x in range(cx - R, cx + R + 1) for z in range(cz - R, cz + R + 1))
     i = 0
     y = y_start
     flat_left = 0
     done = set()
+
+    def tread(x, z, yy, state):
+        g.set(x, yy, z, state)
+        if wide:
+            ix, iz = inner_of(x, z)
+            g.set(ix, yy, iz, state)
+
+    def under(x, z, yy):
+        g.set(x, yy, z, core_block)
+        if wide:
+            ix, iz = inner_of(x, z)
+            g.set(ix, yy, iz, core_block)
+
+    def over(x, z, y0, y1):
+        g.fill(x, y0, z, x, y1, z, "minecraft:air")
+        if wide:
+            ix, iz = inner_of(x, z)
+            g.fill(ix, y0, iz, ix, y1, iz, "minecraft:air")
+
     while y <= y_end:
-        x, z, f = ringcells[i % 16]
+        x, z, f = ringcells[i % n]
         if flat_left == 0 and (y + 1) in landings and (y + 1) not in done and y > y_start:
             flat_left = flat
             done.add(y + 1)
         if i > 0:
-            g.set(x, y - 1, z, core_block)
+            under(x, z, y - 1)
         if flat_left > 0:
-            g.set(x, y, z, core_block)
-            g.fill(x, y + 1, z, x, y + 2, z, "minecraft:air")
+            tread(x, z, y, core_block)
+            over(x, z, y + 1, y + 3)
             flat_left -= 1
         else:
-            g.set(x, y, z, f"{step_block}[facing={f},half=bottom]")
+            tread(x, z, y, f"{step_block}[facing={f},half=bottom]")
+            over(x, z, y + 1, y + 3)
             y += 1
         i += 1
-    g.spiral_last = (i - 1) % 16
-    # a landing round the stair head: every ring cell not under the last four steps gets a floor at
+    g.spiral_last = (i - 1) % n
+    # a landing round the stair head: every ring cell not under the last few steps gets a floor at
     # y_end, so you can step off the top step in any direction instead of into the shaft
     last = i - 1
+    tail = 4 if not wide else 6
     for j, (x, z, _) in enumerate(ringcells):
-        if any(((last - k) % 16) == j for k in range(0, 4)):
+        if any(((last - k) % n) == j for k in range(0, tail)):
             continue
         if g.get(x, y_end, z) == "minecraft:air":
             g.set(x, y_end, z, core_block)
+        if wide:
+            ix, iz = inner_of(x, z)
+            if g.get(ix, y_end, iz) == "minecraft:air":
+                g.set(ix, y_end, iz, core_block)
     # light the shaft: lanterns on top of the newel core edge every 8
-    for y in range(y_start + 3, y_end, 6):
-        g.set(cx - 1, y, cz - 1, "minecraft:shroomlight")
-        g.set(cx + 1, y + 3, cz + 1, "minecraft:shroomlight")
+    for yy in range(y_start + 3, y_end, 6):
+        g.set(cx - 1, yy, cz - 1, "minecraft:shroomlight")
+        g.set(cx + 1, yy + 3, cz + 1, "minecraft:shroomlight")
     return ringcells
 
 

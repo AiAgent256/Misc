@@ -497,10 +497,10 @@ def stepped_top(g, cx, cz, r, y, stages=2, cone=True, posts=None):
         g.fill_mask(disk(g, cx, cz, rr), y, y, STONE)
 
 
-def ring_tower(g, cx, cz, r, top, GL, stages=2, cone=True, posts=None, doors=()):
+def ring_tower(g, cx, cz, r, top, GL, stages=2, cone=True, posts=None, doors=(), wide=None):
     """A tall round tower that steps in once or twice near the top, with a lantern gallery."""
     floors = sorted(set(range(GL + 9, top - 8, 9)) | {y - 1 for (_, _, y) in doors if y > GL + 2})
-    sp = round_tower(g, cx, cz, r, top, GL, floors=tuple(floors), spiral=True, cone=False, doors=doors)
+    sp = round_tower(g, cx, cz, r, top, GL, floors=tuple(floors), spiral=True, cone=False, doors=doors, wide=wide)
     stepped_top(g, cx, cz, r, top, stages=stages, cone=cone, posts=posts)
     return sp
 
@@ -869,7 +869,7 @@ def great_city(seed=77):
         g.fill(bx0, 0, cz_mid - 9, bx1, gtop - 1, cz_mid + 9, STONE)
         for tz in (cz_mid - 12, cz_mid + 12):
             ring_tower(g, gx + sgn, tz, 8, gtop + 6, GL, stages=1, cone=True, posts="crossbowman",
-                       doors=((-sgn, 0, walk), (0, -1 if tz > cz_mid else 1, gtop)))
+                       doors=((-sgn, 0, walk), (0, -1 if tz > cz_mid else 1, gtop)), wide=False)
         pointed_arch(g, cz_mid - 3, cz_mid + 3, GL, 11, bx0, bx1, axis="x")
         g.fill(bx0, GL - 1, cz_mid - 3, bx1, GL - 1, cz_mid + 3, ROAD)
         portcullis_plane_x(g, cz_mid - 3, cz_mid + 3, GL, 11, bx0 + 1 if sgn < 0 else bx1 - 1)
@@ -898,7 +898,7 @@ def great_city(seed=77):
     g.fill(117, 0, bz - 8, 138, gtop - 1, bz + 1, STONE)
     for tx in (114, 141):
         ring_tower(g, tx, bz - 3, 8, gtop + 6, GL, stages=1, cone=True, posts="crossbowman",
-                   doors=((0, -1, walk), (1 if tx < 128 else -1, 0, gtop)))
+                   doors=((0, -1, walk), (1 if tx < 128 else -1, 0, gtop)), wide=False)
     pointed_arch(g, 124, 131, GL, 11, bz - 8, bz + 1)
     g.fill(124, GL - 1, bz - 8, 131, GL - 1, 237, ROAD)
     portcullis_plane(g, 124, 131, GL, 11, bz)
