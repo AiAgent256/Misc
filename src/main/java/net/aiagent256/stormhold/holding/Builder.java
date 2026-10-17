@@ -141,17 +141,25 @@ public final class Builder {
 
     // ------------------------------------------------------------ the work, once a second
 
+    /** How long a house's castle must be quiet after damage before its masons start. */
+    public static final int QUIET = 1200;
+
+    /** The house's masons start on the walls: the survey runs on the next tick. */
+    public static void summonMasons(HoldingManager mgr, Holding h) {
+        h.damagedAt = 0;
+        h.work = REPAIR;
+        h.workQueue = null;
+        h.workDone = 0;
+        mgr.setDirty();
+    }
+
     public static void tick(ServerLevel level, HoldingManager mgr, Holding h) {
         if (!h.isPlayerOwned()) {
             // a house's own masons: once the castle has been quiet for a minute after taking damage, they put it back
             if (h.work.equals(NONE)) {
                 long now = level.getGameTime();
-                if (h.damagedAt <= 0 || now - h.damagedAt < 1200 || h.dragonAt != 0 || h.layout == null) return;
-                h.damagedAt = 0;
-                h.work = REPAIR;
-                h.workQueue = null;
-                h.workDone = 0;
-                mgr.setDirty();
+                if (h.damagedAt <= 0 || now - h.damagedAt < QUIET || h.dragonAt != 0 || h.layout == null) return;
+                summonMasons(mgr, h);
             } else if (!h.work.equals(REPAIR)) {
                 h.work = NONE;
                 return;

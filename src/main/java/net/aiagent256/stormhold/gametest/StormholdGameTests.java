@@ -253,9 +253,12 @@ public class StormholdGameTests {
                 }
                 if (holes.size() < 6) throw new IllegalStateException("could not knock holes in " + id);
                 // first the house's own masons: damage noted, a minute of quiet, and the walls come back unasked
-                String houseOwner = h.owner;
-                h.damagedAt = level.getGameTime() - 1300;
-                for (int k = 0; k < 40 && !(k > 0 && h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE)); k++)
+                // (the world is too young here for the quiet period to pass on its own, so they're summoned)
+                h.damagedAt = 1;
+                net.aiagent256.stormhold.holding.Builder.tick(level, mgr, h);
+                if (!h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE)) throw new IllegalStateException("the masons came before the castle was quiet");
+                net.aiagent256.stormhold.holding.Builder.summonMasons(mgr, h);
+                for (int k = 0; k < 40 && !h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE); k++)
                     net.aiagent256.stormhold.holding.Builder.tick(level, mgr, h);
                 if (!h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE)) throw new IllegalStateException("the masons never finished");
                 for (BlockPos p : holes) if (level.getBlockState(p).isAir()) throw new IllegalStateException("the masons left a hole at " + p);
