@@ -1,7 +1,7 @@
 """Additional Stormhold layouts: ring fortress, castle-town, tower house, peel tower."""
 import numpy as np
 
-from grid import Grid, Mix, disk, ring, rect, rect_ring, spiral_stair, gable_roof, cone_roof, angle_index
+from grid import Grid, Mix, disk, ring, rect, rect_ring, spiral_stair, dogleg_stair, gable_roof, cone_roof, angle_index
 from parts import (STONE, DARK, FOUND, PAVE, ROAD, FLOOR_STONE, ROOF, ROOF_STAIR, STONE_STAIR,
                    DARK_STAIR, SLAB_CAP, RAIL, PLANK, DARK_PLANK, PORTCULLIS, GLASS,
                    curtain, ring_grids, posts_on_walk, round_tower, square_tower, straight_wall,
@@ -436,18 +436,21 @@ def great_castle_c(seed=33):
     g.mark("banner_stand", 82, dtop, 23)
     for (x, z) in ((83, 18), (77, 23)):
         g.mark("crossbowman", x, dtop, z)
-    hall_furnish(g, 70, 89, 28, 37, GL)
-    spiral_stair(g, 71, 34, GL, kroof - 1, STONE_STAIR, STONE)
+    hall_furnish(g, 77, 89, 28, 37, GL)
+    # the stair hall in the hall's south-west corner, up to the roof
+    dogleg_stair(g, 69, 31, GL, kroof - 1, STONE_STAIR, STONE, DARK_PLANK, levels=(F2 + 1, F3 + 1, kroof), back="south")
     for z in range(19, 26, 3):
         g.chest(kx1 - 4, F2 + 1, z, "west", LOOT + "castle_treasury")
         g.chest(kx0 + 4, F2 + 1, z, "east", LOOT + "castle_treasury")
     for z in range(30, 37, 3):
         g.bed(kx1 - 5, F3 + 1, z, "east", "red")
-        g.bed(kx0 + 6, F2 + 1, z, "west", "gray")
+        g.bed(kx1 - 5, F2 + 1, z, "east", "gray")
     for x in range(70, 90, 6):
         for z in (22, 33):
+            if z == 33 and x < 77:
+                continue                       # the stair hall
             g.lantern(x, F2 - 1, z); g.lantern(x, F3 - 1, z); g.lantern(x, kroof - 2, z)
-    for (x, z) in ((70, 31), (89, 31), (70, 36), (89, 36)):
+    for (x, z) in ((78, 31), (89, 31), (78, 36), (89, 36)):
         g.mark("knight", x, GL, z)
     g.mark("captain", 76, GL, 34); g.mark("captain", 84, GL, 34)
     for (x, z) in ((62, 20), (62, 34), (97, 20), (97, 34), (66, 43), (93, 43)):
@@ -618,17 +621,11 @@ def holdfast_b(seed=13):
             for fy in floors:
                 g.fill(x, fy + 2, z, x, fy + 3, z, GLASS)
     g.fill(c - 2, GL, hz1 - 2, c + 1, GL + 3, hz1, AIR)
-    spx, spz = hx0 + 5, hz0 + 5
-    spiral_stair(g, spx, spz, GL, top - 1, STONE_STAIR, STONE)
-    # caphouse over the stair head
-    g.fill(spx - 4, top, spz - 4, spx + 4, top + 4, spz + 4, STONE)
-    g.fill(spx - 3, top, spz - 3, spx + 3, top + 3, spz + 3, AIR)
-    g.fill(spx + 4, top, spz - 1, spx + 4, top + 2, spz + 1, AIR)
-    gable_roof(g, spx - 4, spz - 4, spx + 4, spz + 4, top + 5, "z", ROOF_STAIR, STONE)
-    spiral_stair(g, spx, spz, GL, top - 1, STONE_STAIR, STONE, clear=False)
+    # the stair hall in the north-west corner: two flights and a landing per storey, up to the roof
+    dogleg_stair(g, hx0 + 3, hz0 + 3, GL, top - 1, STONE_STAIR, STONE, PLANK, levels=tuple(f + 1 for f in floors), back="north")
     g.wall_banner(hx0 - 2, top - 6, 20, "west"); g.wall_banner(hx1 + 2, top - 6, 20, "east")
     g.wall_banner(c - 1, top - 6, hz1 + 2, "south")
-    hall_furnish(g, hx0 + 5, hx1 - 5, hz0 + 3, hz1 - 3, GL)
+    hall_furnish(g, hx0 + 11, hx1 - 5, hz0 + 3, hz1 - 3, GL)
     for z in range(hz0 + 3, hz1 - 3, 3):
         g.chest(hx1 - 3, floors[0] + 1, z, "west", LOOT + "holdfast_treasury")
     for z in range(hz0 + 3, hz1 - 3, 3):
@@ -712,18 +709,18 @@ def watchtower_b(seed=9):
     # the peel tower: eighteen across, four floors, a stair two men wide
     tx0, tz0, tx1, tz1 = c - 10, 8, c + 7, 25
     top = GL + 28
-    square_tower(g, tx0, tz0, tx1, tz1, top, GL, floors=(GL + 7, GL + 14, GL + 21), spiral_at=(tx0 + 6, tz0 + 6),
+    square_tower(g, tx0, tz0, tx1, tz1, top, GL, floors=(GL + 7, GL + 14, GL + 21), stair="north",
                  banner_sides=("south", "east", "west"))
     for (cx, cz) in ((tx0 - 1, tz0 - 1), (tx1 + 1, tz0 - 1), (tx0 - 1, tz1 + 1), (tx1 + 1, tz1 + 1)):
         bartizan(g, cx, cz, top + 1)
     g.fill(tx1 - 6, GL, tz1 - 3, tx1 - 5, GL + 2, tz1 + 1, AIR)        # the door, right through the wall and the plinth
-    g.mark("banner_stand", tx1 - 4, top, tz0 + 9)
-    g.mark("lord", tx1 - 5, GL + 15, tz0 + 10)
-    g.stair(tx1 - 4, GL + 15, tz0 + 10, "minecraft:dark_oak_stairs", "west")
-    g.mark("war_table", tx1 - 5, GL + 15, tz0 + 5)
-    g.chest(tx1 - 3, GL + 15, tz0 + 12, "west", LOOT + "watchtower_treasury")
-    g.chest(tx1 - 3, GL + 15, tz0 + 4, "west", LOOT + "watchtower_treasury")
-    for (x, z) in ((tx0 + 4, tz0 + 4), (tx1 - 4, tz1 - 4), (tx1 - 4, tz0 + 4), (tx0 + 4, tz1 - 4)):
+    g.mark("banner_stand", tx0 + 5, top, tz1 - 5)
+    g.mark("lord", tx1 - 5, GL + 15, tz0 + 11)
+    g.stair(tx1 - 4, GL + 15, tz0 + 11, "minecraft:dark_oak_stairs", "west")
+    g.mark("war_table", tx0 + 5, GL + 15, tz0 + 11)
+    g.chest(tx0 + 3, GL + 15, tz0 + 5, "east", LOOT + "watchtower_treasury")
+    g.chest(tx0 + 3, GL + 15, tz0 + 8, "east", LOOT + "watchtower_treasury")
+    for (x, z) in ((tx0 + 4, tz0 + 4), (tx1 - 4, tz1 - 4), (tx0 + 4, tz1 - 4), (tx1 - 8, tz1 - 4)):
         g.mark("archer", x, top, z)
     # the yard: a barracks, a stable, a well, a smithy's lean-to, a campfire
     building(g, 7, 29, 16, 40, GL, 5, "x", door_cells=((16, 34),), chimney=(8, 30))

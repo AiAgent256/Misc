@@ -49,13 +49,14 @@ public final class Guide {
             int st = Standing.get(mgr, h.houseId, p.getUUID());
             String word = Standing.word(st);
             String means = st >= Standing.FRIENDLY ? "You may trade, hire, buy and take their work."
-                    : st > Standing.HOSTILE ? "The gate opens for you. Its people trade; the " + (h.isTown() ? "reeve" : h.isCity() ? "king" : "lord")
-                    + ", the muster post, the board and the houses want friendly standing (do their work, kill monsters at their gate, run them goods)."
+                    : st > Standing.HOSTILE ? "The gate opens for you, the " + (h.isTown() ? "reeve" : h.isCity() ? "king" : "lord")
+                    + " trades and houses are for sale; hiring soldiers wants friendly standing (do their work, kill monsters at their gate, run them goods)."
                     : "The gate stays down for you.";
             out.add(Component.literal("  " + owner + " holds you " + word + " (" + st + "). ").withStyle(ChatFormatting.GRAY)
                     .append(Component.literal(means).withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC)));
         }
         if (!h.gatePos.equals(BlockPos.ZERO)) out.add(line("Gate", from, h.gatePos, ""));
+        if (!h.isCity() && !h.isTown() && !h.rallyPos.equals(BlockPos.ZERO)) out.add(line("Yard", from, h.rallyPos, "Where the garrison musters"));
         if (!h.lordPos.equals(BlockPos.ZERO) && h.lordAlive) {
             String who = (h.isTown() ? "The reeve" : h.isCity() ? "The king" : "The lord") + (h.lordName.isEmpty() ? "" : ", " + h.lordName);
             out.add(line(who, from, h.lordPos, h.isTown() ? "Sits at the War Table in the market hall"
@@ -86,7 +87,8 @@ public final class Guide {
         if (inn != null && !inn.isEmpty()) out.add(line("Inn", from, inn.get(0), ""));
         var smithy = h.extras.get("smithy");
         if (smithy != null && !smithy.isEmpty()) out.add(line("Smithy", from, smithy.get(0), ""));
-        if (h.isCity()) out.add(Component.literal("  The townsfolk trade like villagers: right-click a smith, a cleric, a fletcher. /stormhold guide says all this again.").withStyle(ChatFormatting.GRAY));
+        if (h.isCity()) out.add(Component.literal("  The townsfolk trade like villagers: right-click a smith, a cleric, a fletcher.").withStyle(ChatFormatting.GRAY));
+        out.add(Component.literal("  /stormhold guide says this again.").withStyle(ChatFormatting.DARK_GRAY));
         return out;
     }
 

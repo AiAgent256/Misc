@@ -1,7 +1,7 @@
 """Reusable castle parts: materials, curtain walls, towers, buildings."""
 import numpy as np
 
-from grid import (Mix, disk, ring, rect, rect_ring, angle_index, facing_to_center_grid,
+from grid import (Mix, disk, ring, rect, rect_ring, angle_index, facing_to_center_grid, dogleg_stair,
                   spiral_stair, gable_roof, cone_roof, FACING_VEC, OPPOSITE)
 
 STONE = Mix(("minecraft:stone_bricks", 50), ("minecraft:cracked_stone_bricks", 12),
@@ -283,7 +283,9 @@ def round_tower(g, cx, cz, r, top, GL, floors=(), spiral=True, cone=False, t=3,
 
 
 def square_tower(g, x0, z0, x1, z1, top, GL, floors=(), spiral_at=None, t=3, cone=False,
-                 banner_sides=(), wide=None):
+                 banner_sides=(), wide=None, stair=None):
+    """`stair` = ("north"|"south"|"east"|"west") puts a dog-leg stair hall in the corner against that wall
+    instead of a spiral at `spiral_at`; the room must be at least 7 by 8 inside."""
     full = rect(g, x0, z0, x1, z1)
     inner = rect(g, x0 + t, z0 + t, x1 - t, z1 - t)
     g.fill_mask(full, 0, top - 1, STONE)
@@ -321,7 +323,16 @@ def square_tower(g, x0, z0, x1, z1, top, GL, floors=(), spiral_at=None, t=3, con
     g.fill_mask(merlon, top + 3, top + 3, SLAB_CAP)
     g.fill_mask(proj & ~merlon, top + 1, top + 6, "minecraft:air")
     sp = None
-    if spiral_at:
+    if stair:
+        ix0, iz0, ix1, iz1 = x0 + t, z0 + t, x1 - t, z1 - t
+        if stair in ("north", "south"):
+            wx0 = ix1 - 6
+            wz0 = iz0 if stair == "north" else iz1 - 6
+        else:
+            wz0 = iz1 - 6
+            wx0 = ix0 if stair == "west" else ix1 - 6
+        dogleg_stair(g, wx0, wz0, GL, top - 1, STONE_STAIR, STONE, PLANK, levels=tuple(fy + 1 for fy in floors), back=stair, rail=RAIL)
+    elif spiral_at:
         cx, cz = spiral_at
         sp = spiral_stair(g, cx, cz, GL, top - 1, STONE_STAIR, STONE, landings=tuple(fy + 1 for fy in floors), wide=wide)
         last = g.spiral_last
@@ -497,25 +508,28 @@ def wall_stair(g, x, z, GL, walk, along, toward):
     """
     n = walk - GL
     dx, dz = FACING_VEC[toward]
+    # two men wide: the second tread is the one away from the wall
     if along == "x":
         step_dir = "east" if x < g.X // 2 else "west"
         sx = 1 if step_dir == "east" else -1
-        for k in range(n):
-            g.stair(x + k * sx, GL + k, z, STONE_STAIR, step_dir)
-            g.fill(x + k * sx, GL, z, x + k * sx, GL + k - 1, z, STONE)
-            g.fill(x + k * sx, GL + k + 1, z, x + k * sx, GL + k + 3, z, "minecraft:air")
-        tx = x + n * sx
-        g.fill(tx, GL, z, tx, walk - 1, z, STONE)
-        g.fill(tx, walk, z, tx, walk + 2, z, "minecraft:air")
+        for zz in (z, z - dz):
+            for k in range(n):
+                g.stair(x + k * sx, GL + k, zz, STONE_STAIR, step_dir)
+                g.fill(x + k * sx, GL, zz, x + k * sx, GL + k - 1, zz, STONE)
+                g.fill(x + k * sx, GL + k + 1, zz, x + k * sx, GL + k + 3, zz, "minecraft:air")
+            tx = x + n * sx
+            g.fill(tx, GL, zz, tx, walk - 1, zz, STONE)
+            g.fill(tx, walk, zz, tx, walk + 2, zz, "minecraft:air")
         g.fill(tx + dx, walk, z + dz, tx + dx, walk + 2, z + dz, "minecraft:air")
     else:
         step_dir = "south" if z < g.Z // 2 else "north"
         sz = 1 if step_dir == "south" else -1
-        for k in range(n):
-            g.stair(x, GL + k, z + k * sz, STONE_STAIR, step_dir)
-            g.fill(x, GL, z + k * sz, x, GL + k - 1, z + k * sz, STONE)
-            g.fill(x, GL + k + 1, z + k * sz, x, GL + k + 3, z + k * sz, "minecraft:air")
-        tz = z + n * sz
-        g.fill(x, GL, tz, x, walk - 1, tz, STONE)
-        g.fill(x, walk, tz, x, walk + 2, tz, "minecraft:air")
+        for xx in (x, x - dx):
+            for k in range(n):
+                g.stair(xx, GL + k, z + k * sz, STONE_STAIR, step_dir)
+                g.fill(xx, GL, z + k * sz, xx, GL + k - 1, z + k * sz, STONE)
+                g.fill(xx, GL + k + 1, z + k * sz, xx, GL + k + 3, z + k * sz, "minecraft:air")
+            tz = z + n * sz
+            g.fill(xx, GL, tz, xx, walk - 1, tz, STONE)
+            g.fill(xx, walk, tz, xx, walk + 2, tz, "minecraft:air")
         g.fill(x + dx, walk, tz + dz, x + dx, walk + 2, tz + dz, "minecraft:air")

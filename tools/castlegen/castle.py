@@ -1,7 +1,7 @@
 """Stormhold castle designs."""
 import numpy as np
 
-from grid import Grid, Mix, disk, ring, rect, rect_ring, spiral_stair, gable_roof, cone_roof
+from grid import Grid, Mix, disk, ring, rect, rect_ring, spiral_stair, dogleg_stair, gable_roof, cone_roof
 from parts import (STONE, DARK, FOUND, PAVE, ROAD, FLOOR_STONE, ROOF, ROOF_STAIR, STONE_STAIR,
                    DARK_STAIR, SLAB_CAP, RAIL, PLANK, DARK_PLANK, PORTCULLIS, GLASS,
                    curtain, posts_on_walk, round_tower, square_tower, straight_wall,
@@ -369,19 +369,16 @@ def great_castle_a(seed=7):
     g.fill(72, GL, hz0 - 1, kx1 - 3, F2 - 1, hz0 - 1, STONE)
     g.fill(52, GL, hz0 - 1, 54, GL + 2, hz0 - 1, "minecraft:air")
     g.fill(73, GL, hz0 - 1, 75, GL + 2, hz0 - 1, "minecraft:air")
-    g.set(50, GL, 30, "minecraft:smoker[facing=east,lit=false]")
-    g.set(50, GL, 29, "minecraft:furnace[facing=east,lit=false]")
-    g.chest(50, GL, 31, "east", LOOT + "castle_kitchen")
-    g.set(50, GL, 28, "minecraft:water_cauldron[level=3]")
+    g.set(50, GL, 31, "minecraft:smoker[facing=east,lit=false]")
+    g.set(50, GL, 30, "minecraft:furnace[facing=east,lit=false]")
+    g.chest(50, GL, 32, "east", LOOT + "castle_kitchen")
+    g.set(50, GL, 29, "minecraft:water_cauldron[level=3]")
     for (x, z) in ((77, 23), (77, 25), (77, 27), (77, 29)):
         g.barrel(x, GL, z, LOOT + "castle_armory", facing="west")
     g.set(77, GL, 31, "minecraft:anvil[facing=north]")
     g.set(77, GL, 32, "minecraft:grindstone[face=floor,facing=north]")
 
-    # keep spiral (west wing) to the roof
-    spiral_stair(g, 52, 24, GL, kroof - 1, STONE_STAIR, STONE)
-    for fy in (F2, F3):
-        pass
+    # the keep's stair hall is in the west wing; it goes in after the donjon, whose plinth it cuts
     # second floor: treasury vault + solar
     vx0, vz0, vx1, vz1 = 58, 40, 69, 50
     g.fill(vx0, F2 + 1, vz0, vx1, F3 - 1, vz1, STONE)
@@ -410,6 +407,8 @@ def great_castle_a(seed=7):
         g.barrel(70, F3 + 1, z, LOOT + "castle_armory")
     for x in range(52, 78, 6):
         for z in range(24, 52, 6):
+            if x == 52 and z < 28:
+                continue                       # the stair hall
             g.lantern(x, F2 - 1, z) if not (55 <= x <= 72 and z >= hz0) else None
             g.lantern(x, F3 - 1, z)
             g.lantern(x, kroof - 2, z)
@@ -440,6 +439,8 @@ def great_castle_a(seed=7):
     for y in (F2 + 1, F3 + 1, kroof):
         g.fill(tx1 - 2, y, 26, tx1, y + 1, 27, "minecraft:air")
         g.fill(tx0, y, 26, tx0 + 2, y + 1, 27, "minecraft:air")
+    # the keep's stair hall: two flights and a landing per storey in the west wing, up to the roof terrace
+    dogleg_stair(g, 49, 21, GL, kroof - 1, STONE_STAIR, STONE, DARK_PLANK, levels=(F2 + 1, F3 + 1, kroof), back="north")
     g.mark("banner_stand", 66, gtop2, 27)
     for (x, z) in ((65, 30), (68, 30), (68, 22), (65, 22)):
         g.mark("crossbowman", x, gtop2, z)
@@ -667,7 +668,7 @@ def holdfast_a(seed=11):
             g.fill(x, F2 + 4, z, x, F2 + 5, z, GLASS)
     g.fill(c - 2, GL, kz1, c + 1, GL + 4, kz1, "minecraft:air")
     g.fill(c - 2, GL, kz1 - 1, c + 1, GL + 4, kz1 - 1, "minecraft:air")
-    spiral_stair(g, kx0 + 5, kz0 + 5, GL, kroof - 1, STONE_STAIR, STONE)
+    dogleg_stair(g, kx0 + 2, kz0 + 2, GL, kroof - 1, STONE_STAIR, STONE, DARK_PLANK, levels=(F2 + 1, kroof), back="north")
     # hall
     g.fill(c - 3, GL, kz0 + 3, c + 2, GL, kz0 + 4, "minecraft:polished_deepslate")
     g.stair(c - 1, GL + 1, kz0 + 3, "minecraft:dark_oak_stairs", "south")
@@ -676,7 +677,7 @@ def holdfast_a(seed=11):
     g.fill(c - 2, GL, kz0 + 6, c + 1, GL, kz1 - 2, "minecraft:red_carpet")
     g.mark("lord", c - 1, GL, kz0 + 5)
     g.mark("war_table", c - 4, GL, kz0 + 4)
-    for (x, z) in ((kx0 + 4, 18), (kx1 - 4, 18), (kx0 + 4, 29), (kx1 - 4, 29)):
+    for (x, z) in ((kx0 + 4, 23), (kx1 - 4, 18), (kx0 + 4, 29), (kx1 - 4, 29)):
         g.mark("knight", x, GL, z)
         g.lantern(x, F2 - 1, z)
         g.lantern(x, kroof - 2, z)
@@ -684,10 +685,10 @@ def holdfast_a(seed=11):
     # upper floor: treasury
     for z in range(kz0 + 4, kz1 - 2, 2):
         g.chest(kx1 - 3, F2 + 1, z, "west", LOOT + "holdfast_treasury")
-    for z in range(kz0 + 4, kz1 - 2, 3):
+    for z in range(kz0 + 10, kz1 - 2, 3):
         g.bed(kx0 + 3, F2 + 1, z, "west", "gray")
     g.mark("banner_stand", kx1 - 5, kroof, kz1 - 4)
-    for (x, z) in ((kx0 + 5, kz0 + 3), (kx1 - 3, kz0 + 3), (kx0 + 5, kz1 - 3), (kx1 - 3, kz1 - 3)):
+    for (x, z) in ((kx0 + 11, kz0 + 3), (kx1 - 3, kz0 + 3), (kx0 + 5, kz1 - 3), (kx1 - 3, kz1 - 3)):
         g.mark("archer", x, kroof, z)
     g.mark("rally", c - 1, GL, kz1 + 4)
     g.wall_banner(kx0 - 1, F2 + 3, 22, "west"); g.wall_banner(kx1 + 1, F2 + 3, 22, "east")

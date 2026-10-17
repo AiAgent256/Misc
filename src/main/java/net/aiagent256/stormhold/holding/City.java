@@ -65,6 +65,12 @@ public final class City {
         return h.isHouseOwned() && Standing.friendly(mgr, h.houseId, p.getUUID());
     }
 
+    /** Let in and sold to: anyone the house doesn't hold hostile. Hiring its soldiers still wants friendship. */
+    public static boolean tolerated(HoldingManager mgr, Holding h, Player p) {
+        if (h.owner.equals(Sides.player(p.getUUID()))) return true;
+        return h.isHouseOwned() && !Standing.hostile(mgr, h.houseId, p.getUUID());
+    }
+
     private static int take(Player p, int emeralds) {
         int have = p.getInventory().countItem(Items.EMERALD);
         if (have < emeralds) return have;
@@ -136,7 +142,7 @@ public final class City {
             }
             return false; // your own door: open it
         }
-        if (!welcome(mgr, h, p)) {
+        if (!tolerated(mgr, h, p)) {
             p.displayClientMessage(Component.literal("Nobody in " + h.name + " will sell to you.").withStyle(ChatFormatting.RED), true);
             return true;
         }

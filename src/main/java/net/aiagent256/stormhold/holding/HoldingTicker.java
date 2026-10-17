@@ -94,8 +94,8 @@ public final class HoldingTicker {
                     : h.renown == 3 ? "It does well for itself." : h.renown == 2 ? "A modest place." : "A poor, hard place.";
             p.sendSystemMessage(net.minecraft.network.chat.Component.literal(h.name + ", " + Holding.renownName(h.renown) + " "
                     + h.kindName().toLowerCase() + " of " + owner + ". " + wealth).withStyle(net.minecraft.ChatFormatting.GRAY, net.minecraft.ChatFormatting.ITALIC));
-            // and, for a city or a town, what's here and which way: nothing in them is signposted
-            if (h.isCity() || h.isTown()) for (var line : Guide.lines(level, mgr, h, p)) p.sendSystemMessage(line);
+            // and what's here and which way: nothing in a castle is signposted
+            for (var line : Guide.lines(level, mgr, h, p)) p.sendSystemMessage(line);
         }
     }
 

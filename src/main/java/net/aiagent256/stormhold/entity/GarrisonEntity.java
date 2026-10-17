@@ -244,6 +244,14 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     }
 
     /** The house this soldier serves counts the player a friend. Checked at most every half second. */
+    /** Not a friend, but not an enemy either: the house's standing with the player is above hostile. */
+    public boolean toleratesPlayer(Player p) {
+        if (!isHouse() || !(this.level() instanceof net.minecraft.server.level.ServerLevel sl)) return false;
+        String hid = Sides.houseId(side);
+        if (hid == null) return false;
+        return !net.aiagent256.stormhold.house.Standing.hostile(net.aiagent256.stormhold.holding.HoldingManager.get(sl), hid, p.getUUID());
+    }
+
     public boolean isFriendlyTo(Player p) {
         if (!isHouse() || !(this.level() instanceof net.minecraft.server.level.ServerLevel sl)) return false;
         String hid = Sides.houseId(side);
@@ -381,7 +389,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         return hit;
     }
 
-    /** A friendly lord sells supplies: an emerald buys 8 bread, or 4 iron ingots when sneaking. */
+    /** A lord sells supplies to anyone his house doesn't hate: an emerald buys 8 bread, or 4 iron ingots when sneaking. */
     @Override
     protected net.minecraft.world.InteractionResult mobInteract(Player player, net.minecraft.world.InteractionHand hand) {
         UUID o = owner();
@@ -393,7 +401,8 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
             return super.mobInteract(player, hand);
         }
         ItemStack held = player.getItemInHand(hand);
-        if (!isFriendlyTo(player)) {
+        // a lord trades with anyone his house doesn't hold hostile; only a true enemy is turned away
+        if (!isFriendlyTo(player) && !toleratesPlayer(player)) {
             if (!held.is(Items.EMERALD)) return super.mobInteract(player, hand);
             player.displayClientMessage(net.minecraft.network.chat.Component.literal(
                     this.getDisplayName().getString() + " will not trade with you."), true);

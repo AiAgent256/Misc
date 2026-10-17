@@ -296,6 +296,125 @@ def spiral_stair(g, cx, cz, y_start, y_end, step_block, core_block, clear=True, 
     return ringcells
 
 
+def dogleg_stair(g, x0, z0, y_start, y_end, step_block, core_block, floor_block, levels=(), back="south",
+                 rail="minecraft:stone_brick_wall"):
+    """
+    A stair hall: two straight flights three wide with a half landing between, the way a keep or a tower
+    house is really climbed. The well is 7 by 7: lane A (three cells), a spine wall (one), lane B (three)
+    across, and four cells of flight plus a three-deep landing along `axis`. The open side is the row
+    before (x0, z0) along the axis; every floor level in `levels` (standing heights, floor + 1) and the top
+    (y_end + 1) is reached by one dog-leg: up lane A to the landing, back along lane B onto the floor.
+    Floors inside the well are cut away except under lane A and the arrival cell, so each flight rests on
+    the floor it leaves. Rails fence the drop into the well on every floor and the roof.
+    Returns the (x, z) cells of the well.
+    """
+    # (x0, z0) is the well's low corner; `back` is the wall the landing stands against, so the open side
+    # (the row before v = 0) faces away from it into the room
+    def m(u, v):
+        if back == "south":
+            return (x0 + u, z0 + v)
+        if back == "north":
+            return (x0 + u, z0 + 6 - v)
+        if back == "east":
+            return (x0 + v, z0 + u)
+        return (x0 + 6 - v, z0 + u)
+    up = back
+    down = {"south": "north", "north": "south", "east": "west", "west": "east"}[back]
+    AIR = "minecraft:air"
+    lv = sorted(set([y_start] + [l for l in levels if y_start < l <= y_end + 1] + [y_end + 1]))
+    # a dog-leg climbs eight at most; a taller storey gets a quarter landing part way (a platform on the
+    # open side the next dog-leg starts from)
+    full, virtual = [lv[0]], set()
+    for ya, yb in zip(lv, lv[1:]):
+        k = -(-(yb - ya) // 8)
+        for i in range(1, k):
+            lvl = ya + round((yb - ya) * i / k)
+            full.append(lvl)
+            virtual.add(lvl)
+        full.append(yb)
+    lv = full
+    cells = [m(u, v) for u in range(7) for v in range(7)]
+    # clear the well, floors and all, then put back what the flights rest on
+    for (x, z) in cells:
+        g.fill(x, y_start, z, x, y_end + 3, z, AIR)
+    for (x, z) in cells:
+        if not g.is_solid(x, y_start - 1, z):
+            g.set(x, y_start - 1, z, floor_block)
+    for l in lv[1:]:
+        for u in range(0, 3):
+            for v in range(0, 4):
+                x, z = m(u, v)
+                g.set(x, l - 1, z, floor_block)
+        for u in range(3, 7):
+            x, z = m(u, 0)
+            g.set(x, l - 1, z, floor_block)
+        if l in virtual:
+            # the quarter landing hangs in the storey: a ledge and a rail along its open sides
+            for (u, v) in [(-1, v) for v in range(0, 4)] + [(u, -1) for u in range(0, 7)]:
+                x, z = m(u, v)
+                if g.inb(x, l, z) and g.get(x, l - 1, z) == AIR:
+                    g.set(x, l - 1, z, core_block)
+                    g.set(x, l, z, rail)
+    # the spine between the lanes, open at the mouth so the two lanes join on every landing
+    for v in range(1, 4):
+        x, z = m(3, v)
+        g.fill(x, y_start - 1, z, x, y_end + 1, z, core_block)
+    for ya, yb in zip(lv, lv[1:]):
+        h = yb - ya
+        # the top tread of flight A needs two clear above it under the next storey's lane A floor
+        na = max(0, min(4, h - 3))
+        nb = h - na
+        yl = ya + na
+        # flight A: up lane A
+        for k in range(na):
+            for u in range(0, 3):
+                x, z = m(u, k)
+                g.set(x, ya + k, z, f"{step_block}[facing={up},half=bottom]")
+                if k > 0:
+                    g.fill(x, max(ya, ya + k - 2), z, x, ya + k - 1, z, core_block)
+        # the half landing, three deep and the full width, reaching back to meet a short flight
+        for u in range(7):
+            for v in range(4, 7):
+                x, z = m(u, v)
+                g.set(x, yl - 1, z, core_block)
+        for u in range(0, 3):
+            for v in range(na, 4):
+                x, z = m(u, v)
+                g.set(x, yl - 1, z, core_block)
+        for u in range(4, 7):
+            for v in range(0, 4 - nb):
+                x, z = m(u, v)
+                g.set(x, yb - 1, z, floor_block)
+        # flight B: back down lane B toward the open side, arriving at the floor
+        for j in range(nb):
+            v = 3 - j
+            for u in range(4, 7):
+                x, z = m(u, v)
+                if v >= 0:
+                    g.set(x, yl + j, z, f"{step_block}[facing={down},half=bottom]")
+                    if j > 0:
+                        g.fill(x, max(yl, yl + j - 2), z, x, yl + j - 1, z, core_block)
+        # a light on the spine at the landing
+        x, z = m(3, 3)
+        g.set(x, yl + 1, z, "minecraft:shroomlight")
+    # rails along the drop at each floor and on the roof: the landing's void and lane B's mouth
+    for l in lv[1:]:
+        for (u, v) in [(u, v) for u in range(7) for v in range(4, 7)]:
+            for du, dv in ((-1, 0), (1, 0), (0, 1)):
+                nu, nv = u + du, v + dv
+                if 0 <= nu < 7 and 0 <= nv < 7:
+                    continue
+                x, z = m(nu, nv)
+                if g.inb(x, l, z) and g.get(x, l, z) == AIR and g.is_solid(x, l - 1, z):
+                    g.set(x, l, z, rail)
+        for v in range(1, 4):
+            x, z = m(7, v)
+            if g.inb(x, l, z) and g.get(x, l, z) == AIR and g.is_solid(x, l - 1, z):
+                g.set(x, l, z, rail)
+    g.__dict__.setdefault("protected_xz", set()).update(cells)
+    return cells
+
+
 def gable_roof(g, x0, z0, x1, z1, y, axis, stair, fill_block, overhang=1, ridge_slab=None):
     """Gable roof over rect; ridge runs along `axis` ('x' or 'z'). y = first roof layer."""
     if axis == "z":
