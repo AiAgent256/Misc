@@ -16,7 +16,7 @@ TIERS = {
     "great_city": {"layouts": ["great_city", "canal_city"], "spacing": 96, "separation": 48, "salt": 402911733, "max_slope": 36},
     # the Nether holdfast: the holdfast plans in blackstone and nether brick, sited on the floor of the Nether
     "nether_holdfast": {"layouts": ["holdfast_a", "holdfast_b", "holdfast_a2", "holdfast_b2"], "spacing": 40, "separation": 16,
-                        "salt": 884120977, "themes": ["nether"], "nether": True, "max_slope": 10},
+                        "salt": 884120977, "themes": ["nether"], "nether": True, "max_slope": 16},
 }
 # Castles keep clear of these (and smaller castles keep clear of bigger ones). Siting shifts a castle
 # away from a possible village rather than dropping it. Modded entries are optional.
