@@ -770,10 +770,10 @@ public class StormholdGameTests {
             if (d.dug < 30) {
                 StringBuilder sb = new StringBuilder("mine dug only " + d.dug + " slices (turns " + d.turns + ", done " + d.done + ", heading "
                         + d.dx + "," + d.dz + " side " + d.sx + "," + d.sz + ", next " + d.next + ", last " + d.last + "); at the face:");
-                for (int y = -1; y <= 3; y++) {
+                for (int dy = -1; dy <= 3; dy++) {
                     for (int k = 0; k <= 1; k++) {
-                        BlockPos q = d.next.offset(d.sx * k, y, d.sz * k);
-                        sb.append(' ').append(y).append('/').append(k).append('=').append(level.getBlockState(q).getBlock().getDescriptionId().replace("block.minecraft.", ""));
+                        BlockPos q = d.next.offset(d.sx * k, dy, d.sz * k);
+                        sb.append(' ').append(dy).append('/').append(k).append('=').append(level.getBlockState(q).getBlock().getDescriptionId().replace("block.minecraft.", ""));
                     }
                 }
                 throw new IllegalStateException(sb.toString());
