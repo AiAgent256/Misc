@@ -1,0 +1,188 @@
+{
+ "map": {
+  "minecraft:stone_bricks": [
+   [
+    "minecraft:cut_sandstone",
+    4
+   ],
+   [
+    "minecraft:smooth_sandstone",
+    3
+   ],
+   [
+    "minecraft:sandstone",
+    3
+   ]
+  ],
+  "minecraft:cracked_stone_bricks": [
+   [
+    "minecraft:sandstone",
+    1
+   ]
+  ],
+  "minecraft:mossy_stone_bricks": [
+   [
+    "minecraft:smooth_sandstone",
+    1
+   ]
+  ],
+  "minecraft:cobblestone": [
+   [
+    "minecraft:sandstone",
+    2
+   ],
+   [
+    "minecraft:smooth_sandstone",
+    1
+   ]
+  ],
+  "minecraft:mossy_cobblestone": [
+   [
+    "minecraft:sandstone",
+    1
+   ]
+  ],
+  "minecraft:andesite": [
+   [
+    "minecraft:smooth_sandstone",
+    1
+   ]
+  ],
+  "minecraft:stone": [
+   [
+    "minecraft:sandstone",
+    1
+   ]
+  ],
+  "minecraft:tuff": [
+   [
+    "minecraft:orange_terracotta",
+    1
+   ]
+  ],
+  "minecraft:chiseled_stone_bricks": [
+   [
+    "minecraft:chiseled_sandstone",
+    1
+   ]
+  ],
+  "minecraft:stone_brick_stairs": [
+   [
+    "minecraft:smooth_sandstone_stairs",
+    1
+   ]
+  ],
+  "minecraft:stone_brick_slab": [
+   [
+    "minecraft:smooth_sandstone_slab",
+    1
+   ]
+  ],
+  "minecraft:stone_brick_wall": [
+   [
+    "minecraft:sandstone_wall",
+    1
+   ]
+  ],
+  "minecraft:deepslate_bricks": [
+   [
+    "minecraft:cut_red_sandstone",
+    2
+   ],
+   [
+    "minecraft:red_sandstone",
+    1
+   ]
+  ],
+  "minecraft:cracked_deepslate_bricks": [
+   [
+    "minecraft:red_sandstone",
+    1
+   ]
+  ],
+  "minecraft:cobbled_deepslate": [
+   [
+    "minecraft:red_sandstone",
+    1
+   ]
+  ],
+  "minecraft:polished_deepslate": [
+   [
+    "minecraft:smooth_red_sandstone",
+    1
+   ]
+  ],
+  "minecraft:deepslate_brick_stairs": [
+   [
+    "minecraft:red_sandstone_stairs",
+    1
+   ]
+  ],
+  "minecraft:polished_deepslate_stairs": [
+   [
+    "minecraft:smooth_red_sandstone_stairs",
+    1
+   ]
+  ],
+  "minecraft:polished_andesite": [
+   [
+    "minecraft:smooth_sandstone",
+    1
+   ]
+  ],
+  "minecraft:deepslate_tiles": [
+   [
+    "minecraft:waxed_cut_copper",
+    1
+   ]
+  ],
+  "minecraft:deepslate_tile_stairs": [
+   [
+    "minecraft:waxed_cut_copper_stairs",
+    1
+   ]
+  ],
+  "minecraft:spruce_planks": [
+   [
+    "minecraft:acacia_planks",
+    1
+   ]
+  ],
+  "minecraft:spruce_stairs": [
+   [
+    "minecraft:acacia_stairs",
+    1
+   ]
+  ],
+  "minecraft:spruce_fence": [
+   [
+    "minecraft:acacia_fence",
+    1
+   ]
+  ],
+  "minecraft:grass_block": [
+   [
+    "minecraft:sand",
+    1
+   ]
+  ],
+  "minecraft:podzol": [
+   [
+    "minecraft:sand",
+    1
+   ]
+  ],
+  "minecraft:fern": [
+   [
+    "minecraft:dead_bush",
+    1
+   ]
+  ],
+  "minecraft:gray_stained_glass_pane": [
+   [
+    "minecraft:orange_stained_glass_pane",
+    1
+   ]
+  ]
+ }
+}

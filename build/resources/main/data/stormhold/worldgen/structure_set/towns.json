@@ -1,0 +1,30 @@
+{
+ "structures": [
+  {
+   "structure": "stormhold:town_north",
+   "weight": 3
+  },
+  {
+   "structure": "stormhold:town_riverlands",
+   "weight": 3
+  },
+  {
+   "structure": "stormhold:town_reach",
+   "weight": 2
+  },
+  {
+   "structure": "stormhold:town_dorne",
+   "weight": 2
+  },
+  {
+   "structure": "stormhold:town_stormlands",
+   "weight": 2
+  }
+ ],
+ "placement": {
+  "type": "minecraft:random_spread",
+  "spacing": 36,
+  "separation": 14,
+  "salt": 611290377
+ }
+}

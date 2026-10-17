@@ -1,0 +1,52 @@
+{
+ "type": "stormhold:castle",
+ "biomes": "#stormhold:has_castle/reach",
+ "step": "surface_structures",
+ "terrain_adaptation": "beard_box",
+ "spawn_overrides": {},
+ "theme": "reach",
+ "layouts": [
+  {
+   "name": "watchtower_a",
+   "size_x": 48,
+   "size_z": 48,
+   "ground": 4,
+   "weight": 1
+  },
+  {
+   "name": "watchtower_b",
+   "size_x": 48,
+   "size_z": 48,
+   "ground": 4,
+   "weight": 1
+  },
+  {
+   "name": "watchtower_c",
+   "size_x": 48,
+   "size_z": 48,
+   "ground": 4,
+   "weight": 1
+  },
+  {
+   "name": "watchtower_a2",
+   "size_x": 48,
+   "size_z": 48,
+   "ground": 4,
+   "weight": 1
+  },
+  {
+   "name": "watchtower_b2",
+   "size_x": 48,
+   "size_z": 48,
+   "ground": 4,
+   "weight": 1
+  },
+  {
+   "name": "watchtower_c2",
+   "size_x": 48,
+   "size_z": 48,
+   "ground": 4,
+   "weight": 1
+  }
+ ]
+}

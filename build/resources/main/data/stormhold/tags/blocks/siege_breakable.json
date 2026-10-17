@@ -1,0 +1,29 @@
+{
+  "replace": false,
+  "values": [
+    "stormhold:portcullis",
+    "#minecraft:doors",
+    "#minecraft:trapdoors",
+    "#minecraft:fence_gates",
+    "minecraft:iron_bars",
+    "minecraft:glass_pane",
+    "minecraft:gray_stained_glass_pane",
+    "minecraft:light_blue_stained_glass_pane",
+    "minecraft:orange_stained_glass_pane",
+    "#minecraft:leaves",
+    "minecraft:hay_block",
+    "minecraft:cobweb",
+    "minecraft:ladder",
+    "minecraft:scaffolding",
+    "minecraft:torch",
+    "minecraft:wall_torch",
+    "minecraft:tnt",
+    "#minecraft:crops",
+    "#minecraft:flowers",
+    "minecraft:grass",
+    "minecraft:tall_grass",
+    "minecraft:snow",
+    "minecraft:vine",
+    "#minecraft:wool_carpets"
+  ]
+}

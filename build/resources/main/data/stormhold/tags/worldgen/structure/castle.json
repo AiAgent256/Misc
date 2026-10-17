@@ -1,0 +1,31 @@
+{
+ "replace": false,
+ "values": [
+  "stormhold:great_city_north",
+  "stormhold:great_city_riverlands",
+  "stormhold:great_city_reach",
+  "stormhold:great_city_dorne",
+  "stormhold:great_city_stormlands",
+  "stormhold:great_castle_north",
+  "stormhold:great_castle_riverlands",
+  "stormhold:great_castle_reach",
+  "stormhold:great_castle_dorne",
+  "stormhold:great_castle_stormlands",
+  "stormhold:holdfast_north",
+  "stormhold:holdfast_riverlands",
+  "stormhold:holdfast_reach",
+  "stormhold:holdfast_dorne",
+  "stormhold:holdfast_stormlands",
+  "stormhold:watchtower_north",
+  "stormhold:watchtower_riverlands",
+  "stormhold:watchtower_reach",
+  "stormhold:watchtower_dorne",
+  "stormhold:watchtower_stormlands",
+  "stormhold:town_north",
+  "stormhold:town_riverlands",
+  "stormhold:town_reach",
+  "stormhold:town_dorne",
+  "stormhold:town_stormlands",
+  "stormhold:nether_holdfast_nether"
+ ]
+}

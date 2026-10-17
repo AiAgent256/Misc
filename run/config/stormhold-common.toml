@@ -1,0 +1,56 @@
+
+[holdings]
+	#Structures from other mods that become garrisoned holdings: "namespace:path=tier" (tier 1-3).
+	#Stormhold's own castles always attach.
+	attach = ["dungeons_arise:keep_kayra=3", "idas:castle=3", "idas:pillager_fortress=3", "dungeons_arise:illager_fort=2", "dungeons_arise:thornborn_towers=2", "illagerinvasion:illager_fort=2", "nova_structures:donjon=2", "nova_structures:stray_fort=2", "dungeons_arise:bandit_towers=1", "idas:ruined_fort=1", "valarian_conquest:barathian_castle=2", "valarian_conquest:valarian_castle=2", "valarian_conquest:orleanian_castle=2", "valarian_conquest:templar_castle=2", "valarian_conquest:hospitaller_castle=2", "valarian_conquest:visgothian_castle=2", "valarian_conquest:burgundian_castle=2"]
+	#Multiplier on garrison sizes. Lower this if sieges lag.
+	#Range: 0.1 ~ 4.0
+	garrisonScale = 1.0
+	#Walls of castles held by a house cannot be broken or built on (ladders, scaffolding, torches and TNT allowed; portcullises, doors and glass can be broken).
+	protectHouseCastles = true
+	#Containers inside a house castle stay sealed while its lord lives.
+	sealTreasury = true
+	#Remove mob spawners inside attached structures from other mods.
+	disableForeignSpawners = true
+	#Remove hostile mobs inside attached structures when the garrison arrives.
+	clearForeignMobs = true
+	#Other mods' surface structures (villages, towers, camps) give way where a castle could stand, so nothing spawns on top of one.
+	castlesClaimGround = true
+	#The houses act on their own: they raid rivals, raise buildings, and send envoys with offers.
+	housesAct = true
+	#With Ice and Fire installed, a wild dragon near a castle attacks it and the garrison fights it.
+	dragonsAttackCastles = true
+	#Some mornings a lord is brought a matter to decide: a blight, a smith at the gate, an envoy, rats in the cellar.
+	events = true
+	#Seconds you must hold the banner stand to take a castle.
+	#Range: 5 ~ 1200
+	captureSeconds = 90
+	#Range: 2 ~ 16
+	detectRadiusChunks = 7
+	#Garrisons appear when a player is this many blocks from a castle's edge.
+	#Range: 24 ~ 256
+	materializeDistance = 72
+	#Villagers live and work inside castles.
+	villagers = true
+	#Men who travel with you are Villager Recruits units (their own orders and inventory) instead of Stormhold soldiers (Marshal's Baton orders, kit screen). Only applies when Recruits is installed.
+	companyUsesRecruits = false
+	#A hamlet, village or town of commoners grows around every castle and feeds its stores.
+	fiefs = true
+	#Use Epic Knights armor for garrisons when that mod is installed.
+	epicKnightsGear = true
+
+[raids]
+	enabled = true
+	#Range: 1 ~ 100
+	minDays = 3
+	#Range: 1 ~ 100
+	maxDays = 5
+	#If true, raids on castles you are far from are fought out abstractly. If false they wait until you are near.
+	resolveWhileAway = true
+
+[roads]
+	#Paint a road from each castle to the nearest village as chunks load.
+	enabled = true
+	#Range: 4 ~ 128
+	maxLengthChunks = 40
+

@@ -1,0 +1,10 @@
+{
+ "replace": false,
+ "values": [
+  "stormhold:holdfast_north",
+  "stormhold:holdfast_riverlands",
+  "stormhold:holdfast_reach",
+  "stormhold:holdfast_dorne",
+  "stormhold:holdfast_stormlands"
+ ]
+}

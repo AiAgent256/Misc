@@ -1,0 +1,10 @@
+{
+ "replace": false,
+ "values": [
+  "stormhold:great_castle_north",
+  "stormhold:great_castle_riverlands",
+  "stormhold:great_castle_reach",
+  "stormhold:great_castle_dorne",
+  "stormhold:great_castle_stormlands"
+ ]
+}

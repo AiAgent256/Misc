@@ -1,0 +1,12 @@
+{
+ "replace": false,
+ "values": [
+  "minecraft:dark_forest",
+  "minecraft:mangrove_swamp",
+  "minecraft:windswept_gravelly_hills",
+  {
+   "id": "#forge:is_spooky",
+   "required": false
+  }
+ ]
+}

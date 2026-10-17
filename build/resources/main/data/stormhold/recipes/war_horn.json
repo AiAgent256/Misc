@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "  c",
+    "gcc",
+    "bc "
+  ],
+  "key": {
+    "c": {
+      "item": "minecraft:copper_ingot"
+    },
+    "g": {
+      "item": "minecraft:gold_ingot"
+    },
+    "b": {
+      "item": "stormhold:war_banner"
+    }
+  },
+  "result": {
+    "item": "stormhold:war_horn"
+  }
+}

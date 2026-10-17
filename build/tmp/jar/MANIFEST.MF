@@ -1,0 +1,10 @@
+Manifest-Version: 1.0
+Specification-Title: stormhold
+Specification-Vendor: Andrew
+Specification-Version: 1
+Implementation-Title: stormhold
+Implementation-Version: 0.1.0
+Implementation-Vendor: Andrew
+Implementation-Timestamp: 2026-10-17T22:20:37+0000
+MixinConfigs: stormhold.mixins.json
+

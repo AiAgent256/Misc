@@ -1,0 +1,25 @@
+{
+ "type": "stormhold:castle",
+ "biomes": "#stormhold:has_castle/riverlands",
+ "step": "surface_structures",
+ "terrain_adaptation": "beard_box",
+ "spawn_overrides": {},
+ "theme": "riverlands",
+ "layouts": [
+  {
+   "name": "great_city",
+   "size_x": 256,
+   "size_z": 256,
+   "ground": 8,
+   "weight": 1
+  },
+  {
+   "name": "canal_city",
+   "size_x": 256,
+   "size_z": 256,
+   "ground": 8,
+   "weight": 1
+  }
+ ],
+ "max_slope": 36
+}

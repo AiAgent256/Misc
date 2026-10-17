@@ -1,0 +1,144 @@
+{
+ "replace": false,
+ "values": [
+  "#minecraft:village",
+  {
+   "id": "nova_structures:village_jungle",
+   "required": false
+  },
+  {
+   "id": "nova_structures:village_swamp",
+   "required": false
+  },
+  {
+   "id": "nova_structures:ruin_town",
+   "required": false
+  },
+  {
+   "id": "dungeons_arise:bandit_village",
+   "required": false
+  },
+  {
+   "id": "dungeons_arise:mushroom_village",
+   "required": false
+  },
+  {
+   "id": "dungeons_arise:keep_kayra",
+   "required": false
+  },
+  {
+   "id": "dungeons_arise:illager_fort",
+   "required": false
+  },
+  {
+   "id": "dungeons_arise:coliseum",
+   "required": false
+  },
+  {
+   "id": "dungeons_arise:monastery",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:barathian_castle",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:barathian_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:valarian_castle",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:valarian_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:orleanian_castle",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:orleanian_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:templar_castle",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:templar_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:hospitaller_castle",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:hospitaller_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:visgothian_castle",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:visgothian_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:burgundian_castle",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:burgundian_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:bohemian_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:neutral_outpost",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:bandit_camp",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:neutral_tent_camp",
+   "required": false
+  },
+  {
+   "id": "valarian_conquest:neutral_tent_camp_2",
+   "required": false
+  },
+  "stormhold:great_castle_north",
+  "stormhold:great_castle_riverlands",
+  "stormhold:great_castle_reach",
+  "stormhold:great_castle_dorne",
+  "stormhold:great_castle_stormlands",
+  "stormhold:holdfast_north",
+  "stormhold:holdfast_riverlands",
+  "stormhold:holdfast_reach",
+  "stormhold:holdfast_dorne",
+  "stormhold:holdfast_stormlands",
+  "stormhold:watchtower_north",
+  "stormhold:watchtower_riverlands",
+  "stormhold:watchtower_reach",
+  "stormhold:watchtower_dorne",
+  "stormhold:watchtower_stormlands",
+  "stormhold:town_north",
+  "stormhold:town_riverlands",
+  "stormhold:town_reach",
+  "stormhold:town_dorne",
+  "stormhold:town_stormlands",
+  "stormhold:great_city_north",
+  "stormhold:great_city_riverlands",
+  "stormhold:great_city_reach",
+  "stormhold:great_city_dorne",
+  "stormhold:great_city_stormlands",
+  "stormhold:nether_holdfast_nether"
+ ]
+}

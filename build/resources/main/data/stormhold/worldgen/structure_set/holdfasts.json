@@ -1,0 +1,30 @@
+{
+ "structures": [
+  {
+   "structure": "stormhold:holdfast_north",
+   "weight": 3
+  },
+  {
+   "structure": "stormhold:holdfast_riverlands",
+   "weight": 3
+  },
+  {
+   "structure": "stormhold:holdfast_reach",
+   "weight": 2
+  },
+  {
+   "structure": "stormhold:holdfast_dorne",
+   "weight": 2
+  },
+  {
+   "structure": "stormhold:holdfast_stormlands",
+   "weight": 2
+  }
+ ],
+ "placement": {
+  "type": "minecraft:random_spread",
+  "spacing": 44,
+  "separation": 18,
+  "salt": 515870611
+ }
+}
