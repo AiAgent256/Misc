@@ -151,7 +151,7 @@ public final class Dragons {
             }
             return Boolean.TRUE.equals(m.invoke(e));
         } catch (ReflectiveOperationException | RuntimeException ex) {
-            return e.isDeadOrDying();
+            return e instanceof LivingEntity le && le.isDeadOrDying();
         }
     }
 
