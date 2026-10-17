@@ -109,7 +109,7 @@ Private Forge 1.20.1 mod for the Dungeons and Homestead pack. Castles held by ri
 ## Commands
 
 `/stormhold version` prints the commit the jar was built from; it's also in the corner of the War Table.
-`/stormhold list | nearest | info | houses | realm | chronicle | matters` for everyone; `capture | raid | killlord | befriend` for ops (testing).
+`/stormhold list | nearest | info | houses | realm | chronicle | matters | find <city|castle|holdfast|watchtower|town|nether>` for everyone (`find` names the nearest one already standing and where the next will stand, from the placement maths, in under a few seconds and without loading a chunk; use it instead of `/locate`, which generates structure starts chunk by chunk); `capture | raid | killlord | befriend` for ops (testing).
 
 ## Building
 CI builds on every push to `main` and runs headless game tests. The jar lands on the `dist` branch, logs on `ci-logs`. Castle structures come from `tools/castlegen` (`python3 build_all.py`).

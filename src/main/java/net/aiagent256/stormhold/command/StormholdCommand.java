@@ -50,6 +50,9 @@ public final class StormholdCommand {
                 }))
                 .then(Commands.literal("accept").then(Commands.argument("holding", com.mojang.brigadier.arguments.StringArgumentType.word())
                         .then(Commands.argument("posting", com.mojang.brigadier.arguments.StringArgumentType.word()).executes(StormholdCommand::accept))))
+                .then(Commands.literal("find").then(Commands.argument("kind", com.mojang.brigadier.arguments.StringArgumentType.word())
+                        .suggests((c, b) -> net.minecraft.commands.SharedSuggestionProvider.suggest(net.aiagent256.stormhold.worldgen.Finder.KINDS.keySet(), b))
+                        .executes(StormholdCommand::find)))
                 .then(Commands.literal("choose").then(Commands.argument("matter", com.mojang.brigadier.arguments.StringArgumentType.word())
                         .then(Commands.argument("which", com.mojang.brigadier.arguments.IntegerArgumentType.integer(1, 2)).executes(StormholdCommand::choose))))
                 .then(Commands.literal("matters").executes(c -> {
@@ -127,6 +130,48 @@ public final class StormholdCommand {
         } catch (IllegalArgumentException e) {
             return 0;
         }
+    }
+
+    /** The nearest castle of a kind: one already in the world, and where the next one will stand. Never loads a chunk. */
+    private static int find(CommandContext<CommandSourceStack> c) {
+        String kind = com.mojang.brigadier.arguments.StringArgumentType.getString(c, "kind").toLowerCase(java.util.Locale.ROOT);
+        if (!net.aiagent256.stormhold.worldgen.Finder.KINDS.containsKey(kind)) {
+            c.getSource().sendFailure(Component.literal("Kinds: " + String.join(", ", new java.util.TreeSet<>(net.aiagent256.stormhold.worldgen.Finder.KINDS.keySet()))));
+            return 0;
+        }
+        var level = c.getSource().getLevel();
+        BlockPos from = BlockPos.containing(c.getSource().getPosition());
+        boolean nether = level.dimension() == net.minecraft.world.level.Level.NETHER;
+        if (kind.equals("nether") != nether) {
+            c.getSource().sendFailure(Component.literal(nether ? "Only Nether holdfasts are down here: /stormhold find nether" : "Nether holdfasts are in the Nether."));
+            return 0;
+        }
+        var known = net.aiagent256.stormhold.worldgen.Finder.known(level, from, kind);
+        if (known != null) {
+            c.getSource().sendSuccess(() -> Component.literal(known.what() + " at " + known.x() + ", " + known.z() + " (" + (int) known.dist(from)
+                    + " blocks " + heading(from, known.x(), known.z()) + "), already standing.").withStyle(net.minecraft.ChatFormatting.GOLD), false);
+        }
+        long t = System.currentTimeMillis();
+        int rings = kind.equals("city") ? 10 : 16;
+        var planned = net.aiagent256.stormhold.worldgen.Finder.planned(level, from, kind, rings, 4000);
+        long took = System.currentTimeMillis() - t;
+        if (planned == null) {
+            c.getSource().sendSuccess(() -> Component.literal(known == null ? "No " + kind + " found within reach (" + took + " ms)."
+                    : "No other " + kind + " planned within reach.").withStyle(net.minecraft.ChatFormatting.GRAY), false);
+            return known == null ? 0 : 1;
+        }
+        c.getSource().sendSuccess(() -> Component.literal("Next " + planned.what() + " will stand at " + planned.x() + ", " + planned.z() + " ("
+                + (int) planned.dist(from) + " blocks " + heading(from, planned.x(), planned.z()) + "). " + took + " ms.")
+                .withStyle(net.minecraft.ChatFormatting.AQUA), false);
+        return 1;
+    }
+
+    private static String heading(BlockPos from, int x, int z) {
+        int dx = x - from.getX(), dz = z - from.getZ();
+        String ns = dz < 0 ? "north" : "south", ew = dx < 0 ? "west" : "east";
+        if (Math.abs(dx) < Math.abs(dz) / 2) return ns;
+        if (Math.abs(dz) < Math.abs(dx) / 2) return ew;
+        return ns + "-" + ew;
     }
 
     private static int choose(CommandContext<CommandSourceStack> c) {

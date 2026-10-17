@@ -1274,6 +1274,23 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** The finder names where the next watchtower will stand from placement maths alone, without loading a chunk. */
+    @GameTest(template = "arena", timeoutTicks = 400)
+    public static void finderPlansWithoutChunks(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        BlockPos from = g.absolutePos(BlockPos.ZERO).offset(9000, 0, -9000);
+        long t = System.currentTimeMillis();
+        var found = net.aiagent256.stormhold.worldgen.Finder.planned(level, from, "watchtower", 16, 20000);
+        long took = System.currentTimeMillis() - t;
+        if (found == null) throw new IllegalStateException("no watchtower within sixteen cells; last: " + net.aiagent256.stormhold.worldgen.CastleStructure.lastRejection);
+        if (found.known()) throw new IllegalStateException("planned, not known");
+        if (found.dist(from) > 16 * 18 * 16 * 1.5) throw new IllegalStateException("too far: " + found.dist(from));
+        if (level.getChunkSource().getChunkNow(found.x() >> 4, found.z() >> 4) != null) throw new IllegalStateException("the finder loaded a chunk");
+        Stormhold.LOGGER.info("Finder: {} at {}, {} in {} ms", found.what(), found.x(), found.z(), took);
+        if (net.aiagent256.stormhold.worldgen.Finder.planned(level, from, "nonsense", 2, 1000) != null) throw new IllegalStateException("found nonsense");
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();
