@@ -43,11 +43,11 @@ public final class Fief {
     /** Give up on a building after this many failed sitings; the land is just too rough. */
     private static final int MAX_TRIES = 90;
 
-    private static final List<String> HAMLET = List.of("cottage_a", "well", "cottage_c");
+    private static final List<String> HAMLET = List.of("cottage_a", "well", "cottage_c", "cottage_b", "pasture");
     private static final List<String> VILLAGE = List.of("cottage_a", "well", "cottage_b", "pasture", "cottage_c", "mine", "cottage_d",
-            "mill", "chapel");
+            "mill", "chapel", "cottage_a", "cottage_c");
     private static final List<String> TOWN = List.of("cottage_a", "well", "cottage_b", "pasture", "cottage_c", "mine", "cottage_d",
-            "mill", "chapel", "cottage_a", "lumber", "cottage_b", "quarry", "pasture", "dock");
+            "mill", "chapel", "cottage_a", "lumber", "cottage_b", "quarry", "pasture", "dock", "cottage_c", "cottage_d", "cottage_a");
 
     public static void plan(ServerLevel level, Holding h) {
         if (h.fiefPlan != null) return;
@@ -232,10 +232,13 @@ public final class Fief {
         // the people
         VillagerProfession prof = piece.profession == null ? null
                 : ForgeRegistries.VILLAGER_PROFESSIONS.getValue(new ResourceLocation("minecraft", piece.profession));
-        for (BlockPos bed : piece.beds) {
-            BlockPos at = world(origin, settings, bed);
-            BlockPos free = Garrisons.standable(level, at);
-            spawnVillager(level, free != null ? free : at, prof);
+        // a family to a cottage, a crew to a workshop: one soul a bed and a couple more, so the place looks lived in
+        int souls = piece.kind.equals("well") ? 0 : Math.max(2, piece.beds.size() + 1 + level.random.nextInt(2));
+        for (int i = 0; i < souls; i++) {
+            BlockPos at = i < piece.beds.size() ? world(origin, settings, piece.beds.get(i)) : world(origin, settings, piece.door);
+            BlockPos free = Garrisons.standable(level, at.offset(i < piece.beds.size() ? 0 : level.random.nextInt(5) - 2, 0, 0));
+            // the extra souls take whatever trade the village lacks: vanilla picks from the job blocks about
+            spawnVillager(level, free != null ? free : at, i < piece.beds.size() ? prof : null);
         }
         if (piece.animalSpot != null) {
             BlockPos at = world(origin, settings, piece.animalSpot);

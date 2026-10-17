@@ -849,9 +849,9 @@ public class StormholdGameTests {
         mgr.add(h);
         try {
             net.aiagent256.stormhold.holding.Fief.plan(level, h);
-            if (h.fiefPlan == null || h.fiefPlan.size() != 3) throw new IllegalStateException("hamlet plan " + h.fiefPlan);
-            for (int i = 0; i < 80 && !h.fiefPlan.isEmpty(); i++) net.aiagent256.stormhold.holding.Fief.buildNext(level, mgr, h);
-            if (h.fief.size() != 3) throw new IllegalStateException("built " + h.fief.size() + " of 3: " + h.fief + " plan left " + h.fiefPlan);
+            if (h.fiefPlan == null || h.fiefPlan.size() != 5) throw new IllegalStateException("hamlet plan " + h.fiefPlan);
+            for (int i = 0; i < 120 && !h.fiefPlan.isEmpty(); i++) net.aiagent256.stormhold.holding.Fief.buildNext(level, mgr, h);
+            if (h.fief.size() < 4) throw new IllegalStateException("built " + h.fief.size() + " of 5: " + h.fief + " plan left " + h.fiefPlan);
             int beds = 0;
             for (var b : h.fief) {
                 if (!b.piece().startsWith("cottage")) continue;
@@ -863,7 +863,7 @@ public class StormholdGameTests {
             if (beds < 4) throw new IllegalStateException("cottages have " + beds + " bed blocks");
             var folk = level.getEntitiesOfClass(net.minecraft.world.entity.npc.Villager.class,
                     new net.minecraft.world.phys.AABB(new BlockPos(cx, y, cz)).inflate(120, 60, 120));
-            if (folk.size() < 4) throw new IllegalStateException("only " + folk.size() + " villagers");
+            if (folk.size() < 8) throw new IllegalStateException("only " + folk.size() + " villagers");
             if (!h.posts.get(Role.KNIGHT).stream().anyMatch(p -> !h.box.isInside(p))) throw new IllegalStateException("no patrol post outside the walls");
             net.aiagent256.stormhold.holding.Fief.census(level, mgr, h, level.getGameTime());
             if (h.fiefPop < 4 || !h.fiefJobs.containsKey("farmer")) throw new IllegalStateException("census: " + h.fiefReport);

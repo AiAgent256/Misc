@@ -322,7 +322,8 @@ public final class Garrisons {
         List<BlockPos> ground = new ArrayList<>();
         for (BlockPos p : knights) if (p.getY() == groundY && level.isLoaded(p)) ground.add(p);
         if (ground.size() < 3) return;
-        int n = h.tier * 3;
+        // a castle's people in the baileys and the streets: towns and cities keep a crowd, castles a household
+        int n = h.isTown() ? 14 : h.tier >= 4 ? 30 : h.tier * 6;
         for (int i = 0; i < n; i++) {
             BlockPos p = standable(level, ground.get(level.random.nextInt(ground.size())));
             if (p == null) continue;
