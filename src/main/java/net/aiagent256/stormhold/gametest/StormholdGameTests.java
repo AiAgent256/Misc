@@ -767,7 +767,17 @@ public class StormholdGameTests {
             java.util.Map<String, Integer> made = new java.util.HashMap<>();
             for (int i = 0; i < 40; i++) net.aiagent256.stormhold.holding.Produce.slice(level, d, made);
             Stormhold.LOGGER.info("Mine test: dug {} slices, {} down, {} turns, made {}", d.dug, d.down, d.turns, made);
-            if (d.dug < 30) throw new IllegalStateException("mine dug only " + d.dug + " slices (turns " + d.turns + ", done " + d.done + ")");
+            if (d.dug < 30) {
+                StringBuilder sb = new StringBuilder("mine dug only " + d.dug + " slices (turns " + d.turns + ", done " + d.done + ", heading "
+                        + d.dx + "," + d.dz + " side " + d.sx + "," + d.sz + ", next " + d.next + ", last " + d.last + "); at the face:");
+                for (int y = -1; y <= 3; y++) {
+                    for (int k = 0; k <= 1; k++) {
+                        BlockPos q = d.next.offset(d.sx * k, y, d.sz * k);
+                        sb.append(' ').append(y).append('/').append(k).append('=').append(level.getBlockState(q).getBlock().getDescriptionId().replace("block.minecraft.", ""));
+                    }
+                }
+                throw new IllegalStateException(sb.toString());
+            }
             if (!level.getBlockState(first.above()).isAir()) throw new IllegalStateException("first slice not cut at " + first);
             if (made.getOrDefault("cobblestone", 0) < 100) throw new IllegalStateException("mine yielded " + made);
             if (made.getOrDefault("iron_ingot", 0) < 1) throw new IllegalStateException("mine never reached the iron: " + made + ", " + d.down + " down");
