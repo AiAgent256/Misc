@@ -69,6 +69,14 @@ public final class CommonEvents {
         }
     }
 
+    /** A player's pets and soldiers who aren't his enemies can't hurt each other: accidents start no fights. */
+    @SubscribeEvent
+    public static void accident(net.minecraftforge.event.entity.living.LivingAttackEvent e) {
+        if (e.getEntity().level() instanceof ServerLevel level
+                && net.aiagent256.stormhold.holding.Allies.spared(level, e.getSource().getEntity(), e.getEntity()))
+            e.setCanceled(true);
+    }
+
     /** Every hostile mob, bosses too, is made as hard as the frontier zone it joins the world in. */
     @SubscribeEvent
     public static void joined(net.minecraftforge.event.entity.EntityJoinLevelEvent e) {

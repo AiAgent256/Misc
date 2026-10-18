@@ -149,6 +149,51 @@ public class StormholdGameTests {
     }
 
     @GameTest(template = "arena")
+    public static void petsAndFriendlySoldiersSpareEachOther(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        UUID me = UUID.randomUUID();
+        String house = "allytest" + Math.abs(me.hashCode() % 100000);
+        List<Entity> spawned = new ArrayList<>();
+        try {
+            var wolf = net.minecraft.world.entity.EntityType.WOLF.create(level);
+            if (wolf == null) throw new IllegalStateException("no wolf");
+            BlockPos wp = g.absolutePos(new BlockPos(4, 2, 4));
+            wolf.moveTo(wp.getX() + 0.5, wp.getY(), wp.getZ() + 0.5, 0, 0);
+            wolf.setTame(true);
+            wolf.setOwnerUUID(me);
+            level.addFreshEntity(wolf);
+            spawned.add(wolf);
+            GarrisonEntity theirs = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(7, 2, 4)), Sides.house(house), true);
+            GarrisonEntity mine = Garrisons.spawn(level, mgr, null, Role.ARCHER, g.absolutePos(new BlockPos(4, 2, 7)), Sides.player(me), true);
+            if (theirs == null || mine == null) throw new IllegalStateException("no soldiers");
+            spawned.add(theirs);
+            spawned.add(mine);
+            net.aiagent256.stormhold.house.Standing.change(level, mgr, house, me, 200, "test");
+            if (!net.aiagent256.stormhold.holding.Allies.spared(level, wolf, theirs) || !net.aiagent256.stormhold.holding.Allies.spared(level, theirs, wolf))
+                throw new IllegalStateException("a friendly house's knight and my wolf fight");
+            if (!net.aiagent256.stormhold.holding.Allies.spared(level, wolf, mine) || !net.aiagent256.stormhold.holding.Allies.spared(level, mine, wolf))
+                throw new IllegalStateException("my own archer and my wolf fight");
+            float hp = theirs.getHealth();
+            theirs.hurt(level.damageSources().mobAttack(wolf), 4.0F);
+            if (theirs.getHealth() < hp) throw new IllegalStateException("my wolf's bite landed on a friendly knight");
+            if (theirs.getLastHurtByMob() == wolf) throw new IllegalStateException("the knight holds the bite against my wolf");
+            // a house that holds me hostile is fair game
+            net.aiagent256.stormhold.house.Standing.change(level, mgr, house, me, -400, "test");
+            if (net.aiagent256.stormhold.holding.Allies.spared(level, wolf, theirs))
+                throw new IllegalStateException("a hostile house's knight is spared my wolf");
+            // a wild animal is nobody's pet
+            var stray = net.minecraft.world.entity.EntityType.WOLF.create(level);
+            if (stray != null && net.aiagent256.stormhold.holding.Allies.spared(level, stray, mine))
+                throw new IllegalStateException("a stray is treated as a pet");
+            if (stray != null) stray.discard();
+        } finally {
+            for (Entity e : spawned) e.discard();
+        }
+        g.succeed();
+    }
+
+    @GameTest(template = "arena")
     public static void labourMinersAndSmiths(GameTestHelper g) {
         ServerLevel level = g.getLevel();
         HoldingManager mgr = HoldingManager.get(level);
