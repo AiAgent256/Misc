@@ -8,6 +8,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.MapItem;
+import net.minecraft.world.level.saveddata.maps.MapDecoration;
+import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -116,11 +120,25 @@ public final class Scouts {
         home(level, mgr, h, c);
     }
 
-    /** Home: the men back on the walls, and the report. */
+    /** Home: the men back on the walls, the report, and their map for the hall (a copy for you). */
     public static void home(ServerLevel level, HoldingManager mgr, Holding h, Campaign c) {
         for (var e : c.counts.entrySet()) h.add(e.getKey(), e.getValue());
-        List<Component> lines = report(level, mgr, h, c);
+        List<Sighting> seen = survey(level, mgr, h, c);
+        List<Component> lines = report(h, c, seen);
         for (Component line : lines) HoldingEvents.tell(level, c.player, line);
+        ItemStack map = map(level, h, c, seen);
+        h.pendingMaps.add(map.copy());
+        var sp = c.player == null ? null : level.getServer().getPlayerList().getPlayer(c.player);
+        if (sp != null) {
+            ItemStack copy = map.copy();
+            if (!sp.getInventory().add(copy)) sp.drop(copy, false);
+            HoldingEvents.tell(level, c.player, Component.literal("  They've drawn it on a map: a copy is in your pack, and one goes up in the hall at "
+                    + h.name + ".").withStyle(ChatFormatting.GRAY));
+        }
+        hangPending(level, mgr, h);
+        if (!h.pendingMaps.isEmpty())
+            HoldingEvents.tell(level, c.player, Component.literal("  The hall's copy goes up on a bare wall near the War Table of " + h.name
+                    + " when you're next there.").withStyle(ChatFormatting.GRAY));
         Chronicle.log(level, mgr, Chronicle.NEWS, "Scouts from " + h.name + " report " + (lines.size() - 1) + " places near "
                 + c.to.getX() + ", " + c.to.getZ() + ".", c.player);
         c.stage = Campaign.Stage.DONE;
@@ -160,13 +178,19 @@ public final class Scouts {
         return dx * dx + dz * dz <= (double) r * r;
     }
 
+    /** One thing the riders saw: where, what to call it, how it stands with you, and the report's line. */
+    public record Sighting(BlockPos pos, String name, int stance, Component line, double d) {
+        public static final int YOURS = 2, FRIEND = 1, NEUTRAL = 0, HOSTILE = -1, UNSEEN = -2;
+    }
+
     /** What the riders saw, nearest the spot first. */
     public static List<Component> report(ServerLevel level, HoldingManager mgr, Holding h, Campaign c) {
-        List<Component> out = new ArrayList<>();
+        return report(h, c, survey(level, mgr, h, c));
+    }
+
+    public static List<Sighting> survey(ServerLevel level, HoldingManager mgr, Holding h, Campaign c) {
         BlockPos home = Campaigns.gateOutside(h);
-        record Seen(double d, Component line) {
-        }
-        List<Seen> seen = new ArrayList<>();
+        List<Sighting> seen = new ArrayList<>();
         List<BlockPos> places = new ArrayList<>();
         for (Holding o : mgr.holdings.values()) {
             if (o == h || !near(o, c.to, RADIUS)) continue;
@@ -179,10 +203,11 @@ public final class Scouts {
             boolean yours = c.player != null && c.player.equals(o.ownerPlayer());
             String men = o.troops() <= 0 ? "no garrison to speak of" : "about " + round(o.troops()) + " men";
             BlockPos p = o.center();
-            seen.add(new Seen(dist(p, c.to), Component.literal("  " + o.name + ", " + o.kindName().toLowerCase(java.util.Locale.ROOT) + ", "
+            int stance = yours ? Sighting.YOURS : stand.contains("hate") ? Sighting.HOSTILE : stand.contains("friends") ? Sighting.FRIEND : Sighting.NEUTRAL;
+            seen.add(new Sighting(p, o.name, stance, Component.literal("  " + o.name + ", " + o.kindName().toLowerCase(java.util.Locale.ROOT) + ", "
                     + (yours ? "yours" : "held by " + owner + stand) + ": " + men + ". " + Guide.way(home, p) + " of " + h.name
                     + " (" + p.getX() + ", " + p.getZ() + ").").withStyle(yours ? ChatFormatting.GREEN : stand.contains("hate")
-                    ? ChatFormatting.RED : ChatFormatting.WHITE)));
+                    ? ChatFormatting.RED : ChatFormatting.WHITE), dist(p, c.to)));
         }
         if (!h.isNether()) {
             for (Finder.Found f : Finder.within(level, c.to, RADIUS, SURVEY_MS)) {
@@ -190,11 +215,17 @@ public final class Scouts {
                 boolean known = false;
                 for (BlockPos q : places) if (dist(q, p) < 128) known = true;
                 if (known) continue;
-                seen.add(new Seen(dist(p, c.to), Component.literal("  Unseen: the ground for " + article(f.what()) + " " + f.what()
-                        + " near " + f.x() + ", " + f.z() + ", " + Guide.way(home, p) + " of " + h.name + ".").withStyle(ChatFormatting.GRAY)));
+                seen.add(new Sighting(p, f.what(), Sighting.UNSEEN, Component.literal("  Unseen: the ground for " + article(f.what()) + " " + f.what()
+                        + " near " + f.x() + ", " + f.z() + ", " + Guide.way(home, p) + " of " + h.name + ".").withStyle(ChatFormatting.GRAY),
+                        dist(p, c.to)));
             }
         }
-        seen.sort(Comparator.comparingDouble(Seen::d));
+        seen.sort(Comparator.comparingDouble(Sighting::d));
+        return seen;
+    }
+
+    public static List<Component> report(Holding h, Campaign c, List<Sighting> seen) {
+        List<Component> out = new ArrayList<>();
         int lost = c.spoils;
         out.add(HoldingEvents.gold("The scouts are back at " + h.name + " from " + c.to.getX() + ", " + c.to.getZ()
                 + (lost > 0 ? ", one rider short" : "") + ". " + (seen.isEmpty() ? "Open country: nothing held and nothing built within "
@@ -202,6 +233,88 @@ public final class Scouts {
         for (int i = 0; i < Math.min(10, seen.size()); i++) out.add(seen.get(i).line());
         if (seen.size() > 10) out.add(Component.literal("  ...and " + (seen.size() - 10) + " more.").withStyle(ChatFormatting.GRAY));
         return out;
+    }
+
+    // ------------------------------------------------------------ the map
+
+    /** The country round the spot as the scouts drew it: the lie of the land, and a banner on every place they found. */
+    public static ItemStack map(ServerLevel level, Holding h, Campaign c, List<Sighting> seen) {
+        ItemStack map = MapItem.create(level, c.to.getX(), c.to.getZ(), (byte) 3, true, true);
+        MapItem.renderBiomePreviewMap(level, map);
+        int i = 0;
+        for (Sighting s : seen) {
+            if (i >= 32) break;
+            MapDecoration.Type type = switch (s.stance()) {
+                case Sighting.YOURS -> MapDecoration.Type.BANNER_LIME;
+                case Sighting.FRIEND -> MapDecoration.Type.BANNER_LIGHT_BLUE;
+                case Sighting.HOSTILE -> MapDecoration.Type.BANNER_RED;
+                case Sighting.UNSEEN -> MapDecoration.Type.TARGET_X;
+                default -> MapDecoration.Type.BANNER_WHITE;
+            };
+            MapItemSavedData.addTargetDecoration(map, s.pos(), "stormhold_scout_" + i++, type);
+        }
+        map.setHoverName(Component.literal("Scouts' map: " + c.to.getX() + ", " + c.to.getZ()).withStyle(ChatFormatting.GOLD));
+        net.minecraft.nbt.ListTag lore = new net.minecraft.nbt.ListTag();
+        lore.add(net.minecraft.nbt.StringTag.valueOf(Component.Serializer.toJson(Component.literal("Ridden from " + h.name
+                + ". Green yours, blue friends, red enemies, white others, X unseen.").withStyle(ChatFormatting.GRAY))));
+        for (int k = 0; k < Math.min(8, seen.size()); k++) {
+            Sighting s = seen.get(k);
+            String tag = switch (s.stance()) {
+                case Sighting.YOURS -> " (yours)";
+                case Sighting.FRIEND -> " (friends)";
+                case Sighting.HOSTILE -> " (enemies)";
+                case Sighting.UNSEEN -> " (unseen)";
+                default -> "";
+            };
+            lore.add(net.minecraft.nbt.StringTag.valueOf(Component.Serializer.toJson(Component.literal(s.name() + tag + " at "
+                    + s.pos().getX() + ", " + s.pos().getZ()).withStyle(ChatFormatting.WHITE))));
+        }
+        map.getOrCreateTagElement("display").put("Lore", lore);
+        return map;
+    }
+
+    /** Hang the maps waiting for the hall, nearest the War Table first, as long as its rooms are loaded. */
+    public static void hangPending(ServerLevel level, HoldingManager mgr, Holding h) {
+        if (h.pendingMaps.isEmpty()) return;
+        BlockPos anchor = !h.warTablePos.equals(BlockPos.ZERO) ? h.warTablePos : !h.bannerPos.equals(BlockPos.ZERO) ? h.bannerPos : h.center();
+        if (!level.isLoaded(anchor)) return;
+        for (java.util.Iterator<ItemStack> it = h.pendingMaps.iterator(); it.hasNext(); ) {
+            ItemStack map = it.next();
+            BlockPos at = hang(level, h, anchor, map);
+            if (at == null) return;   // no bare wall yet: it waits, and goes up when there is one
+            it.remove();
+            mgr.setDirty();
+            HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The scouts' map hangs in the hall of " + h.name + " ("
+                    + at.getX() + ", " + at.getY() + ", " + at.getZ() + ").").withStyle(ChatFormatting.GRAY));
+        }
+    }
+
+    /** An item frame on the nearest bare wall to {@code anchor}, at eye height first. Where it went, or null. */
+    @Nullable
+    static BlockPos hang(ServerLevel level, Holding h, BlockPos anchor, ItemStack map) {
+        int[] heights = {1, 2, 0, 3};
+        for (int r = 1; r <= 8; r++) {
+            for (int dy : heights) {
+                for (int dx = -r; dx <= r; dx++) {
+                    for (int dz = -r; dz <= r; dz++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
+                        BlockPos p = anchor.offset(dx, dy, dz);
+                        if (!h.box.isInside(p) || !level.isLoaded(p) || !level.getBlockState(p).isAir()) continue;
+                        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                            BlockPos wall = p.relative(d.getOpposite());
+                            var ws = level.getBlockState(wall);
+                            if (!ws.isSolidRender(level, wall) || !ws.isFaceSturdy(level, wall, d)) continue;
+                            net.minecraft.world.entity.decoration.ItemFrame frame = new net.minecraft.world.entity.decoration.ItemFrame(level, p, d);
+                            if (!frame.survives()) continue;
+                            frame.setItem(map.copy(), false);
+                            level.addFreshEntity(frame);
+                            return p;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private static String article(String what) {

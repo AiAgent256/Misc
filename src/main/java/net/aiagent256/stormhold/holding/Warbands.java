@@ -153,7 +153,7 @@ public final class Warbands {
         c.target = h.id;
         c.tier = h.tier;
         c.band.putAll(muster(level, h));
-        c.spoils = c.total();
+        c.spoils = 2 * c.total() + 10;   // two emeralds a head, and the captain's purse
         double ang = level.random.nextDouble() * Math.PI * 2;
         BlockPos center = h.center();
         int reach = Math.max(h.box.getXSpan(), h.box.getZSpan()) / 2 + 48;
@@ -178,7 +178,7 @@ public final class Warbands {
         }
         prune(level, c);
         if (c.total() <= 0) {
-            broken(level, mgr, h, c, c.spoils);
+            broken(level, mgr, h, c, c.spoils, true);
             return;
         }
         boolean near = Campaigns.playerNear(level, h.center(), 160);
@@ -515,15 +515,19 @@ public final class Warbands {
             h.add(r, -l);
             losses -= l;
         }
-        broken(level, mgr, h, c, c.spoils / 2);
+        broken(level, mgr, h, c, c.spoils / 2, false);
     }
 
     /** The warband broken: its spoils into the castle's stores. */
-    static void broken(ServerLevel level, HoldingManager mgr, Holding h, Campaign c, int spoils) {
+    static void broken(ServerLevel level, HoldingManager mgr, Holding h, Campaign c, int spoils, boolean watched) {
         discardLive(level, c);
-        if (spoils > 0) h.addStock(new ResourceLocation("minecraft", "emerald"), spoils);
+        boolean pack = false;
+        if (spoils > 0) {
+            if (watched) pack = Rewards.pay(level, mgr, h.ownerPlayer(), spoils, h) > 0;
+            else h.addStock(new ResourceLocation("minecraft", "emerald"), spoils);
+        }
         HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The illager warband is broken at " + h.name + "! Their spoils, "
-                + spoils + " emeralds, go to its stores.").withStyle(ChatFormatting.GREEN));
+                + spoils + " emeralds, " + (pack ? "are yours." : "go to its stores.")).withStyle(ChatFormatting.GREEN));
         Chronicle.log(level, mgr, Chronicle.WAR, "The illagers are broken at the walls of " + h.name + ".", h.ownerPlayer());
         c.stage = Campaign.Stage.DONE;
         mgr.setDirty();

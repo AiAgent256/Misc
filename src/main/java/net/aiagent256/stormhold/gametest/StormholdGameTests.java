@@ -334,6 +334,53 @@ public class StormholdGameTests {
     }
 
     @GameTest(template = "arena")
+    public static void spoilsRentsAndPurses(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = sample(g);
+        UUID lord = UUID.randomUUID();
+        h.owner = Sides.player(lord);
+        h.warTablePos = g.absolutePos(new BlockPos(5, 2, 5));
+        level.setBlock(h.warTablePos, net.minecraft.world.level.block.Blocks.CRAFTING_TABLE.defaultBlockState(), 3);
+        // the takings: plain goods and a sword with an enchantment both go in the chest the garrison sets up
+        BlockPos at = h.warTablePos.above();
+        var flesh = new net.minecraft.world.entity.item.ItemEntity(level, at.getX(), at.getY(), at.getZ(),
+                new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.ROTTEN_FLESH, 3));
+        var blade = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_SWORD);
+        blade.enchant(net.minecraft.world.item.enchantment.Enchantments.SHARPNESS, 1);
+        var sword = new net.minecraft.world.entity.item.ItemEntity(level, at.getX(), at.getY(), at.getZ(), blade);
+        List<net.minecraft.world.entity.item.ItemEntity> drops = new ArrayList<>(List.of(flesh, sword));
+        int moved = net.aiagent256.stormhold.holding.Spoils.take(level, mgr, h, drops.iterator());
+        if (moved != 4 || !drops.isEmpty()) throw new IllegalStateException(moved + " carried, " + drops.size() + " left on the ground");
+        BlockPos chestAt = net.aiagent256.stormhold.holding.Steward.spoilsChest(level, h);
+        if (chestAt == null) throw new IllegalStateException("no spoils chest set up");
+        var chest = net.aiagent256.stormhold.holding.Steward.container(level, chestAt);
+        if (count(chest, net.minecraft.world.item.Items.ROTTEN_FLESH) != 3 || count(chest, net.minecraft.world.item.Items.IRON_SWORD) != 1)
+            throw new IllegalStateException("the spoils chest holds the wrong things");
+        // the rents: every place pays its lord at dawn; away from the game it goes to the stores
+        int rent = net.aiagent256.stormhold.holding.Rewards.rent(level, h);
+        if (rent < 3) throw new IllegalStateException("a rent of " + rent);
+        var em = net.aiagent256.stormhold.holding.Rewards.EMERALD;
+        int was = h.stock(em);
+        var line = net.aiagent256.stormhold.holding.Rewards.rents(level, mgr, lord, List.of(h));
+        if (line == null || !line.getString().startsWith("Rents") || h.stock(em) != was + rent)
+            throw new IllegalStateException("rents: " + (line == null ? "none" : line.getString()) + ", stores " + h.stock(em) + " from " + was);
+        // what winning pays
+        int tower = h.tier;
+        h.tier = 3;
+        int great = net.aiagent256.stormhold.holding.Rewards.treasury(level, h);
+        h.tier = 1;
+        int small = net.aiagent256.stormhold.holding.Rewards.treasury(level, h);
+        h.tier = tower;
+        if (great <= small || small < 15) throw new IllegalStateException("treasuries: " + small + " and " + great);
+        var r = net.minecraft.util.RandomSource.create(7);
+        if (net.aiagent256.stormhold.holding.Rewards.purse(r, Role.LORD, Sides.house("testhouse"), 1) < 12
+                || net.aiagent256.stormhold.holding.Rewards.purse(r, Role.KNIGHT, Sides.OUTLAWS, 9) > 1)
+            throw new IllegalStateException("purses");
+        g.succeed();
+    }
+
+    @GameTest(template = "arena")
     public static void scoutsRideOutAndReport(GameTestHelper g) {
         ServerLevel level = g.getLevel();
         HoldingManager mgr = HoldingManager.get(level);
@@ -377,6 +424,14 @@ public class StormholdGameTests {
             net.aiagent256.stormhold.holding.Scouts.home(level, mgr, h, c);
             if (h.troops() != men || c.stage != net.aiagent256.stormhold.holding.Campaign.Stage.DONE)
                 throw new IllegalStateException("back home: " + h.troops() + " of " + men + ", " + c.stage);
+            // the map: drawn, and up on a wall of the hall (or waiting for one)
+            var frames = level.getEntitiesOfClass(net.minecraft.world.entity.decoration.ItemFrame.class, net.minecraft.world.phys.AABB.of(h.box).inflate(2),
+                    f -> f.getItem().is(net.minecraft.world.item.Items.FILLED_MAP));
+            if (frames.isEmpty() && h.pendingMaps.isEmpty()) throw new IllegalStateException("no map");
+            var drawn = frames.isEmpty() ? h.pendingMaps.get(0) : frames.get(0).getItem();
+            if (!drawn.getHoverName().getString().startsWith("Scouts' map") || !drawn.getOrCreateTag().contains("Decorations"))
+                throw new IllegalStateException("the map: " + drawn.getHoverName().getString() + " " + drawn.getTag());
+            for (var f : frames) f.discard();
         } finally {
             if (c != null) mgr.campaigns.remove(c);
             mgr.holdings.remove(h.id);

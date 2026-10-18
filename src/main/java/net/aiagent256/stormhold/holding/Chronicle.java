@@ -80,6 +80,8 @@ public final class Chronicle {
             if (mine.isEmpty()) continue;
             tribute(level, mgr, p.getUUID(), mine);
             for (Component c : account(level, mgr, p.getUUID(), mine, day)) p.sendSystemMessage(c);
+            Component rents = Rewards.rents(level, mgr, p.getUUID(), mine);
+            if (rents != null) p.sendSystemMessage(rents);
             Events.dawn(level, mgr, p, mine);
         }
     }

@@ -358,6 +358,7 @@ public final class HoldingEvents {
         if (p != null) {
             tell(level, p, Component.literal("The garrison swears to you. Use the War Table in the hall to give orders.")
                     .withStyle(ChatFormatting.GREEN));
+            if (Sides.isHouse(oldSide)) Rewards.seized(level, mgr, h, p, peaceful);
             Titles.check(level, mgr, p, rankBefore);
             House house = mgr.houseOf(oldSide);
             if (house != null && h.id.equals(house.capital)) {

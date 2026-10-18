@@ -172,6 +172,10 @@ public class Holding {
     /** The steward's name, and what he's done since the morning's account (not saved). */
     public String stewardName = "";
     public int stewardSold, stewardEarned, stewardStored, stewardSent, stewardStocked, stewardBought, stewardSpent;
+    /** Things the garrison has put in the spoils chest since the morning (not saved). */
+    public int spoilsTaken;
+    /** Scouts' maps waiting to go up in the hall. */
+    public final List<net.minecraft.world.item.ItemStack> pendingMaps = new ArrayList<>();
     /** The places the builder has laid a road to from here. */
     public final java.util.Set<UUID> roadsTo = new java.util.LinkedHashSet<>();
 
@@ -428,6 +432,9 @@ public class Holding {
         for (UUID r : roadsTo) roadTags.add(NbtUtils.createUUID(r));
         t.put("RoadsTo", roadTags);
         t.putString("Steward", stewardName);
+        ListTag mapTags = new ListTag();
+        for (var m : pendingMaps) mapTags.add(m.save(new CompoundTag()));
+        t.put("PendingMaps", mapTags);
         t.putString("BuilderName", builderName);
         if (builder != null) t.putUUID("Builder", builder);
         t.putString("FiefReport", fiefReport);
@@ -558,6 +565,7 @@ public class Holding {
         h.workDone = t.getInt("WorkDone");
         for (var r : t.getList("RoadsTo", 11)) h.roadsTo.add(NbtUtils.loadUUID(r));
         h.stewardName = t.getString("Steward");
+        for (var m : t.getList("PendingMaps", 10)) h.pendingMaps.add(net.minecraft.world.item.ItemStack.of((CompoundTag) m));
         h.builderName = t.getString("BuilderName");
         if (t.hasUUID("Builder")) h.builder = t.getUUID("Builder");
         h.fiefReport = t.getString("FiefReport");

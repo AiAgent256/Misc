@@ -37,7 +37,7 @@ public final class Net {
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
             MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19,
-            SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23;
+            SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23, TREASURY = 24;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -241,6 +241,20 @@ public final class Net {
                 case REPAIR -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.REPAIR, player);
                 case FORTIFY -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.FORTIFY, player);
                 case SCOUT -> net.aiagent256.stormhold.holding.Scouts.send(level, mgr, h, player, a.pos());
+                case TREASURY -> {
+                    var em = new net.minecraft.resources.ResourceLocation("minecraft", "emerald");
+                    int have = net.aiagent256.stormhold.holding.Stores.realmStock(mgr, h, player.getUUID(), em);
+                    int n = Math.min(64, have);
+                    if (n <= 0) {
+                        player.sendSystemMessage(Component.literal("The realm's treasury is empty.").withStyle(net.minecraft.ChatFormatting.RED));
+                    } else {
+                        net.aiagent256.stormhold.holding.Stores.take(mgr, h, player.getUUID(), em, n);
+                        net.minecraft.world.item.ItemStack purse = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.EMERALD, n);
+                        if (!player.getInventory().add(purse)) player.drop(purse, false);
+                        player.sendSystemMessage(HoldingEvents.gold("You take " + n + " emeralds from the treasury; " + (have - n)
+                                + " left in the realm's stores."));
+                    }
+                }
                 case PROJECT -> {
                     String[] ps = net.aiagent256.stormhold.holding.Builder.PROJECTS;
                     if (a.amount() >= 0 && a.amount() < ps.length) net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, ps[a.amount()], player);

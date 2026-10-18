@@ -118,6 +118,11 @@ public final class CommonEvents {
                 "A child is born at " + h.name + " to " + parent + ": " + net.aiagent256.stormhold.holding.Fief.nameOf(child) + ".", h.ownerPlayer());
     }
 
+    @SubscribeEvent(priority = net.minecraftforge.eventbus.api.EventPriority.LOW)
+    public static void drops(net.minecraftforge.event.entity.living.LivingDropsEvent e) {
+        net.aiagent256.stormhold.holding.Spoils.onDrops(e);
+    }
+
     @SubscribeEvent
     public static void death(LivingDeathEvent e) {
         if (e.getEntity() instanceof GarrisonEntity g && !g.level().isClientSide) HoldingEvents.onDeath(g);

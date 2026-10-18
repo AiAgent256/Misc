@@ -81,7 +81,10 @@ public final class HoldingTicker {
         greet(level, mgr, h);
         if (!h.villagersSpawned) Garrisons.spawnVillagers(level, h);
         if (now % 200 == 100) Labour.tick(level, mgr, h);
-        if (now % 200 == 160) Steward.tick(level, mgr, h);
+        if (now % 200 == 160) {
+            Steward.tick(level, mgr, h);
+            Scouts.hangPending(level, mgr, h);
+        }
         if (now % 100 == 40) {
             Market.tick(level, mgr, h);
             Shops.tick(level, mgr, h);

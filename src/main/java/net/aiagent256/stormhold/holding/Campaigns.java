@@ -84,6 +84,7 @@ public final class Campaigns {
         c.add(Role.KNIGHT, Math.max(4, (int) Math.ceil(h.count(Role.KNIGHT) * 0.8) + 2));
         c.add(Role.CROSSBOWMAN, Math.max(1, (int) Math.ceil(h.count(Role.CROSSBOWMAN) * 0.7)));
         c.add(Role.ARCHER, (int) Math.ceil(h.count(Role.ARCHER) * 0.4));
+        c.spoils = c.total();
         mgr.campaigns.add(c);
         h.lastRaidAt = level.getGameTime();
         HoldingEvents.tell(level, h.ownerPlayer(), Component.literal(mgr.house(h.houseId).title() + " marches on "
@@ -296,8 +297,10 @@ public final class Campaigns {
             return;
         }
         if (c.total() <= 0) {
-            HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The raid on " + h.name + " is broken!")
-                    .withStyle(ChatFormatting.GREEN));
+            int spoils = Rewards.raidSpoils(c, true);
+            boolean pack = Rewards.pay(level, mgr, h.ownerPlayer(), spoils, h) > 0;
+            HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The raid on " + h.name + " is broken! The spoils of the field: "
+                    + spoils + " emeralds" + (pack ? "." : ", to its stores.")).withStyle(ChatFormatting.GREEN));
             Chronicle.log(level, mgr, Chronicle.WAR, HoldingEvents.ownerName(level, mgr, c.side) + "'s attack on " + h.name
                     + " is broken at the walls.", h.ownerPlayer());
             c.stage = Campaign.Stage.DONE;
@@ -346,9 +349,11 @@ public final class Campaigns {
                 h.add(r, -l);
                 losses -= l;
             }
+            int spoils = Rewards.raidSpoils(c, false);
+            h.addStock(Rewards.EMERALD, spoils);
             HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("Your garrison at " + h.name
-                    + " threw back a raid by " + HoldingEvents.ownerName(level, mgr, c.side) + ". " + h.troops() + " soldiers remain.")
-                    .withStyle(ChatFormatting.GREEN));
+                    + " threw back a raid by " + HoldingEvents.ownerName(level, mgr, c.side) + ". " + h.troops() + " soldiers remain, and "
+                    + spoils + " emeralds of spoils go to the stores.").withStyle(ChatFormatting.GREEN));
             Chronicle.log(level, mgr, Chronicle.WAR, h.name + " threw back " + HoldingEvents.ownerName(level, mgr, c.side)
                     + "; " + h.troops() + " of the garrison remain.", h.ownerPlayer());
         }

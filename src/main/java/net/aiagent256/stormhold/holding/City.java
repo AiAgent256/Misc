@@ -218,7 +218,7 @@ public final class City {
         String dir = Math.abs(Math.cos(ang)) > Math.abs(Math.sin(ang)) ? (Math.cos(ang) > 0 ? "east" : "west") : (Math.sin(ang) > 0 ? "south" : "north");
         p.title = big ? "Raiders under " + NameGen.first(level.random) + " the Black, camped " + dist + " blocks " + dir
                 : "Brigands on the " + dir + " road, " + dist + " blocks out";
-        p.reward = big ? 24 : 12;
+        p.reward = (big ? 40 : 20) + 5 * (Frontier.zone(level, p.at) - 1);
         p.standing = big ? 30 : 15;
         p.expires = level.getGameTime() + 24000L * 3;
         return p;

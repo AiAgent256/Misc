@@ -75,6 +75,10 @@ public class WarTableScreen extends Screen {
                 .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("The map of every castle you know, the houses and how they stand with you, and the realm's record.")))
                 .bounds(x0 + W - 60, y0 + 4, 54, 14).build());
         HoldingInfo h = current();
+        if (h != null) this.addRenderableWidget(Button.builder(Component.literal("Treasury"), b -> Net.sendAction(h.id(), Net.TREASURY, BlockPos.ZERO, 0))
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Take up to 64 emeralds from the realm's stores into your pack. "
+                        + "Spoils, the steward's sales and rents paid while you're away collect there.")))
+                .bounds(x0 + 6, y0 + H - 50, 112, 20).build());
         if (h == null) return;
         int rx = x0 + 128;
         int y = y0 + 128;

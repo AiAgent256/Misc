@@ -68,6 +68,30 @@ public class WarTableBlock extends Block {
                     + h.stock(new ResourceLocation("minecraft:iron_ingot")) + ").").withStyle(ChatFormatting.GREEN), true);
             return InteractionResult.sidedSuccess(false);
         }
+        if (held.isEmpty() && player.isShiftKeyDown()) {
+            // the treasury: a purse of emeralds out of the realm's stores
+            ServerLevel sl = (ServerLevel) level;
+            HoldingManager mgr = HoldingManager.get(sl);
+            Holding h = mgr.at(pos, 2);
+            if (h == null || !h.owner.equals(net.aiagent256.stormhold.Sides.player(player.getUUID()))) {
+                player.displayClientMessage(Component.literal("This table commands no castle of yours.").withStyle(ChatFormatting.RED), true);
+                return InteractionResult.sidedSuccess(false);
+            }
+            ResourceLocation em = new ResourceLocation("minecraft", "emerald");
+            int have = net.aiagent256.stormhold.holding.Stores.realmStock(mgr, h, player.getUUID(), em);
+            int n = Math.min(64, have);
+            if (n <= 0) {
+                player.displayClientMessage(Component.literal("The realm's treasury is empty.").withStyle(ChatFormatting.RED), true);
+                return InteractionResult.sidedSuccess(false);
+            }
+            net.aiagent256.stormhold.holding.Stores.take(mgr, h, player.getUUID(), em, n);
+            ItemStack purse = new ItemStack(net.minecraft.world.item.Items.EMERALD, n);
+            if (!player.getInventory().add(purse)) player.drop(purse, false);
+            level.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.BLOCKS, 0.6F, 1.2F);
+            player.displayClientMessage(Component.literal("You take " + n + " emeralds from the treasury; " + (have - n) + " left in the realm's stores.")
+                    .withStyle(ChatFormatting.GREEN), true);
+            return InteractionResult.sidedSuccess(false);
+        }
         if (player instanceof ServerPlayer sp) Net.openWarTable(sp);
         return InteractionResult.sidedSuccess(false);
     }

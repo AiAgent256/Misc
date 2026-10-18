@@ -46,11 +46,14 @@ import java.util.UUID;
  * you're near, and tells you each morning what he's done.
  */
 public final class Steward {
-    public static final String SELL = "sell", STORES = "stores", SEND = "send", KEEP = "keep", BUY = "buy";
+    public static final String SELL = "sell", STORES = "stores", SEND = "send", KEEP = "keep", BUY = "buy", SPOILS = "spoils";
 
     /** A standing order read off a sign. */
-    public record Rule(String kind, boolean whenFull, int over, Map<Item, Integer> want, String place) {
+    public record Rule(String kind, boolean whenFull, int over, Map<Item, Integer> want, String place, boolean sell) {
     }
+
+    /** Where each place's spoils chest is, as last seen. */
+    static final Map<UUID, BlockPos> SPOILS_AT = new HashMap<>();
 
     /** Chests the steward has already told the lord he's taken charge of, by holding. Not saved: he says it again after a restart. */
     private static final Map<UUID, Set<BlockPos>> KNOWN = new HashMap<>();
@@ -74,12 +77,37 @@ public final class Steward {
                     Container c = container(level, at);
                     if (c == null) continue;
                     seen.add(at);
+                    if (r.kind().equals(SPOILS)) SPOILS_AT.putIfAbsent(h.id, at);
                     if (known.add(at)) announce(level, h, r, at);
                     run(level, mgr, h, owner, r, c);
                 }
             }
         }
         known.retainAll(seen);
+    }
+
+    /** The place's spoils chest: the one last seen, else the first signed "Spoils" in it, else null. */
+    @Nullable
+    public static BlockPos spoilsChest(ServerLevel level, Holding h) {
+        BlockPos at = SPOILS_AT.get(h.id);
+        if (at != null && level.isLoaded(at) && container(level, at) != null) return at;
+        SPOILS_AT.remove(h.id);
+        for (int cx = h.box.minX() >> 4; cx <= h.box.maxX() >> 4; cx++) {
+            for (int cz = h.box.minZ() >> 4; cz <= h.box.maxZ() >> 4; cz++) {
+                LevelChunk chunk = level.getChunkSource().getChunkNow(cx, cz);
+                if (chunk == null) continue;
+                for (BlockEntity be : chunk.getBlockEntities().values()) {
+                    if (!(be instanceof SignBlockEntity sign) || !h.box.isInside(be.getBlockPos())) continue;
+                    Rule r = read(sign);
+                    if (r == null || !r.kind().equals(SPOILS)) continue;
+                    BlockPos p = containerPos(level, sign);
+                    if (p == null) continue;
+                    SPOILS_AT.put(h.id, p);
+                    return p;
+                }
+            }
+        }
+        return null;
     }
 
     // ------------------------------------------------------------ reading the sign
@@ -106,10 +134,11 @@ public final class Steward {
             case "send", "send to", "ship", "ship to" -> SEND;
             case "keep", "keep stocked", "stock", "steward keep" -> KEEP;
             case "buy", "keep and buy", "steward buy" -> BUY;
+            case "spoils", "loot", "the spoils", "spoils of war" -> SPOILS;
             default -> head.startsWith("send to ") || head.startsWith("ship to ") ? SEND : null;
         };
         if (kind == null) return null;
-        boolean full = false;
+        boolean full = false, sellToo = false;
         int over = 0;
         Map<Item, Integer> want = new java.util.LinkedHashMap<>();
         String place = head.startsWith("send to ") ? head.substring(8) : head.startsWith("ship to ") ? head.substring(8) : "";
@@ -118,6 +147,10 @@ public final class Steward {
             if (l.isEmpty()) continue;
             if (l.contains("when full") || l.equals("full") || l.equals("if full")) {
                 full = true;
+                continue;
+            }
+            if (kind.equals(SPOILS) && (l.equals("sell") || l.equals("and sell") || l.equals("sell them") || l.equals("sell it"))) {
+                sellToo = true;
                 continue;
             }
             var m = java.util.regex.Pattern.compile("^(?:over|keep|leave) (\\d+)$").matcher(l);
@@ -149,7 +182,7 @@ public final class Steward {
         }
         if ((kind.equals(KEEP) || kind.equals(BUY)) && want.isEmpty()) return null;
         if (kind.equals(SEND) && place.isEmpty()) return null;
-        return new Rule(kind, full, over, want, place);
+        return new Rule(kind, full, over, want, place, sellToo);
     }
 
     private static Map<String, Item> byName;
@@ -195,7 +228,7 @@ public final class Steward {
     }
 
     @Nullable
-    static Container container(ServerLevel level, BlockPos p) {
+    public static Container container(ServerLevel level, BlockPos p) {
         BlockState s = level.getBlockState(p);
         if (s.getBlock() instanceof ChestBlock chest) return ChestBlock.getContainer(chest, s, level, p, true);
         BlockEntity be = level.getBlockEntity(p);
@@ -235,6 +268,9 @@ public final class Steward {
                 send(level, mgr, h, owner, r, c);
             }
             case KEEP, BUY -> keep(mgr, h, owner, r, c);
+            case SPOILS -> {
+                if (r.sell() && (!r.whenFull() || full(c))) sell(h, r, c);
+            }
             default -> {
             }
         }
@@ -439,6 +475,7 @@ public final class Steward {
             case STORES -> "empties it into the stores" + (r.over() > 0 ? ", leaving " + r.over() + " of each" : "");
             case SEND -> "sends it by courier to " + r.place();
             case KEEP -> "keeps it stocked from the stores: " + wants(r);
+            case SPOILS -> "has the garrison put what they take off the dead in it" + (r.sell() ? ", and sells what the shops will buy" : "");
             default -> "keeps it stocked, buying what the stores lack: " + wants(r);
         };
         HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("Steward " + h.stewardName + " of " + h.name + " takes charge of the chest at "
@@ -461,7 +498,9 @@ public final class Steward {
         if (h.stewardSent > 0) parts.add("sent " + h.stewardSent + " by courier");
         if (h.stewardStocked > 0) parts.add("stocked " + h.stewardStocked + " from the stores");
         if (h.stewardBought > 0) parts.add("bought " + h.stewardBought + " for " + h.stewardSpent + " emeralds");
+        if (h.spoilsTaken > 0) parts.add("put " + h.spoilsTaken + " things the garrison took off the dead in the spoils chest");
         h.stewardSold = h.stewardEarned = h.stewardStored = h.stewardSent = h.stewardStocked = h.stewardBought = h.stewardSpent = 0;
+        h.spoilsTaken = 0;
         if (parts.isEmpty()) return null;
         return Component.literal("Steward " + (h.stewardName.isEmpty() ? "" : h.stewardName + " ") + "of " + h.name + ": "
                 + String.join(", ", parts) + ".").withStyle(ChatFormatting.GRAY);

@@ -561,6 +561,16 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     protected void dropCustomDeathLoot(DamageSource src, int looting, boolean recentlyHit) {
         if (owner() == null) {
             super.dropCustomDeathLoot(src, looting, recentlyHit);
+            // a house's man carries coin, for the lord who cuts him down or whose men do
+            if (this.level() instanceof net.minecraft.server.level.ServerLevel sl && Sides.playerId(side) == null) {
+                Entity k = src.getEntity();
+                boolean lord = k instanceof Player || (k instanceof GarrisonEntity g && Sides.playerId(g.side()) != null);
+                if (lord) {
+                    int n = net.aiagent256.stormhold.holding.Rewards.purse(this.random, role(), side,
+                            net.aiagent256.stormhold.holding.Frontier.zone(sl, this.blockPosition()));
+                    if (n > 0) this.spawnAtLocation(new ItemStack(Items.EMERALD, n));
+                }
+            }
             return;
         }
         for (EquipmentSlot s : EquipmentSlot.values()) {
