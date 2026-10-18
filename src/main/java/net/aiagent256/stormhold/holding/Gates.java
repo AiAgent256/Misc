@@ -45,6 +45,8 @@ public final class Gates {
     }
 
     public static void tick(ServerLevel level, HoldingManager mgr, Holding h) {
+        // an inner gate whose chunks weren't loaded at the last look is looked for again in a while
+        if (h.gates != null && h.gatesRescanAt > 0 && level.getGameTime() >= h.gatesRescanAt) h.gates = null;
         if (h.gates == null) {
             if (!scan(level, mgr, h)) return;
         }
@@ -98,7 +100,12 @@ public final class Gates {
         return placed;
     }
 
-    /** Find the portcullis planes around the gate markers. False if those chunks aren't loaded yet. */
+    /**
+     * Find every portcullis plane of the castle: the ones round the gate markers, and every plane the plans
+     * record (the inner ward's gate, a shell keep's, a city's inner and upper gates), wherever they stand.
+     * False if the gate markers' chunks aren't loaded yet; a recorded plane in an unloaded chunk is looked
+     * for again later.
+     */
     private static boolean scan(ServerLevel level, HoldingManager mgr, Holding h) {
         List<BlockPos> markers = new ArrayList<>();
         if (!h.gatePos.equals(BlockPos.ZERO)) markers.add(h.gatePos);
@@ -117,6 +124,22 @@ public final class Gates {
         restore(level, mgr, h);
         Set<BlockPos> seen = new HashSet<>();
         List<Plane> planes = new ArrayList<>();
+        h.gatesRescanAt = 0;
+        Layout l = h.plans();
+        if (l != null) {
+            BlockPos o = new BlockPos(h.box.minX(), h.box.minY(), h.box.minZ());
+            for (int[] b : l.gatePlanes) {
+                BlockPos a = o.offset(b[0] - 1, b[1] - 1, b[2] - 1), z = o.offset(b[3] + 1, b[4] + 1, b[5] + 1);
+                if (!level.isLoaded(a) || !level.isLoaded(z)) {
+                    h.gatesRescanAt = level.getGameTime() + 400;
+                    continue;
+                }
+                for (BlockPos q : BlockPos.betweenClosed(a, z)) {
+                    if (seen.contains(q) || !level.getBlockState(q).is(ModBlocks.PORTCULLIS.get())) continue;
+                    planes.add(flood(level, q.immutable(), seen));
+                }
+            }
+        }
         for (BlockPos m : markers) {
             for (int x = m.getX() - SCAN; x <= m.getX() + SCAN; x++) {
                 for (int z = m.getZ() - SCAN; z <= m.getZ() + SCAN; z++) {

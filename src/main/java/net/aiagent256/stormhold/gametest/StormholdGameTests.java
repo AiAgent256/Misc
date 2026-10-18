@@ -217,8 +217,20 @@ public class StormholdGameTests {
             for (BlockPos gm : gateMarks)
                 for (int dx = -2; dx <= 2; dx++)
                     for (int dz = -2; dz <= 2; dz++) level.getChunk((gm.getX() >> 4) + dx, (gm.getZ() >> 4) + dz);
+            // and the inner gates: every plane the plans record
+            BlockPos lo = new BlockPos(h.box.minX(), h.box.minY(), h.box.minZ());
+            for (int[] pl : lay.gatePlanes) level.getChunk((lo.getX() + pl[0]) >> 4, (lo.getZ() + pl[2]) >> 4);
             net.aiagent256.stormhold.holding.Gates.tick(level, mgr, h);
             if (h.gates == null) throw new IllegalStateException(id + " gate scan found its chunks unloaded");
+            for (int[] pl : lay.gatePlanes) {
+                BlockPos pa = lo.offset(pl[0], pl[1], pl[2]), pb = lo.offset(pl[3], pl[4], pl[5]);
+                boolean found = false;
+                for (var plane : h.gates) for (BlockPos q : plane.blocks)
+                    if (q.getX() >= pa.getX() && q.getX() <= pb.getX() && q.getY() >= pa.getY() && q.getY() <= pb.getY()
+                            && q.getZ() >= pa.getZ() && q.getZ() <= pb.getZ()) found = true;
+                if (!found) throw new IllegalStateException(id + " never found its gate at " + pa + " (" + h.gates.size() + " planes found of "
+                        + lay.gatePlanes.size() + " in the plans)");
+            }
             if (h.gates.isEmpty()) {
                 int pc = 0;
                 for (BlockPos q : BlockPos.betweenClosed(h.box.minX(), h.box.minY(), h.box.minZ(), h.box.maxX(), h.box.maxY(), h.box.maxZ()))

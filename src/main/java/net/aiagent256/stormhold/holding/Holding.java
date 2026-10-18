@@ -181,6 +181,8 @@ public class Holding {
     public final Set<BlockPos> usedPosts = new HashSet<>();
     /** Portcullis planes, found on first tick near the castle; null until scanned. Not saved. */
     public java.util.List<Gates.Plane> gates;
+    /** When to look again for gate planes whose chunks weren't loaded at the last scan; 0 if none are missing. Not saved. */
+    public long gatesRescanAt;
     @Nullable public ServerBossEvent bar;
     public int idleSeconds;
 
