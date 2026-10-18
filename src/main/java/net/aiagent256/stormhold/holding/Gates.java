@@ -8,6 +8,7 @@ import net.aiagent256.stormhold.house.Standing;
 import net.aiagent256.stormhold.registry.ModBlocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
@@ -43,6 +44,8 @@ public final class Gates {
         boolean open;
         int holdTicks;
     }
+
+    private static final java.util.Map<java.util.UUID, Long> TOLD = new java.util.HashMap<>();
 
     public static void tick(ServerLevel level, HoldingManager mgr, Holding h) {
         // an inner gate whose chunks weren't loaded at the last look is looked for again in a while
@@ -187,6 +190,8 @@ public final class Gates {
     private static void tickPlane(ServerLevel level, HoldingManager mgr, Holding h, Plane plane) {
         if (!level.isLoaded(plane.blocks.get(0))) return;
         boolean friend = false, foe = false;
+        Entity holder = null;
+        List<ServerPlayer> waiting = new ArrayList<>();
         List<Entity> about = level.getEntities((Entity) null, plane.area.inflate(HOLD_RANGE, 1, HOLD_RANGE));
         // anyone the garrison at the gate is fighting right now is an enemy whatever their standing
         java.util.Set<java.util.UUID> fought = new java.util.HashSet<>();
@@ -199,12 +204,29 @@ public final class Gates {
             boolean creative = e instanceof Player p && p.isCreative();
             double d = distance(plane.area, e);
             if (!fought.contains(e.getUUID()) && isFriend(mgr, h, e)) {
-                if (d <= OPEN_RANGE) friend = true;
+                if (d <= OPEN_RANGE) {
+                    friend = true;
+                    if (e instanceof ServerPlayer sp) waiting.add(sp);
+                }
             } else if (!creative && (fought.contains(e.getUUID()) || isFoe(mgr, h, e))) {
                 foe = true;
+                if (holder == null) holder = e;
             }
         }
         boolean want = friend && !foe;
+        if (foe && !plane.open) {
+            // a traveller at a shut gate is told what's keeping it shut, so he can deal with it or wait
+            for (ServerPlayer sp : waiting) {
+                Long last = TOLD.get(sp.getUUID());
+                long now = level.getGameTime();
+                if (last != null && now - last < 100) continue;
+                TOLD.put(sp.getUUID(), now);
+                String who = holder.getDisplayName().getString();
+                sp.displayClientMessage(net.minecraft.network.chat.Component.literal("The gate stays down: " + who
+                        + " is at it (" + holder.blockPosition().getX() + ", " + holder.blockPosition().getY() + ", "
+                        + holder.blockPosition().getZ() + ").").withStyle(net.minecraft.ChatFormatting.GRAY), true);
+            }
+        }
         if (want == plane.open) return;
         // don't slam it up and down every half second
         if (plane.holdTicks > 0) {
@@ -265,26 +287,32 @@ public final class Gates {
      */
     private static boolean isFriend(HoldingManager mgr, Holding h, Entity e) {
         if (e instanceof GarrisonEntity g) {
-            if (g.side().isEmpty() || !g.side().equals(h.owner)) return false;
+            if (g.side().isEmpty()) return false;
+            if (!g.side().equals(h.owner)) return welcomes(mgr, h, g.side());   // a traveller's own men come in with him
             return g.marchTarget() != null || g.owner() != null || g.shipmentId() != null
                     || g.role() == net.aiagent256.stormhold.entity.Role.COURIER
                     || (g.getTarget() != null && !g.holdsPosition());
         }
-        if (e instanceof Player p) {
-            if (h.owner.equals(Sides.player(p.getUUID()))) return true;
-            return h.isHouseOwned() && !Standing.hostile(mgr, h.houseId, p.getUUID());
-        }
+        if (e instanceof Player p) return welcomes(mgr, h, Sides.player(p.getUUID()));
         String rs = RecruitsCompat.sideOf(e);
-        return rs != null && rs.equals(h.owner);
+        return rs != null && welcomes(mgr, h, rs);
+    }
+
+    /** The castle's own side, or a player the house doesn't hold hostile. */
+    private static boolean welcomes(HoldingManager mgr, Holding h, String side) {
+        if (side.equals(h.owner)) return true;
+        java.util.UUID pid = Sides.playerId(side);
+        return pid != null && h.isHouseOwned() && !Standing.hostile(mgr, h.houseId, pid);
     }
 
     /** Someone the gate stays down for: soldiers of another side, monsters, and players the house holds hostile
      *  (or anyone at all, at a castle a player owns). Villagers and animals don't count. */
     private static boolean isFoe(HoldingManager mgr, Holding h, Entity e) {
-        if (e instanceof GarrisonEntity g) return !g.side().equals(h.owner);
+        if (e instanceof GarrisonEntity g) return !g.side().isEmpty() && !welcomes(mgr, h, g.side());
         if (e instanceof Player p) return !h.isHouseOwned() || Standing.hostile(mgr, h.houseId, p.getUUID());
         if (e instanceof Enemy) return true;
-        return RecruitsCompat.sideOf(e) != null;
+        String rs = RecruitsCompat.sideOf(e);
+        return rs != null && !welcomes(mgr, h, rs);
     }
 
     private Gates() {

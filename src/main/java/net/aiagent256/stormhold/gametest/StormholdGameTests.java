@@ -980,6 +980,12 @@ public class StormholdGameTests {
             for (int i = 0; i < 8; i++) net.aiagent256.stormhold.holding.Gates.tick(level, mgr, h);
             if (level.getBlockState(gate).getValue(net.aiagent256.stormhold.block.PortcullisBlock.OPEN)) throw new IllegalStateException("gate stayed up with an enemy at it");
             if (foe != null) foe.discard();
+            // a traveller's own sworn man is no enemy at a house that doesn't hate his lord: he doesn't hold the gate shut
+            knight.setMarchTarget(null);
+            var sworn = Garrisons.spawn(level, mgr, null, Role.KNIGHT, gate.offset(0, 0, 3), Sides.player(UUID.randomUUID()), false);
+            for (int i = 0; i < 8; i++) net.aiagent256.stormhold.holding.Gates.tick(level, mgr, h);
+            if (!level.getBlockState(gate).getValue(net.aiagent256.stormhold.block.PortcullisBlock.OPEN)) throw new IllegalStateException("a wary traveller's soldier kept the gate shut");
+            if (sworn != null) sworn.discard();
             // the ram
             if (!net.aiagent256.stormhold.holding.Gates.breach(level, h)) throw new IllegalStateException("breach did nothing");
             if (!level.getBlockState(gate).isAir()) throw new IllegalStateException("gate survived the ram");
