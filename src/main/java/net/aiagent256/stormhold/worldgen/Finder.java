@@ -31,7 +31,9 @@ public final class Finder {
             "holdfast", "stormhold:holdfasts",
             "watchtower", "stormhold:watchtowers",
             "town", "stormhold:towns",
-            "nether", "stormhold:nether_holdfasts");
+            "nether", "stormhold:nether_holdfasts",
+            "ruin", "stormhold:ruins",
+            "temple", "stormhold:temple_ruins");
 
     public record Found(String what, int x, int z, boolean known) {
         public double dist(BlockPos from) {
@@ -56,11 +58,12 @@ public final class Finder {
     private static boolean matches(Holding h, String kind) {
         return switch (kind) {
             case "city" -> h.tier >= 4;
-            case "castle" -> h.tier == 3 && !h.isTown();
-            case "holdfast" -> h.tier == 2 && !h.isNether();
-            case "watchtower" -> h.tier == 1 && !h.isTown();
+            case "castle" -> h.tier == 3 && !h.isTown() && !h.ruined;
+            case "holdfast" -> h.tier == 2 && !h.isNether() && !h.ruined;
+            case "watchtower" -> h.tier == 1 && !h.isTown() && !h.ruined;
             case "town" -> h.isTown();
             case "nether" -> h.isNether();
+            case "ruin" -> h.ruined;
             default -> false;
         };
     }

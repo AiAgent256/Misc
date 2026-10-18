@@ -37,7 +37,9 @@ public class StormholdGameTests {
             "holdfast_a2", "holdfast_b2", "watchtower_a2", "watchtower_b2", "holdfast_c", "holdfast_c2", "watchtower_c",
             "watchtower_c2", "town_walled", "town_cross", "town_green", "great_city", "canal_city",
             // second revisions: new castles use these, the old ones keep their plans for repairs and half-built chunks
-            "town_walled_r2", "town_cross_r2", "town_green_r2", "great_city_r2", "canal_city_r2"};
+            "town_walled_r2", "town_cross_r2", "town_green_r2", "great_city_r2", "canal_city_r2",
+            // moated castles and the chateau
+            "holdfast_b_moat", "holdfast_c_moat", "great_castle_a_moat", "great_castle_c_moat", "great_castle_d", "great_castle_d2"};
 
     @GameTest(template = "arena")
     public static void castleDataLoads(GameTestHelper g) {
@@ -73,7 +75,7 @@ public class StormholdGameTests {
         }
         // every keep has its crypt: the marker the generator leaves at the founder's tomb
         for (String n : new String[]{"holdfast_a", "holdfast_b", "holdfast_c", "great_castle_a", "great_castle_b", "great_castle_c", "great_city", "canal_city",
-                "great_city_r2", "canal_city_r2"}) {
+                "great_city_r2", "canal_city_r2", "holdfast_b_moat", "great_castle_a_moat", "great_castle_d", "great_castle_d2"}) {
             var crypt = DataRegistries.layout(n).extras.get("crypt");
             if (crypt == null || crypt.isEmpty()) throw new IllegalStateException("no crypt under " + n);
         }
@@ -84,6 +86,16 @@ public class StormholdGameTests {
             throw new IllegalStateException("the Nether holdfast is not registered for the Nether");
         if (reg.get(Stormhold.id("holdfast_north")) instanceof net.aiagent256.stormhold.worldgen.CastleStructure o && o.nether())
             throw new IllegalStateException("a surface holdfast is flagged for the Nether");
+        // ruins are the old plans placed ruined; the temple is a landmark with its own tiles and no holding
+        if (!(reg.get(Stormhold.id("ruin_north")) instanceof net.aiagent256.stormhold.worldgen.CastleStructure ruin) || !ruin.ruined())
+            throw new IllegalStateException("the ruins are not registered as ruined");
+        if (reg.get(Stormhold.id("holdfast_north")) instanceof net.aiagent256.stormhold.worldgen.CastleStructure hf && hf.ruined())
+            throw new IllegalStateException("a whole holdfast is flagged as a ruin");
+        var temple = DataRegistries.layout("temple_ruin");
+        if (temple == null || !"landmark".equals(temple.kind) || stm.get(CastleTilePiece.tileId("temple_ruin", 0, 0)).isEmpty())
+            throw new IllegalStateException("the temple ruin is missing or not a landmark");
+        if (!(reg.get(Stormhold.id("temple_ruin_north")) instanceof net.aiagent256.stormhold.worldgen.CastleStructure))
+            throw new IllegalStateException("the temple ruin structure is not registered");
         g.succeed();
     }
 
