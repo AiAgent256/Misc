@@ -19,6 +19,7 @@ import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.level.block.state.properties.Half;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import org.jetbrains.annotations.Nullable;
 
@@ -166,7 +167,11 @@ public final class Market {
                 for (int dz = -1; dz <= 1 && ok; dz++)
                     for (int dx = -1; dx <= 1 && ok; dx++)
                         if (!free(level, c.offset(dx, 0, dz)) || !free(level, c.offset(dx, 1, dz))) ok = false;
-                if (ok && level.canSeeSky(c.above(5))) cands.add(c);
+                // open to the sky: nothing over the stall (the heightmap, not sky light, which lags behind blocks)
+                for (int dz = -1; dz <= 1 && ok; dz++)
+                    for (int dx = -1; dx <= 1 && ok; dx++)
+                        if (level.getHeight(Heightmap.Types.MOTION_BLOCKING, cx + dx, cz + dz) > y) ok = false;
+                if (ok) cands.add(c);
             }
         }
 
