@@ -52,7 +52,7 @@ public final class Shops {
     public static final String TAG = "StormholdShop";
     public static final String HOLDING_TAG = "StormholdShopHolding";
 
-    public record Type(String id, String title, String keeper, VillagerProfession profession, List<MerchantOffer> stock) {
+    public record Type(String id, String title, String keeper, VillagerProfession profession, String[] sign, List<MerchantOffer> stock) {
         public MerchantOffers offers() {
             MerchantOffers o = new MerchantOffers();
             for (MerchantOffer m : stock) o.add(new MerchantOffer(m.createTag()));
@@ -68,9 +68,23 @@ public final class Shops {
         return types;
     }
 
+    /**
+     * The trades the first plans marked, folded into today's shops: the baker, butcher and fishmonger into
+     * Food & Provisions, the draper and farm supply into the General Store, the chandler into the Enchanter,
+     * the potter into the Mason & Carpenter, the saddler into Stables & Tack, the apothecary into the Alchemist.
+     */
+    private static final Map<String, String> FOLDED = Map.of("baker", "provisioner", "butcher", "provisioner",
+            "fish", "provisioner", "cloth", "general", "farmer", "general", "chandler", "enchanter", "potter", "mason",
+            "tanner", "stables", "apothecary", "alchemist");
+
+    /** Today's name for a trade the plans mark. */
+    public static String canonical(String id) {
+        return FOLDED.getOrDefault(id, id);
+    }
+
     @Nullable
     public static Type type(String id) {
-        return types().get(id);
+        return types().get(canonical(id));
     }
 
     // ------------------------------------------------------------ stock
@@ -144,22 +158,22 @@ public final class Shops {
                 new Extra(5, dear(ench(Items.BOW, Enchantments.POWER_ARROWS, 4), 12, 0)),
                 new Extra(6, sell(potion(Items.TIPPED_ARROW, Potions.STRONG_HARMING).copyWithCount(8), 6)),
                 new Extra(8, dear(ench(Items.BOW, Enchantments.POWER_ARROWS, 5, Enchantments.INFINITY_ARROWS, 1, U, 3), 32, 0))));
-        m.put("apothecary", List.of(
+        m.put("alchemist", List.of(
                 new Extra(4, sell(potion(Items.POTION, Potions.STRONG_STRENGTH), 6)), new Extra(4, sell(potion(Items.SPLASH_POTION, Potions.STRONG_HEALING), 6)),
                 new Extra(4, sell(potion(Items.POTION, Potions.STRONG_REGENERATION), 8)), new Extra(6, sell(Items.GOLDEN_APPLE, 1, 4)),
                 new Extra(8, dear(new ItemStack(Items.TOTEM_OF_UNDYING), 48, 4)), new Extra(9, dear(new ItemStack(Items.ENCHANTED_GOLDEN_APPLE), 64, 8))));
         m.put("general", List.of(
                 new Extra(4, sell(Items.ENDER_PEARL, 4, 4)), new Extra(5, sell(Items.EXPERIENCE_BOTTLE, 8, 6)),
                 new Extra(7, dear(new ItemStack(Items.SHULKER_SHELL), 24, 0))));
-        m.put("chandler", List.of(
+        m.put("enchanter", List.of(
                 new Extra(5, dear(book(P, 4), 24, 0)), new Extra(5, sell(book(U, 3), 16)),
                 new Extra(6, dear(book(Enchantments.BLOCK_EFFICIENCY, 5), 24, 0)), new Extra(7, dear(book(S, 5), 32, 0)),
                 new Extra(8, dear(book(Enchantments.MENDING, 1), 48, 2))));
         m.put("quartermaster", List.of(
                 new Extra(4, sell(Items.GOLDEN_CARROT, 8, 4)), new Extra(6, sell(Items.GOLDEN_APPLE, 1, 4)),
                 new Extra(8, dear(new ItemStack(Items.TOTEM_OF_UNDYING), 48, 4))));
-        m.put("tanner", List.of(new Extra(6, sell(Items.DIAMOND_HORSE_ARMOR, 1, 12))));
-        m.put("farmer", List.of(new Extra(4, sell(Items.GOLDEN_CARROT, 8, 4))));
+        m.put("stables", List.of(new Extra(6, sell(Items.DIAMOND_HORSE_ARMOR, 1, 12))));
+        m.put("provisioner", List.of(new Extra(4, sell(Items.GOLDEN_CARROT, 8, 4)), new Extra(6, sell(Items.GOLDEN_APPLE, 1, 4))));
         frontier = m;
         return m;
     }
@@ -171,94 +185,137 @@ public final class Shops {
         return o;
     }
 
+    /** An Epic Knights item, when that mod is here. */
+    @Nullable
+    private static Item ek(String name) {
+        Item i = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(new net.minecraft.resources.ResourceLocation("magistuarmory", name));
+        return i == null || i == Items.AIR ? null : i;
+    }
+
+    private static Type type(String id, String title, String keeper, VillagerProfession prof, String[] sign, List<MerchantOffer> stock) {
+        return new Type(id, title, keeper, prof, sign, List.copyOf(stock));
+    }
+
+    /**
+     * Every shop's stock. Prices run in three bands: one to three emeralds for what you use up, five to
+     * fifteen for tools and armour, twenty and up (and emerald blocks) for enchanted and frontier gear. Every
+     * shop buys the goods of its trade, the valuable ones dear: diamonds, blaze rods, ghast tears, ender pearls,
+     * saddles and horse armour found in the world.
+     */
     private static Map<String, Type> build() {
+        var P = Enchantments.ALL_DAMAGE_PROTECTION;
         Map<String, Type> m = new LinkedHashMap<>();
-        m.put("general", new Type("general", "General Store", "Shopkeeper", VillagerProfession.NITWIT, List.of(
-                sell(Items.TORCH, 16, 1), sell(Items.BREAD, 6, 1), sell(Items.STRING, 8, 1), sell(Items.COAL, 8, 1),
-                sell(Items.LADDER, 8, 1), sell(Items.PAPER, 16, 1), sell(Items.BOOK, 3, 1), sell(Items.CHEST, 2, 1),
-                sell(Items.BUCKET, 1, 2), sell(Items.SHEARS, 1, 2), sell(Items.FLINT_AND_STEEL, 1, 2), sell(Items.FISHING_ROD, 1, 2),
-                sell(Items.LEAD, 1, 2), sell(Items.OAK_BOAT, 1, 2), sell(Items.WHITE_BED, 1, 3), sell(Items.MAP, 1, 3),
-                sell(Items.COMPASS, 1, 4),
-                buy(Items.COBBLESTONE, 32, 1), buy(Items.OAK_LOG, 16, 1), buy(Items.SPRUCE_LOG, 16, 1), buy(Items.WHEAT, 20, 1),
-                buy(Items.ROTTEN_FLESH, 32, 1), buy(Items.BONE, 16, 1), buy(Items.GUNPOWDER, 8, 1))));
-        m.put("armoury", new Type("armoury", "Armoury", "Armourer", VillagerProfession.ARMORER, List.of(
-                sell(Items.CHAINMAIL_HELMET, 1, 3), sell(Items.CHAINMAIL_CHESTPLATE, 1, 6), sell(Items.CHAINMAIL_LEGGINGS, 1, 5),
-                sell(Items.CHAINMAIL_BOOTS, 1, 3), sell(Items.IRON_HELMET, 1, 5), sell(Items.IRON_CHESTPLATE, 1, 9),
-                sell(Items.IRON_LEGGINGS, 1, 8), sell(Items.IRON_BOOTS, 1, 4), sell(Items.SHIELD, 1, 4),
-                sell(Items.DIAMOND_HELMET, 1, 20), sell(Items.DIAMOND_CHESTPLATE, 1, 32), sell(Items.DIAMOND_LEGGINGS, 1, 28),
-                sell(Items.DIAMOND_BOOTS, 1, 18),
-                buy(Items.IRON_INGOT, 4, 1), buy(Items.COAL, 15, 1), buy(Items.LAVA_BUCKET, 1, 1))));
-        m.put("weapons", new Type("weapons", "Weaponsmith", "Weaponsmith", VillagerProfession.WEAPONSMITH, List.of(
-                sell(Items.STONE_SWORD, 1, 1), sell(Items.IRON_SWORD, 1, 4), sell(Items.IRON_AXE, 1, 4), sell(Items.BOW, 1, 3),
-                sell(Items.CROSSBOW, 1, 5), sell(Items.SHIELD, 1, 4), sell(Items.DIAMOND_SWORD, 1, 18), sell(Items.DIAMOND_AXE, 1, 18),
-                buy(Items.IRON_INGOT, 4, 1), buy(Items.COAL, 15, 1), buy(Items.FLINT, 24, 1))));
-        m.put("smith", new Type("smith", "Smithy", "Smith", VillagerProfession.TOOLSMITH, List.of(
-                sell(Items.IRON_INGOT, 3, 1), sell(Items.CHAIN, 4, 1), sell(Items.IRON_BARS, 16, 1), sell(Items.IRON_SHOVEL, 1, 2),
-                sell(Items.IRON_HOE, 1, 2), sell(Items.SHEARS, 1, 2), sell(Items.BUCKET, 1, 2), sell(Items.SMITHING_TABLE, 1, 2),
-                sell(Items.IRON_AXE, 1, 4), sell(Items.IRON_PICKAXE, 1, 5), sell(Items.DIAMOND_SHOVEL, 1, 10), sell(Items.ANVIL, 1, 12),
-                sell(Items.DIAMOND_PICKAXE, 1, 20),
-                buy(Items.COAL, 15, 1), buy(Items.RAW_IRON, 4, 1), buy(Items.GOLD_INGOT, 3, 1), buy(Items.COPPER_INGOT, 10, 1))));
-        m.put("fletcher", new Type("fletcher", "Fletcher", "Fletcher", VillagerProfession.FLETCHER, List.of(
-                sell(Items.ARROW, 16, 1), sell(Items.TARGET, 1, 1), sell(Items.SPECTRAL_ARROW, 8, 2), sell(Items.BOW, 1, 3),
+        m.put("general", type("general", "General Store", "Shopkeeper", VillagerProfession.NITWIT, new String[]{"General", "Store"}, List.of(
+                sell(Items.TORCH, 16, 1), sell(Items.BREAD, 6, 1), sell(Items.LADDER, 8, 1), sell(Items.CHEST, 2, 1),
+                sell(Items.CRAFTING_TABLE, 1, 1), sell(Items.FURNACE, 1, 1), sell(Items.WHITE_BED, 1, 2), sell(Items.BUCKET, 1, 2),
+                sell(Items.SHEARS, 1, 2), sell(Items.FLINT_AND_STEEL, 1, 2), sell(Items.FISHING_ROD, 1, 2), sell(Items.LEAD, 1, 2),
+                sell(Items.OAK_BOAT, 1, 1), sell(Items.COMPASS, 1, 3), sell(Items.CLOCK, 1, 3), sell(Items.MAP, 1, 2),
+                sell(Items.SPYGLASS, 1, 4), sell(Items.PAPER, 16, 1), sell(Items.BOOK, 4, 1), sell(Items.STRING, 8, 1),
+                sell(Items.COAL, 8, 1), sell(Items.STONE_PICKAXE, 1, 1), sell(Items.STONE_AXE, 1, 1), sell(Items.IRON_SHOVEL, 1, 2),
+                sell(Items.IRON_AXE, 1, 4), sell(Items.IRON_PICKAXE, 1, 5), sell(Items.WHEAT_SEEDS, 16, 1), sell(Items.OAK_SAPLING, 4, 1),
+                sell(Items.BONE_MEAL, 16, 1), sell(Items.WHITE_WOOL, 8, 1), sell(Items.CANDLE, 4, 1), sell(Items.NAME_TAG, 1, 10),
+                buy(Items.COBBLESTONE, 32, 1), buy(Items.OAK_LOG, 16, 1), buy(Items.SPRUCE_LOG, 16, 1), buy(Items.BIRCH_LOG, 16, 1),
+                buy(Items.WHEAT, 20, 1), buy(Items.CARROT, 22, 1), buy(Items.POTATO, 26, 1), buy(Items.MELON, 4, 1),
+                buy(Items.PUMPKIN, 6, 1), buy(Items.SUGAR_CANE, 16, 1), buy(Items.ROTTEN_FLESH, 32, 1), buy(Items.BONE, 16, 1),
+                buy(Items.GUNPOWDER, 6, 1), buy(Items.STRING, 12, 1), buy(Items.LEATHER, 6, 1), buy(Items.WHITE_WOOL, 16, 1),
+                buy(Items.SLIME_BALL, 4, 1), buy(Items.INK_SAC, 8, 1))));
+        m.put("provisioner", type("provisioner", "Food & Provisions", "Provisioner", VillagerProfession.BUTCHER, new String[]{"Food &", "Provisions"}, List.of(
+                sell(Items.BREAD, 6, 1), sell(Items.BAKED_POTATO, 8, 1), sell(Items.APPLE, 4, 1), sell(Items.COOKIE, 16, 1),
+                sell(Items.PUMPKIN_PIE, 4, 1), sell(Items.COOKED_BEEF, 5, 1), sell(Items.COOKED_PORKCHOP, 5, 1),
+                sell(Items.COOKED_CHICKEN, 6, 1), sell(Items.COOKED_MUTTON, 5, 1), sell(Items.COOKED_COD, 6, 1),
+                sell(Items.COOKED_SALMON, 5, 1), sell(Items.RABBIT_STEW, 1, 1), sell(Items.MUSHROOM_STEW, 2, 1),
+                sell(Items.HONEY_BOTTLE, 2, 1), sell(Items.SWEET_BERRIES, 16, 1), sell(Items.MILK_BUCKET, 1, 2), sell(Items.CAKE, 1, 2),
+                sell(Items.GOLDEN_CARROT, 3, 3),
+                buy(Items.BEEF, 10, 1), buy(Items.PORKCHOP, 7, 1), buy(Items.CHICKEN, 14, 1), buy(Items.MUTTON, 7, 1),
+                buy(Items.RABBIT, 4, 1), buy(Items.COD, 15, 1), buy(Items.SALMON, 13, 1), buy(Items.TROPICAL_FISH, 6, 1),
+                buy(Items.EGG, 16, 1), buy(Items.WHEAT, 20, 1), buy(Items.COCOA_BEANS, 12, 1), buy(Items.SWEET_BERRIES, 16, 1),
+                buy(Items.HONEYCOMB, 6, 1))));
+        m.put("armoury", type("armoury", "Armoury", "Armourer", VillagerProfession.ARMORER, new String[]{"Armoury", ""}, List.of(
+                sell(Items.LEATHER_HELMET, 1, 1), sell(Items.LEATHER_CHESTPLATE, 1, 2), sell(Items.LEATHER_LEGGINGS, 1, 2),
+                sell(Items.LEATHER_BOOTS, 1, 1), sell(Items.CHAINMAIL_HELMET, 1, 3), sell(Items.CHAINMAIL_CHESTPLATE, 1, 6),
+                sell(Items.CHAINMAIL_LEGGINGS, 1, 5), sell(Items.CHAINMAIL_BOOTS, 1, 3), sell(Items.IRON_HELMET, 1, 5),
+                sell(Items.IRON_CHESTPLATE, 1, 9), sell(Items.IRON_LEGGINGS, 1, 7), sell(Items.IRON_BOOTS, 1, 4), sell(Items.SHIELD, 1, 3),
+                sell(Items.DIAMOND_HELMET, 1, 13), sell(Items.DIAMOND_CHESTPLATE, 1, 21), sell(Items.DIAMOND_LEGGINGS, 1, 19),
+                sell(Items.DIAMOND_BOOTS, 1, 13),
+                buy(Items.IRON_INGOT, 4, 1), buy(Items.COAL, 15, 1), buy(Items.LEATHER, 6, 1), buy(Items.LAVA_BUCKET, 1, 1),
+                buy(Items.DIAMOND, 1, 5))));
+        List<MerchantOffer> arms = new ArrayList<>(List.of(
+                sell(Items.STONE_SWORD, 1, 1), sell(Items.IRON_SWORD, 1, 4), sell(Items.IRON_AXE, 1, 4),
+                sell(Items.DIAMOND_SWORD, 1, 12), sell(Items.DIAMOND_AXE, 1, 12)));
+        String[][] ekArms = {{"iron_shortsword", "4"}, {"iron_bastardsword", "6"}, {"iron_heavymace", "6"}, {"iron_pike", "6"},
+                {"iron_concavehalberd", "7"}, {"iron_lochaberaxe", "7"}, {"iron_claymore", "8"}, {"diamond_bastardsword", "14"},
+                {"diamond_heavymace", "14"}, {"diamond_claymore", "16"}};
+        for (String[] w : ekArms) {
+            Item i = ek(w[0]);
+            if (i != null) arms.add(sell(i, 1, Integer.parseInt(w[1])));
+        }
+        arms.addAll(List.of(buy(Items.FLINT, 20, 1), buy(Items.IRON_INGOT, 4, 1), buy(Items.COAL, 15, 1), buy(Items.DIAMOND, 1, 5),
+                buy(Items.WITHER_SKELETON_SKULL, 1, 12)));
+        m.put("weapons", type("weapons", "Weaponsmith", "Weaponsmith", VillagerProfession.WEAPONSMITH, new String[]{"Weapon", "smith"}, arms));
+        m.put("smith", type("smith", "Smithy", "Smith", VillagerProfession.TOOLSMITH, new String[]{"Smithy", "Tools"}, List.of(
+                sell(Items.IRON_INGOT, 2, 1), sell(Items.CHAIN, 4, 1), sell(Items.IRON_BARS, 16, 1), sell(Items.LANTERN, 4, 1),
+                sell(Items.BUCKET, 1, 2), sell(Items.SHEARS, 1, 2), sell(Items.CAULDRON, 1, 2), sell(Items.IRON_SHOVEL, 1, 2),
+                sell(Items.IRON_HOE, 1, 2), sell(Items.IRON_AXE, 1, 4), sell(Items.IRON_PICKAXE, 1, 5), sell(Items.RAIL, 16, 2),
+                sell(Items.MINECART, 1, 3), sell(Items.HOPPER, 1, 5), sell(Items.SMITHING_TABLE, 1, 2), sell(Items.GRINDSTONE, 1, 2),
+                sell(Items.ANVIL, 1, 8), sell(Items.DIAMOND_SHOVEL, 1, 8), sell(Items.DIAMOND_HOE, 1, 6), sell(Items.DIAMOND_AXE, 1, 12),
+                sell(Items.DIAMOND_PICKAXE, 1, 14),
+                buy(Items.COAL, 12, 1), buy(Items.RAW_IRON, 4, 1), buy(Items.IRON_INGOT, 3, 1), buy(Items.RAW_GOLD, 4, 1),
+                buy(Items.GOLD_INGOT, 3, 1), buy(Items.RAW_COPPER, 12, 1), buy(Items.COPPER_INGOT, 10, 1), buy(Items.QUARTZ, 12, 1),
+                buy(Items.AMETHYST_SHARD, 8, 1), buy(Items.DIAMOND, 1, 5), buy(Items.NETHERITE_SCRAP, 1, 12))));
+        m.put("fletcher", type("fletcher", "Fletcher", "Fletcher", VillagerProfession.FLETCHER, new String[]{"Fletcher", "Bows"}, List.of(
+                sell(Items.ARROW, 16, 1), sell(Items.TARGET, 1, 1), sell(Items.FLETCHING_TABLE, 1, 1), sell(Items.FIREWORK_ROCKET, 8, 1),
+                sell(Items.BOW, 1, 2), sell(Items.CROSSBOW, 1, 3), sell(Items.SPECTRAL_ARROW, 8, 2),
                 sell(potion(Items.TIPPED_ARROW, Potions.SLOWNESS).copyWithCount(8), 3),
-                sell(potion(Items.TIPPED_ARROW, Potions.POISON).copyWithCount(8), 3), sell(Items.CROSSBOW, 1, 5),
-                buy(Items.STICK, 32, 1), buy(Items.FEATHER, 24, 1), buy(Items.STRING, 14, 1), buy(Items.FLINT, 26, 1))));
-        m.put("baker", new Type("baker", "Bakery", "Baker", VillagerProfession.FARMER, List.of(
-                sell(Items.BREAD, 6, 1), sell(Items.COOKIE, 16, 1), sell(Items.PUMPKIN_PIE, 4, 1), sell(Items.APPLE, 4, 1),
-                sell(Items.CAKE, 1, 2),
-                buy(Items.WHEAT, 20, 1), buy(Items.PUMPKIN, 6, 1), buy(Items.SUGAR_CANE, 16, 1), buy(Items.EGG, 16, 1))));
-        m.put("butcher", new Type("butcher", "Butcher", "Butcher", VillagerProfession.BUTCHER, List.of(
-                sell(Items.COOKED_BEEF, 5, 1), sell(Items.COOKED_PORKCHOP, 5, 1), sell(Items.COOKED_CHICKEN, 6, 1),
-                sell(Items.COOKED_MUTTON, 5, 1), sell(Items.RABBIT_STEW, 1, 1),
-                buy(Items.CHICKEN, 14, 1), buy(Items.PORKCHOP, 7, 1), buy(Items.BEEF, 10, 1), buy(Items.MUTTON, 7, 1),
-                buy(Items.RABBIT, 4, 1))));
-        m.put("fish", new Type("fish", "Fishmonger", "Fishmonger", VillagerProfession.FISHERMAN, List.of(
-                sell(Items.COOKED_COD, 6, 1), sell(Items.COOKED_SALMON, 5, 1), sell(Items.CAMPFIRE, 1, 1), sell(Items.FISHING_ROD, 1, 2),
-                sell(Items.COD_BUCKET, 1, 3),
-                buy(Items.COD, 15, 1), buy(Items.SALMON, 13, 1), buy(Items.TROPICAL_FISH, 6, 1), buy(Items.STRING, 20, 1))));
-        m.put("farmer", new Type("farmer", "Farm Supply", "Farmer", VillagerProfession.FARMER, List.of(
-                sell(Items.WHEAT_SEEDS, 16, 1), sell(Items.CARROT, 8, 1), sell(Items.POTATO, 8, 1), sell(Items.BEETROOT_SEEDS, 16, 1),
-                sell(Items.MELON_SEEDS, 4, 1), sell(Items.PUMPKIN_SEEDS, 4, 1), sell(Items.SUGAR_CANE, 8, 1), sell(Items.BONE_MEAL, 16, 1),
-                sell(Items.OAK_SAPLING, 4, 1), sell(Items.HAY_BLOCK, 2, 1), sell(Items.COMPOSTER, 1, 1), sell(Items.IRON_HOE, 1, 2),
-                buy(Items.WHEAT, 20, 1), buy(Items.CARROT, 22, 1), buy(Items.POTATO, 26, 1), buy(Items.BEETROOT, 15, 1),
-                buy(Items.MELON, 4, 1))));
-        m.put("cloth", new Type("cloth", "Draper & Tailor", "Draper", VillagerProfession.SHEPHERD, List.of(
-                sell(Items.WHITE_WOOL, 4, 1), sell(Items.RED_WOOL, 4, 1), sell(Items.BLUE_WOOL, 4, 1), sell(Items.BLACK_WOOL, 4, 1),
-                sell(Items.YELLOW_WOOL, 4, 1), sell(Items.GREEN_WOOL, 4, 1), sell(Items.WHITE_CARPET, 8, 1),
-                sell(Items.LEATHER_HELMET, 1, 1), sell(Items.LEATHER_BOOTS, 1, 1), sell(Items.LEATHER_LEGGINGS, 1, 2),
-                sell(Items.LEATHER_CHESTPLATE, 1, 3), sell(Items.PAINTING, 1, 2), sell(Items.WHITE_BANNER, 1, 3),
-                sell(Items.RED_BED, 1, 3),
-                buy(Items.WHITE_WOOL, 18, 1), buy(Items.STRING, 14, 1))));
-        m.put("tanner", new Type("tanner", "Saddler", "Saddler", VillagerProfession.LEATHERWORKER, List.of(
-                sell(Items.LEATHER, 2, 1), sell(Items.HAY_BLOCK, 2, 1), sell(Items.LEAD, 1, 2), sell(Items.LEATHER_HORSE_ARMOR, 1, 3),
-                sell(Items.SADDLE, 1, 6), sell(Items.IRON_HORSE_ARMOR, 1, 8), sell(Items.NAME_TAG, 1, 10),
-                sell(Items.GOLDEN_HORSE_ARMOR, 1, 12), sell(Items.DIAMOND_HORSE_ARMOR, 1, 24),
-                buy(Items.LEATHER, 6, 1), buy(Items.RABBIT_HIDE, 9, 1))));
-        m.put("potter", new Type("potter", "Mason & Potter", "Mason", VillagerProfession.MASON, List.of(
-                sell(Items.STONE_BRICKS, 16, 1), sell(Items.BRICKS, 10, 1), sell(Items.POLISHED_ANDESITE, 16, 1),
-                sell(Items.POLISHED_DIORITE, 16, 1), sell(Items.POLISHED_GRANITE, 16, 1), sell(Items.SMOOTH_STONE, 16, 1),
-                sell(Items.CHISELED_STONE_BRICKS, 8, 1), sell(Items.TERRACOTTA, 8, 1), sell(Items.GLASS, 8, 1),
-                sell(Items.FLOWER_POT, 4, 1), sell(Items.DECORATED_POT, 1, 1),
-                buy(Items.CLAY_BALL, 10, 1), buy(Items.STONE, 20, 1), buy(Items.GRANITE, 16, 1))));
-        m.put("apothecary", new Type("apothecary", "Apothecary", "Apothecary", VillagerProfession.CLERIC, List.of(
+                sell(potion(Items.TIPPED_ARROW, Potions.POISON).copyWithCount(8), 3),
+                sell(potion(Items.TIPPED_ARROW, Potions.HARMING).copyWithCount(8), 4),
+                buy(Items.STICK, 32, 1), buy(Items.FEATHER, 20, 1), buy(Items.STRING, 12, 1), buy(Items.FLINT, 20, 1))));
+        m.put("enchanter", type("enchanter", "Enchanter", "Enchanter", VillagerProfession.LIBRARIAN, new String[]{"Enchanter", ""}, List.of(
+                sell(Items.LAPIS_LAZULI, 8, 1), sell(Items.BOOK, 4, 1), sell(Items.BOOKSHELF, 1, 2), sell(Items.EXPERIENCE_BOTTLE, 4, 3),
+                sell(Items.GRINDSTONE, 1, 2), sell(Items.ANVIL, 1, 8), sell(Items.ENCHANTING_TABLE, 1, 10),
+                sell(book(Enchantments.BLOCK_EFFICIENCY, 3), 8), sell(book(Enchantments.UNBREAKING, 2), 8), sell(book(P, 2), 8),
+                sell(book(Enchantments.SHARPNESS, 2), 8), sell(book(Enchantments.POWER_ARROWS, 2), 8),
+                sell(book(Enchantments.FALL_PROTECTION, 3), 8), sell(book(Enchantments.RESPIRATION, 2), 6),
+                sell(book(Enchantments.AQUA_AFFINITY, 1), 6), sell(book(Enchantments.DEPTH_STRIDER, 2), 8),
+                sell(book(Enchantments.BLOCK_FORTUNE, 1), 10), sell(book(Enchantments.MOB_LOOTING, 1), 10),
+                sell(book(Enchantments.SILK_TOUCH, 1), 12),
+                buy(Items.PAPER, 24, 1), buy(Items.BOOK, 4, 1), buy(Items.INK_SAC, 6, 1), buy(Items.LAPIS_LAZULI, 16, 1))));
+        m.put("alchemist", type("alchemist", "Alchemist", "Alchemist", VillagerProfession.CLERIC, new String[]{"Alchemist", ""}, List.of(
                 sell(Items.GLASS_BOTTLE, 8, 1), sell(Items.REDSTONE, 4, 1), sell(Items.GLOWSTONE_DUST, 4, 1),
-                sell(Items.GLISTERING_MELON_SLICE, 1, 2), sell(potion(Items.POTION, Potions.HEALING), 3),
-                sell(potion(Items.POTION, Potions.SWIFTNESS), 3), sell(potion(Items.POTION, Potions.NIGHT_VISION), 3),
-                sell(potion(Items.POTION, Potions.WATER_BREATHING), 3), sell(potion(Items.POTION, Potions.REGENERATION), 4),
-                sell(potion(Items.POTION, Potions.STRENGTH), 4), sell(potion(Items.POTION, Potions.FIRE_RESISTANCE), 4),
-                sell(potion(Items.SPLASH_POTION, Potions.HEALING), 4), sell(Items.GOLDEN_APPLE, 1, 8),
-                buy(Items.ROTTEN_FLESH, 32, 1), buy(Items.SPIDER_EYE, 8, 1), buy(Items.NETHER_WART, 22, 1), buy(Items.GOLD_INGOT, 3, 1))));
-        m.put("quartermaster", new Type("quartermaster", "Quartermaster", "Quartermaster", VillagerProfession.CARTOGRAPHER, List.of(
+                sell(Items.FERMENTED_SPIDER_EYE, 2, 1), sell(Items.NETHER_WART, 8, 2), sell(Items.BLAZE_POWDER, 2, 2),
+                sell(Items.MAGMA_CREAM, 1, 2), sell(Items.GLISTERING_MELON_SLICE, 1, 2), sell(Items.BREWING_STAND, 1, 3),
+                sell(potion(Items.POTION, Potions.HEALING), 3), sell(potion(Items.POTION, Potions.SWIFTNESS), 3),
+                sell(potion(Items.POTION, Potions.NIGHT_VISION), 3), sell(potion(Items.POTION, Potions.WATER_BREATHING), 3),
+                sell(potion(Items.POTION, Potions.FIRE_RESISTANCE), 4), sell(potion(Items.POTION, Potions.REGENERATION), 4),
+                sell(potion(Items.POTION, Potions.STRENGTH), 4), sell(potion(Items.SPLASH_POTION, Potions.HEALING), 4),
+                sell(Items.GOLDEN_APPLE, 1, 6),
+                buy(Items.ROTTEN_FLESH, 32, 1), buy(Items.SPIDER_EYE, 6, 1), buy(Items.NETHER_WART, 16, 1), buy(Items.GLOWSTONE_DUST, 8, 1),
+                buy(Items.GUNPOWDER, 6, 1), buy(Items.MAGMA_CREAM, 2, 1), buy(Items.ENDER_PEARL, 1, 1), buy(Items.BLAZE_ROD, 1, 2),
+                buy(Items.PHANTOM_MEMBRANE, 1, 2), buy(Items.RABBIT_FOOT, 1, 2), buy(Items.GHAST_TEAR, 1, 4))));
+        m.put("mason", type("mason", "Mason & Carpenter", "Mason", VillagerProfession.MASON, new String[]{"Mason &", "Carpenter"}, List.of(
+                sell(Items.STONE_BRICKS, 16, 1), sell(Items.BRICKS, 10, 1), sell(Items.SMOOTH_STONE, 16, 1),
+                sell(Items.POLISHED_ANDESITE, 16, 1), sell(Items.POLISHED_DIORITE, 16, 1), sell(Items.POLISHED_GRANITE, 16, 1),
+                sell(Items.CHISELED_STONE_BRICKS, 8, 1), sell(Items.DEEPSLATE_TILES, 16, 1), sell(Items.MUD_BRICKS, 16, 1),
+                sell(Items.TERRACOTTA, 8, 1), sell(Items.WHITE_CONCRETE, 8, 1), sell(Items.QUARTZ_BLOCK, 4, 1), sell(Items.GLASS, 8, 1),
+                sell(Items.OAK_PLANKS, 32, 1), sell(Items.SPRUCE_PLANKS, 32, 1), sell(Items.OAK_LOG, 8, 1), sell(Items.SCAFFOLDING, 16, 1),
+                sell(Items.LANTERN, 3, 1), sell(Items.FLOWER_POT, 4, 1), sell(Items.DECORATED_POT, 1, 1), sell(Items.STONECUTTER, 1, 1),
+                buy(Items.CLAY_BALL, 10, 1), buy(Items.STONE, 20, 1), buy(Items.COBBLED_DEEPSLATE, 32, 1), buy(Items.GRANITE, 16, 1),
+                buy(Items.DIORITE, 16, 1), buy(Items.ANDESITE, 16, 1), buy(Items.SAND, 24, 1), buy(Items.GRAVEL, 24, 1),
+                buy(Items.QUARTZ, 12, 1), buy(Items.OBSIDIAN, 4, 1))));
+        m.put("stables", type("stables", "Stables & Tack", "Ostler", VillagerProfession.LEATHERWORKER, new String[]{"Stables &", "Tack"}, List.of(
+                sell(Items.LEATHER, 2, 1), sell(Items.HAY_BLOCK, 2, 1), sell(Items.APPLE, 4, 1), sell(Items.GOLDEN_CARROT, 3, 3),
+                sell(Items.LEAD, 1, 2), sell(Items.CARROT_ON_A_STICK, 1, 1), sell(Items.LEATHER_HORSE_ARMOR, 1, 3),
+                sell(Items.SADDLE, 1, 6), sell(Items.IRON_HORSE_ARMOR, 1, 6), sell(Items.GOLDEN_HORSE_ARMOR, 1, 8),
+                sell(Items.NAME_TAG, 1, 10), sell(Items.DIAMOND_HORSE_ARMOR, 1, 16),
+                buy(Items.LEATHER, 6, 1), buy(Items.RABBIT_HIDE, 6, 1), buy(Items.WHEAT, 20, 1), buy(Items.SADDLE, 1, 3),
+                buy(Items.NAME_TAG, 1, 4), buy(Items.IRON_HORSE_ARMOR, 1, 3), buy(Items.GOLDEN_HORSE_ARMOR, 1, 4),
+                buy(Items.DIAMOND_HORSE_ARMOR, 1, 8))));
+        m.put("quartermaster", type("quartermaster", "Quartermaster", "Quartermaster", VillagerProfession.CARTOGRAPHER, new String[]{"Quarter-", "master"}, List.of(
                 sell(Items.BREAD, 6, 1), sell(Items.COOKED_BEEF, 5, 1), sell(Items.ARROW, 16, 1), sell(Items.TORCH, 16, 1),
                 sell(Items.CAMPFIRE, 1, 1), sell(Items.LEAD, 1, 2), sell(potion(Items.POTION, Potions.HEALING), 3),
-                sell(Items.WHITE_BED, 1, 3), sell(Items.MAP, 1, 3), sell(Items.SPYGLASS, 1, 3), sell(Items.SHIELD, 1, 4),
+                sell(Items.WHITE_BED, 1, 2), sell(Items.MAP, 1, 2), sell(Items.SPYGLASS, 1, 4), sell(Items.SHIELD, 1, 3),
                 sell(Items.SADDLE, 1, 6),
-                buy(Items.IRON_INGOT, 4, 1), buy(Items.LEATHER, 6, 1), buy(Items.WHEAT, 20, 1), buy(Items.STRING, 14, 1),
-                buy(Items.BONE, 16, 1))));
-        m.put("chandler", new Type("chandler", "Chandler", "Chandler", VillagerProfession.LIBRARIAN, List.of(
-                sell(Items.TORCH, 16, 1), sell(Items.LANTERN, 3, 1), sell(Items.CANDLE, 4, 1), sell(Items.WHITE_CANDLE, 4, 1),
-                sell(Items.SOUL_LANTERN, 2, 1), sell(Items.CHAIN, 4, 1), sell(Items.CAMPFIRE, 1, 1), sell(Items.SEA_LANTERN, 1, 3),
-                buy(Items.HONEYCOMB, 6, 1), buy(Items.COAL, 15, 1))));
+                buy(Items.IRON_INGOT, 4, 1), buy(Items.LEATHER, 6, 1), buy(Items.WHEAT, 20, 1), buy(Items.STRING, 12, 1),
+                buy(Items.BONE, 16, 1), buy(Items.DIAMOND, 1, 5))));
         return m;
     }
 
@@ -274,15 +331,15 @@ public final class Shops {
         return h.isTown() || h.isCity() || Market.wants(h);
     }
 
-    /** The shops a place keeps, by kind, with every post. */
+    /** The shops a place keeps, by today's trade, with every post that is staffed. */
     public static Map<String, List<BlockPos>> posts(Holding h) {
         Map<String, List<BlockPos>> out = new LinkedHashMap<>();
         for (var e : h.extras.entrySet()) {
             if (!e.getKey().startsWith("shop_")) continue;
-            String kind = e.getKey().substring(5);
-            if (type(kind) == null) continue;
-            List<BlockPos> ps = e.getValue();
-            out.put(kind, ps.subList(0, Math.min(ps.size(), cap(h))));
+            Type t = type(e.getKey().substring(5));
+            if (t == null) continue;
+            List<BlockPos> list = out.computeIfAbsent(t.id(), k -> new ArrayList<>());
+            for (BlockPos p : e.getValue()) if (list.size() < cap(h)) list.add(p);
         }
         return out;
     }
@@ -298,9 +355,14 @@ public final class Shops {
         long day = level.getDayTime() / 24000L;
         boolean newDay = day != h.shopsDay;
         boolean dirty = false;
-        for (var e : posts(h).entrySet()) {
+        Map<String, Integer> staffed = new java.util.HashMap<>();
+        for (var e : h.extras.entrySet()) {
+            if (!e.getKey().startsWith("shop_")) continue;
+            Type t = type(e.getKey().substring(5));
+            if (t == null) continue;
             List<BlockPos> ps = e.getValue();
             for (int i = 0; i < ps.size(); i++) {
+                if (staffed.merge(t.id(), 1, Integer::sum) > cap(h)) break;
                 BlockPos post = ps.get(i);
                 if (!level.isLoaded(post) || !level.areEntitiesLoaded(ChunkPos.asLong(post))) continue;
                 if (!h.shopkeepers.containsKey(post)) {
@@ -322,11 +384,15 @@ public final class Shops {
                     if (v.distanceToSqr(post.getX() + 0.5, post.getY(), post.getZ() + 0.5) > 1.0) {
                         v.teleportTo(post.getX() + 0.5, post.getY(), post.getZ() + 0.5);
                     }
-                    if (newDay) restock(level, v, e.getKey(), post);
+                    if (!t.id().equals(v.getPersistentData().getString(TAG))) {
+                        convert(level, v, t, post);                // a keeper of a trade since folded into another
+                    } else if (newDay) {
+                        restock(level, v, t.id(), post);
+                    }
                     continue;
                 }
                 if (h.shopkeepers.containsKey(post) && !newDay) continue;      // killed: his stall stands empty till morning
-                Villager k = spawnKeeper(level, h, e.getKey(), post);
+                Villager k = spawnKeeper(level, h, t.id(), post);
                 if (k != null) {
                     h.shopkeepers.put(post.immutable(), k.getUUID());
                     dirty = true;
@@ -485,19 +551,27 @@ public final class Shops {
         return Direction.SOUTH;
     }
 
-    /** The labels the first towns were built with, before their shops had proper names. */
-    private static final Set<String> OLD_LABELS = Set.of("merchant", "smithy", "bakery", "fishmonger", "draper", "tannery",
-            "butcher", "potter", "apothecary", "chandler");
+    /** Every word a shop's sign has ever said: the first towns' labels, the plans' signs and today's names. */
+    private static final Set<String> SHOP_WORDS = Set.of("merchant", "smithy", "tools", "armoury", "weapon", "smith",
+            "weaponsmith", "fletcher", "bows", "farm", "supply", "bakery", "fish", "fishmonger", "draper", "tailor", "saddler",
+            "tannery", "butcher", "mason", "potter", "apothe", "cary", "apothecary", "chandler", "general", "store", "food",
+            "provisions", "enchanter", "alchemist", "carpenter", "stables", "tack", "quarter", "master", "quartermaster");
 
-    /** The shop's sign shows its name: rewrites the nearest old-style trade label near the counter. */
+    private static boolean shopSign(SignBlockEntity s) {
+        for (int i = 0; i < 4; i++) {
+            String w = s.getFrontText().getMessage(i, false).getString().toLowerCase().replaceAll("[^a-z]", "");
+            if (SHOP_WORDS.contains(w)) return true;
+        }
+        return false;
+    }
+
+    /** The shop's sign shows today's name: the nearest shop label near the counter is rewritten. */
     private static void labelSign(ServerLevel level, BlockPos post, Type t) {
         SignBlockEntity best = null;
         double bd = Double.MAX_VALUE;
         for (BlockPos q : BlockPos.betweenClosed(post.offset(-3, 0, -3), post.offset(3, 3, 3))) {
             if (!(level.getBlockState(q).getBlock() instanceof SignBlock)) continue;
-            if (!(level.getBlockEntity(q) instanceof SignBlockEntity s)) continue;
-            String first = s.getFrontText().getMessage(0, false).getString().trim().toLowerCase();
-            if (!OLD_LABELS.contains(first)) continue;
+            if (!(level.getBlockEntity(q) instanceof SignBlockEntity s) || !shopSign(s)) continue;
             double d = q.distSqr(post);
             if (d < bd) {
                 bd = d;
@@ -505,8 +579,23 @@ public final class Shops {
             }
         }
         if (best == null) return;
-        String[] words = t.title().split(" ", 2);
-        write(level, best, "", words[0], words.length > 1 ? words[1] : "", "");
+        String l1 = best.getFrontText().getMessage(1, false).getString(), l2 = best.getFrontText().getMessage(2, false).getString();
+        if (l1.equals(t.sign()[0]) && l2.equals(t.sign()[1])) return;
+        write(level, best, "", t.sign()[0], t.sign()[1], "");
+    }
+
+    /** A keeper of a trade since folded into another takes the new one: its apron, name, stock and sign. */
+    public static void convert(ServerLevel level, Villager v, Type t, BlockPos post) {
+        v.setVillagerData(v.getVillagerData().setProfession(t.profession()).setLevel(5));
+        String first = v.hasCustomName() ? v.getCustomName().getString().split(" ")[0] : NameGen.commoner(level.random, "none").split(" ")[0];
+        v.setCustomName(Component.literal(first + " the " + t.keeper()));
+        v.getPersistentData().putString(TAG, t.id());
+        if (v.getTradingPlayer() == null) {
+            MerchantOffers fresh = offers(t, Frontier.zone(level, post));
+            v.getOffers().clear();
+            v.getOffers().addAll(fresh);
+        }
+        labelSign(level, post, t);
     }
 
     /** Write a sign, both faces, and wax it so it can't be changed. */
@@ -548,6 +637,55 @@ public final class Shops {
             for (BlockPos p : e.getValue()) list.add(o.offset(p));
             h.extras.put(k, list);
         }
+    }
+
+    // ------------------------------------------------------------ regulars
+
+    /** Trades at a place's shops for each percent off, up to {@link #MAX_DISCOUNT}. */
+    public static final int TRADES_PER_PERCENT = 6, MAX_DISCOUNT = 25;
+
+    /** The percent a place's shops take off for a regular. */
+    public static int discount(Holding h, UUID player) {
+        return Math.min(MAX_DISCOUNT, h.custom.getOrDefault(player, 0) / TRADES_PER_PERCENT);
+    }
+
+    @Nullable
+    private static Holding placeOf(ServerLevel level, Villager v) {
+        if (!v.getPersistentData().contains(TAG) || !v.getPersistentData().hasUUID(HOLDING_TAG)) return null;
+        return HoldingManager.get(level).holdings.get(v.getPersistentData().getUUID(HOLDING_TAG));
+    }
+
+    /** As a regular opens a keeper's trades: his discount comes off every price in emeralds. */
+    public static void welcome(ServerLevel level, ServerPlayer p, Villager v) {
+        Holding h = placeOf(level, v);
+        if (h == null || v.getTradingPlayer() != null || v.isBaby() || !v.isAlive()) return;
+        for (MerchantOffer o : v.getOffers()) o.resetSpecialPriceDiff();
+        int pct = discount(h, p.getUUID());
+        if (pct <= 0) return;
+        applyDiscount(v, pct);
+        p.displayClientMessage(Component.literal("A regular in " + h.name + ": " + pct + "% off.").withStyle(ChatFormatting.GREEN), true);
+    }
+
+    /** Take a percent off every price in emeralds (the game puts it back when the trading window closes). */
+    public static void applyDiscount(Villager v, int pct) {
+        for (MerchantOffer o : v.getOffers()) {
+            if (!o.getBaseCostA().is(Items.EMERALD)) continue;
+            int cut = (int) Math.floor(o.getBaseCostA().getCount() * pct / 100.0);
+            if (cut > 0) o.addToSpecialPriceDiff(-cut);
+        }
+    }
+
+    /** A trade done at one of a place's shops counts toward being a regular there. */
+    public static void traded(ServerLevel level, ServerPlayer p, Villager v) {
+        Holding h = placeOf(level, v);
+        if (h == null) return;
+        int before = discount(h, p.getUUID());
+        h.custom.merge(p.getUUID(), 1, Integer::sum);
+        HoldingManager.get(level).setDirty();
+        int after = discount(h, p.getUUID());
+        if (after > before && after % 5 == 0)
+            p.sendSystemMessage(Component.literal("The shops of " + h.name + " know you now: " + after + "% off from here on.")
+                    .withStyle(ChatFormatting.GREEN));
     }
 
     /** A keeper of a house that holds the player hostile turns him away. True if the trade is refused. */

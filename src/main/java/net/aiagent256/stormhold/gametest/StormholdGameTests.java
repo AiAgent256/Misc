@@ -118,7 +118,7 @@ public class StormholdGameTests {
                     throw new IllegalStateException(kind + " keeper is called " + v.getCustomName());
                 i++;
             }
-            if (i < 12) throw new IllegalStateException("only " + i + " kinds of shop");
+            if (i < 10) throw new IllegalStateException("only " + i + " kinds of shop");
             // a town an older plan built: the post lands on the counter, so the keeper stands beside it
             var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
             var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
@@ -330,6 +330,62 @@ public class StormholdGameTests {
         for (var o : net.aiagent256.stormhold.holding.Shops.offers(armoury, 9))
             if (o.getResult().is(net.minecraft.world.item.Items.NETHERITE_CHESTPLATE)) edge = true;
         if (home || !edge) throw new IllegalStateException("netherite plate in the heartland " + home + ", at the edge " + edge);
+        g.succeed();
+    }
+
+    @GameTest(template = "arena")
+    public static void shopsFoldAndRegularsPayLess(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        String[][] folded = {{"baker", "provisioner"}, {"butcher", "provisioner"}, {"fish", "provisioner"}, {"cloth", "general"},
+                {"farmer", "general"}, {"chandler", "enchanter"}, {"potter", "mason"}, {"tanner", "stables"}, {"apothecary", "alchemist"}};
+        for (String[] f : folded) {
+            var t = net.aiagent256.stormhold.holding.Shops.type(f[0]);
+            if (t == null || !t.id().equals(f[1])) throw new IllegalStateException(f[0] + " folds into " + (t == null ? null : t.id()));
+        }
+        Holding h = sample(g);
+        List<Entity> spawned = new ArrayList<>();
+        try {
+            var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+            BlockPos a = g.absolutePos(new BlockPos(3, 2, 3)), b = g.absolutePos(new BlockPos(6, 2, 3));
+            for (BlockPos q : List.of(a, a.above(), b, b.above())) level.setBlock(q, air, 3);
+            // a baker from an old plan becomes the provisioner
+            var old = net.aiagent256.stormhold.holding.Shops.spawnKeeper(level, h, "general", a);
+            if (old == null) throw new IllegalStateException("no keeper");
+            spawned.add(old);
+            old.getPersistentData().putString(net.aiagent256.stormhold.holding.Shops.TAG, "baker");
+            net.aiagent256.stormhold.holding.Shops.convert(level, old, net.aiagent256.stormhold.holding.Shops.type("baker"), a);
+            boolean fish = false;
+            for (var o : old.getOffers()) if (o.getResult().is(net.minecraft.world.item.Items.COOKED_COD)) fish = true;
+            if (!"provisioner".equals(old.getPersistentData().getString(net.aiagent256.stormhold.holding.Shops.TAG)) || !fish
+                    || old.getVillagerData().getProfession() != net.minecraft.world.entity.npc.VillagerProfession.BUTCHER
+                    || !old.getCustomName().getString().endsWith("the Provisioner"))
+                throw new IllegalStateException("the old baker is " + old.getCustomName().getString() + ", " + old.getVillagerData().getProfession());
+            // a regular's discount
+            UUID me = UUID.randomUUID();
+            h.custom.put(me, net.aiagent256.stormhold.holding.Shops.TRADES_PER_PERCENT * 10);
+            if (net.aiagent256.stormhold.holding.Shops.discount(h, me) != 10) throw new IllegalStateException("60 trades is not 10% off");
+            h.custom.put(me, 100000);
+            if (net.aiagent256.stormhold.holding.Shops.discount(h, me) != net.aiagent256.stormhold.holding.Shops.MAX_DISCOUNT)
+                throw new IllegalStateException("the discount runs past its cap");
+            var arm = net.aiagent256.stormhold.holding.Shops.spawnKeeper(level, h, "armoury", b);
+            if (arm == null) throw new IllegalStateException("no armourer");
+            spawned.add(arm);
+            net.aiagent256.stormhold.holding.Shops.applyDiscount(arm, 25);
+            int price = -1;
+            for (var o : arm.getOffers()) {
+                if (o.getResult().is(net.minecraft.world.item.Items.DIAMOND_CHESTPLATE)) {
+                    price = o.getCostA().getCount();                // the plain one comes first; the frontier's follow
+                    break;
+                }
+            }
+            if (price != 16) throw new IllegalStateException("a 21-emerald chestplate at 25% off costs " + price);
+            // and every shop buys something dear
+            boolean diamonds = false;
+            for (var o : arm.getOffers()) if (o.getBaseCostA().is(net.minecraft.world.item.Items.DIAMOND) && o.getResult().is(net.minecraft.world.item.Items.EMERALD)) diamonds = true;
+            if (!diamonds) throw new IllegalStateException("the armoury won't buy diamonds");
+        } finally {
+            for (Entity e : spawned) e.discard();
+        }
         g.succeed();
     }
 

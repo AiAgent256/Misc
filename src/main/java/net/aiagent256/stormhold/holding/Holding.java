@@ -110,6 +110,8 @@ public class Holding {
     public final Map<BlockPos, UUID> ownedHouses = new HashMap<>();
     /** The keeper standing at each shop post, and the day the shops last restocked. */
     public final Map<BlockPos, UUID> shopkeepers = new HashMap<>();
+    /** Trades each player has done at this place's shops: regulars get a discount (see Shops). */
+    public final Map<UUID, Integer> custom = new HashMap<>();
     public long shopsDay = -1;
     /** 1 once the plans' shop posts and homes for sale have been read into a place built before it had them. */
     public int shopsVersion;
@@ -353,6 +355,9 @@ public class Holding {
         t.putLong("ShopsDay", shopsDay);
         t.putInt("ShopsVersion", shopsVersion);
         t.putInt("MarketVersion", marketVersion);
+        CompoundTag cu = new CompoundTag();
+        custom.forEach((k, v) -> cu.putInt(k.toString(), v));
+        t.put("Custom", cu);
         t.putInt("Miners", miners);
         t.putInt("Smiths", smiths);
         t.putInt("MinersAt", minersAt);
@@ -466,6 +471,13 @@ public class Holding {
         h.shopsDay = t.contains("ShopsDay") ? t.getLong("ShopsDay") : -1;
         h.shopsVersion = t.getInt("ShopsVersion");
         h.marketVersion = t.getInt("MarketVersion");
+        CompoundTag cu = t.getCompound("Custom");
+        for (String k : cu.getAllKeys()) {
+            try {
+                h.custom.put(UUID.fromString(k), cu.getInt(k));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
         h.miners = t.getInt("Miners");
         h.smiths = t.getInt("Smiths");
         h.minersAt = t.getInt("MinersAt");

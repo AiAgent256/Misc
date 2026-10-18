@@ -226,7 +226,17 @@ public final class CommonEvents {
         if (net.aiagent256.stormhold.holding.Shops.refuses(level, sp, v)) {
             e.setCanceled(true);
             e.setCancellationResult(InteractionResult.SUCCESS);
+        } else if (e.getHand() == net.minecraft.world.InteractionHand.MAIN_HAND) {
+            net.aiagent256.stormhold.holding.Shops.welcome(level, sp, v);
         }
+    }
+
+    /** Every trade at a place's shops counts toward being a regular there. */
+    @SubscribeEvent
+    public static void traded(net.minecraftforge.event.entity.player.TradeWithVillagerEvent e) {
+        if (e.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp && sp.level() instanceof ServerLevel level
+                && e.getAbstractVillager() instanceof net.minecraft.world.entity.npc.Villager v)
+            net.aiagent256.stormhold.holding.Shops.traded(level, sp, v);
     }
 
     @SubscribeEvent
