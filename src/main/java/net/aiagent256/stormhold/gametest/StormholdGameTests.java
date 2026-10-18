@@ -153,21 +153,23 @@ public class StormholdGameTests {
         ServerLevel level = g.getLevel();
         var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
         var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+        // the test arenas lie underground, and a market wants sky over it: a yard high over this arena instead
+        BlockPos a = g.absolutePos(BlockPos.ZERO);
+        BlockPos o = new BlockPos(a.getX(), 300, a.getZ());
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-                level.setBlock(g.absolutePos(new BlockPos(x, 1, z)), stone, 3);
-                for (int y = 2; y < 8; y++) level.setBlock(g.absolutePos(new BlockPos(x, y, z)), air, 3);
+                level.setBlock(o.offset(x, 1, z), stone, 3);
+                for (int y = 2; y < 10; y++) level.setBlock(o.offset(x, y, z), air, 3);
             }
         }
-        BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();
         h.key = "gametest-market@" + o.asLong();
         h.name = "Testmarket";
         h.tier = 3;
         h.layout = "great_castle_a";
-        h.box = new BoundingBox(o.getX(), o.getY(), o.getZ(), o.getX() + 15, o.getY() + 7, o.getZ() + 15);
-        h.rallyPos = g.absolutePos(new BlockPos(2, 2, 2));
-        h.gatePos = g.absolutePos(new BlockPos(-40, 2, -40));
+        h.box = new BoundingBox(o.getX(), o.getY(), o.getZ(), o.getX() + 15, o.getY() + 9, o.getZ() + 15);
+        h.rallyPos = o.offset(2, 2, 2);
+        h.gatePos = o.offset(-40, 2, -40);
         if (!net.aiagent256.stormhold.holding.Market.wants(h) || !net.aiagent256.stormhold.holding.Shops.hasShops(h))
             throw new IllegalStateException("a great castle wants no market");
         List<Entity> spawned = new ArrayList<>();
