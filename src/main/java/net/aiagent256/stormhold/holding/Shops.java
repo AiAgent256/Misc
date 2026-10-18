@@ -41,7 +41,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * The shops of a town or a city. Every stall and shopfront the plans mark ({@code shop_<kind>}) gets a
+ * The shops of a town, a city or a great castle's yard market. Every stall and shopfront the plans mark
+ * ({@code shop_<kind>}), and every stall a castle puts up ({@link Market}), gets a
  * keeper who stands behind his counter all day, sells a fixed stock for emeralds and buys a few goods of
  * his trade, and restocks every morning. A keeper killed is replaced the next morning. The houses that
  * hold the player hostile won't sell to him.
@@ -167,6 +168,13 @@ public final class Shops {
                 sell(potion(Items.POTION, Potions.STRENGTH), 4), sell(potion(Items.POTION, Potions.FIRE_RESISTANCE), 4),
                 sell(potion(Items.SPLASH_POTION, Potions.HEALING), 4), sell(Items.GOLDEN_APPLE, 1, 8),
                 buy(Items.ROTTEN_FLESH, 32, 1), buy(Items.SPIDER_EYE, 8, 1), buy(Items.NETHER_WART, 22, 1), buy(Items.GOLD_INGOT, 3, 1))));
+        m.put("quartermaster", new Type("quartermaster", "Quartermaster", "Quartermaster", VillagerProfession.CARTOGRAPHER, List.of(
+                sell(Items.BREAD, 6, 1), sell(Items.COOKED_BEEF, 5, 1), sell(Items.ARROW, 16, 1), sell(Items.TORCH, 16, 1),
+                sell(Items.CAMPFIRE, 1, 1), sell(Items.LEAD, 1, 2), sell(potion(Items.POTION, Potions.HEALING), 3),
+                sell(Items.WHITE_BED, 1, 3), sell(Items.MAP, 1, 3), sell(Items.SPYGLASS, 1, 3), sell(Items.SHIELD, 1, 4),
+                sell(Items.SADDLE, 1, 6),
+                buy(Items.IRON_INGOT, 4, 1), buy(Items.LEATHER, 6, 1), buy(Items.WHEAT, 20, 1), buy(Items.STRING, 14, 1),
+                buy(Items.BONE, 16, 1))));
         m.put("chandler", new Type("chandler", "Chandler", "Chandler", VillagerProfession.LIBRARIAN, List.of(
                 sell(Items.TORCH, 16, 1), sell(Items.LANTERN, 3, 1), sell(Items.CANDLE, 4, 1), sell(Items.WHITE_CANDLE, 4, 1),
                 sell(Items.SOUL_LANTERN, 2, 1), sell(Items.CHAIN, 4, 1), sell(Items.CAMPFIRE, 1, 1), sell(Items.SEA_LANTERN, 1, 3),
@@ -181,9 +189,9 @@ public final class Shops {
         return h.isCity() ? 5 : 3;
     }
 
-    /** Whether a place has shops at all: towns and cities. */
+    /** Whether a place has shops at all: towns, cities and the great castles' yard markets. */
     public static boolean hasShops(Holding h) {
-        return h.isTown() || h.isCity();
+        return h.isTown() || h.isCity() || Market.wants(h);
     }
 
     /** The shops a place keeps, by kind, with every post. */
@@ -302,7 +310,7 @@ public final class Shops {
     }
 
     /** Room for a man: nothing solid at his feet or head, and a floor under him. */
-    private static boolean standable(ServerLevel level, BlockPos p) {
+    static boolean standable(ServerLevel level, BlockPos p) {
         if (!level.getBlockState(p).getCollisionShape(level, p).isEmpty()) return false;
         if (!level.getBlockState(p.above()).getCollisionShape(level, p.above()).isEmpty()) return false;
         if (!level.getFluidState(p).isEmpty()) return false;

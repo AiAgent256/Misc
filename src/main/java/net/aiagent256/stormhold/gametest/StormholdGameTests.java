@@ -149,6 +149,62 @@ public class StormholdGameTests {
     }
 
     @GameTest(template = "arena")
+    public static void castleMarketGoesUp(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
+        var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                level.setBlock(g.absolutePos(new BlockPos(x, 1, z)), stone, 3);
+                for (int y = 2; y < 8; y++) level.setBlock(g.absolutePos(new BlockPos(x, y, z)), air, 3);
+            }
+        }
+        BlockPos o = g.absolutePos(BlockPos.ZERO);
+        Holding h = new Holding();
+        h.key = "gametest-market@" + o.asLong();
+        h.name = "Testmarket";
+        h.tier = 3;
+        h.layout = "great_castle_a";
+        h.box = new BoundingBox(o.getX(), o.getY(), o.getZ(), o.getX() + 15, o.getY() + 7, o.getZ() + 15);
+        h.rallyPos = g.absolutePos(new BlockPos(2, 2, 2));
+        h.gatePos = g.absolutePos(new BlockPos(-40, 2, -40));
+        if (!net.aiagent256.stormhold.holding.Market.wants(h) || !net.aiagent256.stormhold.holding.Shops.hasShops(h))
+            throw new IllegalStateException("a great castle wants no market");
+        List<Entity> spawned = new ArrayList<>();
+        try {
+            int n = net.aiagent256.stormhold.holding.Market.raise(level, h);
+            if (n < 2) throw new IllegalStateException("only " + n + " stalls went up in an open yard");
+            for (int i = 0; i < n; i++) {
+                String kind = net.aiagent256.stormhold.holding.Market.KINDS.get(i);
+                List<BlockPos> ps = h.extras.get("shop_" + kind);
+                if (ps == null || ps.size() != 1) throw new IllegalStateException(kind + " has posts " + ps);
+                BlockPos post = ps.get(0);
+                if (Math.max(Math.abs(post.getX() - h.rallyPos.getX()), Math.abs(post.getZ() - h.rallyPos.getZ())) < 8)
+                    throw new IllegalStateException(kind + " stall stands on the muster ground at " + post);
+                int counter = 0;
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dz = -1; dz <= 1; dz++)
+                        if (level.getBlockState(post.offset(dx, 0, dz)).getBlock() instanceof net.minecraft.world.level.block.TrapDoorBlock) counter++;
+                if (counter != 3) throw new IllegalStateException(kind + " stall has " + counter + " counter trapdoors");
+                if (!post.equals(net.aiagent256.stormhold.holding.Shops.standAt(level, post)))
+                    throw new IllegalStateException(kind + " keeper can't stand in his stall");
+                boolean signed = false;
+                for (BlockPos q : BlockPos.betweenClosed(post.offset(-1, 2, -1), post.offset(1, 2, 1)))
+                    if (level.getBlockEntity(q) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sb
+                            && !sb.getFrontText().getMessage(1, false).getString().isBlank()) signed = true;
+                if (!signed) throw new IllegalStateException(kind + " stall has no sign");
+                var v = net.aiagent256.stormhold.holding.Shops.spawnKeeper(level, h, kind, post);
+                if (v == null) throw new IllegalStateException("no keeper for the " + kind + " stall");
+                spawned.add(v);
+            }
+            if (h.extras.get("market") == null) throw new IllegalStateException("the guide has no market to point to");
+        } finally {
+            for (Entity e : spawned) e.discard();
+        }
+        g.succeed();
+    }
+
+    @GameTest(template = "arena")
     public static void everyRoleSpawnsArmed(GameTestHelper g) {
         ServerLevel level = g.getLevel();
         HoldingManager mgr = HoldingManager.get(level);

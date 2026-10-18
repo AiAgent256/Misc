@@ -113,6 +113,8 @@ public class Holding {
     public long shopsDay = -1;
     /** 1 once the plans' shop posts and homes for sale have been read into a place built before it had them. */
     public int shopsVersion;
+    /** 1 once a great castle has looked for room for its yard market (and put it up, if there was room). */
+    public int marketVersion;
     public final List<Posting> postings = new ArrayList<>();
     public long nextPosting;
     public boolean cityBlocksPlaced;
@@ -346,6 +348,7 @@ public class Holding {
         t.put("Shopkeepers", sk);
         t.putLong("ShopsDay", shopsDay);
         t.putInt("ShopsVersion", shopsVersion);
+        t.putInt("MarketVersion", marketVersion);
         ListTag pl = new ListTag();
         for (Posting p2 : postings) pl.add(p2.save());
         t.put("Postings", pl);
@@ -449,6 +452,7 @@ public class Holding {
         }
         h.shopsDay = t.contains("ShopsDay") ? t.getLong("ShopsDay") : -1;
         h.shopsVersion = t.getInt("ShopsVersion");
+        h.marketVersion = t.getInt("MarketVersion");
         ListTag pl = t.getList("Postings", Tag.TAG_COMPOUND);
         for (int i = 0; i < pl.size(); i++) h.postings.add(Posting.load(pl.getCompound(i)));
         h.nextPosting = t.getLong("NextPosting");

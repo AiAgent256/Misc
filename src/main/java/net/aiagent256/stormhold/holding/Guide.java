@@ -70,7 +70,12 @@ public final class Guide {
         if ((h.isCity() || h.isTown()) && board != null && !board.isEmpty())
             out.add(line("Notice Board, in the market", from, board.get(0), "Right-click it: every shop and house for sale with the way there, and work"));
         var shops = Shops.posts(h);
-        if (!shops.isEmpty()) {
+        var market = h.extras.get("market");
+        if (!shops.isEmpty() && market != null && !market.isEmpty()) {
+            List<String> names = new ArrayList<>();
+            for (String k : shops.keySet()) names.add(Shops.type(k).title());
+            out.add(line("Market, in the yard", from, market.get(0), String.join(", ", names) + ", each behind his counter"));
+        } else if (!shops.isEmpty()) {
             List<String> names = new ArrayList<>();
             for (String k : shops.keySet()) names.add(Shops.type(k).title());
             out.add(Component.literal("  Shops: ").withStyle(ChatFormatting.GOLD)
