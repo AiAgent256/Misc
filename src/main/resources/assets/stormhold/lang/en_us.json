@@ -31,5 +31,6 @@
   "item.stormhold.marshal_baton": "Marshal's Baton",
   "item.stormhold.marshal_baton.tip1": "Point at a creature or soldier: your men attack it.",
   "item.stormhold.marshal_baton.tip2": "Point at a block: they clear the building around it. Sneak: they hold that spot.",
-  "item.stormhold.marshal_baton.tip3": "Point at the sky: follow / aggressive. Sneak: fall in."
+  "item.stormhold.marshal_baton.tip3": "Point at the sky: follow / aggressive. Sneak: fall in.",
+  "item.stormhold.marshal_baton.tip4": "Point at one of your men: he holds where he stands (or comes with you while the rest hold)."
 }

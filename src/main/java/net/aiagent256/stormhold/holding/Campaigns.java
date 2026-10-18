@@ -211,6 +211,7 @@ public final class Campaigns {
             if (c.kind == Campaign.Kind.RAID) tickRaid(level, mgr, c);
             else if (c.kind == Campaign.Kind.CAMP) tickCamp(level, mgr, c);
             else if (c.kind == Campaign.Kind.COLUMN) Columns.tick(level, mgr, c);
+            else if (c.kind == Campaign.Kind.ILLAGERS) Warbands.tick(level, mgr, c);
             else tickParty(level, mgr, c, now);
         }
         if (mgr.campaigns.removeIf(c -> c.stage == Campaign.Stage.DONE)) mgr.setDirty();
@@ -221,9 +222,10 @@ public final class Campaigns {
         if (c.stage == Campaign.Stage.DONE) return;
         Garrisons.pruneLive(level, c.live);
         if (c.kind == Campaign.Kind.RAID) tickRaid(level, mgr, c);
+        else if (c.kind == Campaign.Kind.ILLAGERS) Warbands.tick(level, mgr, c);
     }
 
-    private static boolean playerNear(ServerLevel level, BlockPos p, int radius) {
+    static boolean playerNear(ServerLevel level, BlockPos p, int radius) {
         for (ServerPlayer sp : level.players()) {
             if (!sp.isSpectator() && sp.blockPosition().distSqr(new BlockPos(p.getX(), sp.getBlockY(), p.getZ())) < (double) radius * radius) {
                 return true;

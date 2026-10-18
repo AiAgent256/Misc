@@ -29,7 +29,7 @@ import java.util.UUID;
 /** What you can do in a Great City: hire soldiers, buy a house, take work from the notice board. */
 public final class City {
     public static final int KNIGHT_PRICE = 6, ARCHER_PRICE = 5, CROSSBOW_PRICE = 5;
-    public static final int HOUSE_PRICE = 32;
+    public static final int HOUSE_PRICE = 24;
     public static final int MAX_POSTINGS = 3;
 
     // ------------------------------------------------------------ setup
@@ -78,7 +78,7 @@ public final class City {
 
     /** What a home costs: less in a market town than in the capital. */
     public static int housePrice(Holding h) {
-        return h.isTown() ? 24 : HOUSE_PRICE;
+        return h.isTown() ? 18 : HOUSE_PRICE;
     }
 
     /** Can this player deal with the city: it's theirs, or its house likes them. */

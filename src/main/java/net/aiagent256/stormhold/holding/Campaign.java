@@ -13,7 +13,7 @@ import java.util.UUID;
 
 /** An army on the move: a house raid against a player's castle, or a player's war party. */
 public class Campaign {
-    public enum Kind {RAID, PARTY, CAMP, COLUMN}
+    public enum Kind {RAID, PARTY, CAMP, COLUMN, ILLAGERS}
 
     public enum Stage {MARCH, SIEGE, RETURN, DONE}
 
@@ -39,16 +39,25 @@ public class Campaign {
     public int stallSeconds;
     /** Not saved: the raiders have already broken this castle's gate. */
     public boolean rammed;
+    /** ILLAGERS: the warband by kind (entity id, or "captain"), what's on the field now, and its spoils. */
+    public final Map<String, Integer> band = new java.util.LinkedHashMap<>();
+    public final Map<UUID, String> bandLive = new HashMap<>();
+    public int spoils;
+    /** Not saved: how the warband's siege is going. */
+    public int siegeSeconds, sackSeconds;
+    public boolean rammedOpen, laddered, sapped;
 
     public int total() {
         int n = 0;
         for (int v : counts.values()) n += v;
+        for (int v : band.values()) n += v;
         return n;
     }
 
     public double strength() {
         double s = 0;
         for (var e : counts.entrySet()) s += e.getValue() * e.getKey().strength();
+        for (var e : band.entrySet()) s += e.getValue() * Warbands.strength(e.getKey());
         return s;
     }
 
@@ -86,6 +95,10 @@ public class Campaign {
         CompoundTag c = new CompoundTag();
         counts.forEach((r, n) -> c.putInt(r.name(), n));
         t.put("Counts", c);
+        CompoundTag b = new CompoundTag();
+        band.forEach(b::putInt);
+        t.put("Band", b);
+        t.putInt("Spoils", spoils);
         return t;
     }
 
@@ -112,6 +125,9 @@ public class Campaign {
             } catch (IllegalArgumentException ignored) {
             }
         }
+        CompoundTag b = t.getCompound("Band");
+        for (String k : b.getAllKeys()) c.band.put(k, b.getInt(k));
+        c.spoils = t.getInt("Spoils");
         return c;
     }
 }

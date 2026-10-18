@@ -157,7 +157,7 @@ public final class Frontier {
     /** A hostile mob joining the world is made as hard as the zone it's in, once. */
     public static void onJoin(ServerLevel level, Mob mob) {
         if (!enabled() || !Config.FRONTIER_MOBS.get()) return;
-        if (!(mob instanceof Enemy) && mob.getType().getCategory() != MobCategory.MONSTER) return;
+        if (!(mob instanceof Enemy) && mob.getType().getCategory() != MobCategory.MONSTER && !Dragons.isWild(mob)) return;
         CompoundTag data = mob.getPersistentData();
         if (data.contains(TAG)) return;
         ResourceLocation id = ForgeRegistries.ENTITY_TYPES.getKey(mob.getType());

@@ -134,6 +134,9 @@ public class Holding {
     /** Supply line: keep this many men with the owner, sending columns to top up. 0 = off. */
     public int reinforceKeep;
     public boolean raidWarned;
+    /** When the next illager warband comes for this place, if a player holds it, and whether he's been warned. */
+    public long nextWarband;
+    public boolean warbandWarned;
     /** When the castle last took damage (a dragon, a blast, a broken gate); the masons come once it's quiet. 0 if none. */
     public long damagedAt;
     public boolean villagersSpawned;
@@ -388,6 +391,8 @@ public class Holding {
         t.putLong("NextColumn", nextColumn);
         t.putInt("ReinforceKeep", reinforceKeep);
         t.putBoolean("RaidWarned", raidWarned);
+        t.putLong("NextWarband", nextWarband);
+        t.putBoolean("WarbandWarned", warbandWarned);
         t.putLong("DamagedAt", damagedAt);
         t.putBoolean("Villagers", villagersSpawned);
         t.putBoolean("BannersDirty", bannersDirty);
@@ -514,6 +519,8 @@ public class Holding {
         h.nextColumn = t.getLong("NextColumn");
         h.reinforceKeep = t.getInt("ReinforceKeep");
         h.raidWarned = t.getBoolean("RaidWarned");
+        h.nextWarband = t.getLong("NextWarband");
+        h.warbandWarned = t.getBoolean("WarbandWarned");
         h.damagedAt = t.getLong("DamagedAt");
         h.villagersSpawned = t.getBoolean("Villagers");
         h.bannersDirty = t.getBoolean("BannersDirty");

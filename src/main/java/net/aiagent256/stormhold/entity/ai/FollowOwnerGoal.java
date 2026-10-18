@@ -28,7 +28,7 @@ public class FollowOwnerGoal extends Goal {
     }
 
     private boolean following() {
-        var m = net.aiagent256.stormhold.holding.Orders.mode(mob.owner());
+        var m = net.aiagent256.stormhold.holding.Orders.modeOf(mob);
         return m == net.aiagent256.stormhold.holding.Orders.Mode.FOLLOW || m == net.aiagent256.stormhold.holding.Orders.Mode.AGGRESSIVE;
     }
 

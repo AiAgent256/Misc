@@ -93,9 +93,16 @@ public final class Shops {
         return sell(new ItemStack(item, count), emeralds);
     }
 
+    /** Every price the shops ask, against what the stock lists say: a fifth off, a one-emerald thing still one. */
+    public static final double PRICE = 0.8;
+
+    private static int price(int emeralds) {
+        return emeralds <= 1 ? emeralds : Math.max(1, (int) Math.round(emeralds * PRICE));
+    }
+
     private static MerchantOffer sell(ItemStack result, int emeralds) {
         int uses = emeralds >= 10 ? 3 : emeralds >= 5 ? 6 : 12;
-        return new MerchantOffer(new ItemStack(Items.EMERALD, emeralds), ItemStack.EMPTY, result, uses, 1, 0.05F);
+        return new MerchantOffer(new ItemStack(Items.EMERALD, price(emeralds)), ItemStack.EMPTY, result, uses, 1, 0.05F);
     }
 
     private static MerchantOffer buy(Item item, int count, int emeralds) {
@@ -109,7 +116,8 @@ public final class Shops {
     /** A dear thing: emeralds and emerald blocks. */
     private static MerchantOffer dear(ItemStack result, int emeralds, int blocks) {
         int uses = blocks >= 4 ? 2 : 3;
-        return new MerchantOffer(new ItemStack(Items.EMERALD, emeralds), blocks > 0 ? new ItemStack(Items.EMERALD_BLOCK, blocks) : ItemStack.EMPTY,
+        int b = blocks <= 0 ? 0 : Math.max(1, (int) Math.round(blocks * PRICE));
+        return new MerchantOffer(new ItemStack(Items.EMERALD, price(emeralds)), b > 0 ? new ItemStack(Items.EMERALD_BLOCK, b) : ItemStack.EMPTY,
                 result, uses, 5, 0.05F);
     }
 
@@ -365,12 +373,15 @@ public final class Shops {
                 if (staffed.merge(t.id(), 1, Integer::sum) > cap(h)) break;
                 BlockPos post = ps.get(i);
                 if (!level.isLoaded(post) || !level.areEntitiesLoaded(ChunkPos.asLong(post))) continue;
-                if (!h.shopkeepers.containsKey(post)) {
-                    // a place an older plan built can have its counter a step off where today's plan puts it
+                if (!h.shopkeepers.containsKey(post) || doorBeside(level, post)) {
+                    // a place an older plan built can have its counter a step off where today's plan puts it,
+                    // and a keeper isn't left standing in a doorway
                     BlockPos at = standAt(level, post);
                     if (at == null) continue;
                     if (!at.equals(post)) {
                         ps.set(i, at);
+                        UUID kept = h.shopkeepers.remove(post);
+                        if (kept != null) h.shopkeepers.put(at.immutable(), kept);
                         post = at;
                         dirty = true;
                     }
@@ -441,18 +452,31 @@ public final class Shops {
      */
     @Nullable
     public static BlockPos standAt(ServerLevel level, BlockPos post) {
-        if (standable(level, post)) return post;
+        boolean here = standable(level, post);
+        if (here && !doorBeside(level, post)) return post;
         BlockPos best = null;
         int bd = Integer.MAX_VALUE;
         for (BlockPos q : BlockPos.betweenClosed(post.offset(-2, -1, -2), post.offset(2, 1, 2))) {
-            if (!level.isLoaded(q) || !standable(level, q) || !counterBeside(level, q)) continue;
-            int d = q.distManhattan(post) * 2 + (q.getY() != post.getY() ? 1 : 0);
+            if (!level.isLoaded(q) || !standable(level, q) || doorBeside(level, q)) continue;
+            // behind a counter if there's one; in a doorway post, any clear spot inside will do
+            boolean counter = counterBeside(level, q);
+            if (!counter && !here) continue;
+            int d = q.distManhattan(post) * 2 + (q.getY() != post.getY() ? 1 : 0) + (counter ? 0 : 3);
             if (d < bd) {
                 bd = d;
                 best = q.immutable();
             }
         }
-        return best;
+        return best != null ? best : here ? post : null;
+    }
+
+    /** A door beside this spot, at the feet or the head: a keeper standing here would block it. */
+    static boolean doorBeside(ServerLevel level, BlockPos p) {
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            if (level.getBlockState(p.relative(d)).getBlock() instanceof DoorBlock
+                    || level.getBlockState(p.relative(d).above()).getBlock() instanceof DoorBlock) return true;
+        }
+        return false;
     }
 
     /** Room for a man: nothing solid at his feet or head, and a floor under him. */
@@ -623,7 +647,48 @@ public final class Shops {
 
     /** The first time a place built before it had shops is seen: its plans' shop posts and homes for sale are added. */
     private static void refreshFromPlans(HoldingManager mgr, Holding h) {
-        if (h.shopsVersion >= 1) return;
+        if (h.shopsVersion < 1) addFromPlans(mgr, h);
+        if (h.shopsVersion < 2) {
+            h.shopsVersion = 2;
+            mgr.setDirty();
+            ensureEnchanter(h);
+        }
+    }
+
+    /**
+     * Every town and city has an Enchanter. A town whose plans have none gives one post of its biggest trade
+     * (a general store or provisions stall it has more of than it staffs) to an enchanter.
+     */
+    static void ensureEnchanter(Holding h) {
+        if (!(h.isTown() || h.isCity())) return;
+        Map<String, Integer> total = new java.util.HashMap<>();
+        String bestRaw = null;
+        for (var e : h.extras.entrySet()) {
+            if (!e.getKey().startsWith("shop_")) continue;
+            Type t = type(e.getKey().substring(5));
+            if (t == null) continue;
+            if (t.id().equals("enchanter")) return;
+            total.merge(t.id(), e.getValue().size(), Integer::sum);
+        }
+        String donor = null;
+        for (var e : total.entrySet()) if (e.getValue() >= 2 && (donor == null || e.getValue() > total.get(donor))) donor = e.getKey();
+        if (donor == null) return;
+        int most = 0;
+        for (var e : h.extras.entrySet()) {
+            if (!e.getKey().startsWith("shop_")) continue;
+            Type t = type(e.getKey().substring(5));
+            if (t != null && t.id().equals(donor) && e.getValue().size() > most) {
+                most = e.getValue().size();
+                bestRaw = e.getKey();
+            }
+        }
+        if (bestRaw == null) return;
+        List<BlockPos> from = h.extras.get(bestRaw);
+        BlockPos post = from.remove(from.size() - 1);
+        h.extras.put("shop_enchanter", new ArrayList<>(List.of(post)));
+    }
+
+    private static void addFromPlans(HoldingManager mgr, Holding h) {
         h.shopsVersion = 1;
         mgr.setDirty();
         Layout l = h.plans();

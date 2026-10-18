@@ -22,6 +22,10 @@ public final class Config {
     public static final ForgeConfigSpec.IntValue RAID_MAX_DAYS;
     public static final ForgeConfigSpec.BooleanValue RAIDS_ENABLED;
     public static final ForgeConfigSpec.BooleanValue ABSTRACT_RAIDS;
+    public static final ForgeConfigSpec.BooleanValue WARBANDS_ENABLED;
+    public static final ForgeConfigSpec.IntValue WARBAND_MIN_DAYS;
+    public static final ForgeConfigSpec.IntValue WARBAND_MAX_DAYS;
+    public static final ForgeConfigSpec.BooleanValue WARBAND_SAPPERS;
     public static final ForgeConfigSpec.IntValue DETECT_RADIUS_CHUNKS;
     public static final ForgeConfigSpec.IntValue MATERIALIZE_DISTANCE;
     public static final ForgeConfigSpec.BooleanValue ROADS_ENABLED;
@@ -91,6 +95,11 @@ public final class Config {
         RAID_MAX_DAYS = b.defineInRange("maxDays", 5, 1, 100);
         ABSTRACT_RAIDS = b.comment("If true, raids on castles you are far from are fought out abstractly. If false they wait until you are near.")
                 .define("resolveWhileAway", true);
+        WARBANDS_ENABLED = b.comment("Illager warbands come for the castles, towns and cities a player holds, try the gate, ladders and the walls,",
+                "and sack the place if they take the yard.").define("illagerWarbands", true);
+        WARBAND_MIN_DAYS = b.defineInRange("warbandMinDays", 5, 1, 100);
+        WARBAND_MAX_DAYS = b.defineInRange("warbandMaxDays", 9, 1, 100);
+        WARBAND_SAPPERS = b.comment("A warband held at the walls long enough blows a breach in them with TNT.").define("warbandSappers", true);
         b.pop();
         b.push("frontier");
         FRONTIER_ENABLED = b.comment("The farther from the frontier's centre (world spawn until /stormhold frontier here sets it), the harder",

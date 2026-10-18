@@ -170,10 +170,9 @@ public final class Company {
      * and comes out at their side. Men holding a spot or clearing a building stay where they were told.
      */
     public static void followThrough(ServerLevel from, ServerLevel to, net.minecraft.server.level.ServerPlayer player, BlockPos left) {
-        var mode = Orders.mode(player.getUUID());
-        if (mode == Orders.Mode.HOLD || mode == Orders.Mode.CLEAR) return;
         var men = from.getEntitiesOfClass(GarrisonEntity.class, new AABB(left).inflate(PORTAL_RANGE, 24, PORTAL_RANGE),
-                g -> g.isAlive() && player.getUUID().equals(g.owner()));
+                g -> g.isAlive() && player.getUUID().equals(g.owner())
+                        && Orders.modeOf(g) != Orders.Mode.HOLD && Orders.modeOf(g) != Orders.Mode.CLEAR);
         int n = 0;
         for (GarrisonEntity g : men) {
             BlockPos at = null;

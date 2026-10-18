@@ -97,6 +97,7 @@ public final class Net {
                 for (Campaign c : mgr.campaigns) {
                     if (c.stage == Campaign.Stage.DONE) continue;
                     if (c.kind == Campaign.Kind.RAID && h.id.equals(c.target)) status.append("Under attack by ").append(c.total()).append(" men. ");
+                    if (c.kind == Campaign.Kind.ILLAGERS && h.id.equals(c.target)) status.append("Illager warband at the walls: ").append(c.total()).append(". ");
                     if (c.kind == Campaign.Kind.PARTY && h.id.equals(c.origin)) status.append("War party out: ").append(c.total()).append(" men, ")
                             .append(c.stage.name().toLowerCase()).append(". ");
                     if (c.kind == Campaign.Kind.COLUMN && h.id.equals(c.origin)) status.append("Column of ").append(c.total())

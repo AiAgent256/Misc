@@ -23,13 +23,13 @@ public class CompanyPostGoal extends Goal {
     @Nullable
     private BlockPos wanted() {
         if (mob.owner() == null || mob.getTarget() != null) return null;
-        Orders.Order o = Orders.peek(mob.owner());
-        if (o == null || o.pos == null || (o.mode != Orders.Mode.HOLD && o.mode != Orders.Mode.CLEAR)) return null;
-        return o.pos;
+        Orders.Mode m = Orders.modeOf(mob);
+        if (m != Orders.Mode.HOLD && m != Orders.Mode.CLEAR) return null;
+        return Orders.posOf(mob);
     }
 
     private double leash() {
-        return Orders.mode(mob.owner()) == Orders.Mode.CLEAR ? 4.0 : 1.5;
+        return Orders.modeOf(mob) == Orders.Mode.CLEAR ? 4.0 : 1.5;
     }
 
     @Override

@@ -36,6 +36,59 @@ public final class Orders {
         public long since;
         int quiet;
         int lastLeft = -1;
+        /**
+         * Men told apart from the company's order with the baton: a spot to hold while the rest follow, or
+         * (no spot) coming along while the rest hold. A new order for the whole company calls them back in.
+         */
+        public final Map<UUID, BlockPos> apart = new java.util.HashMap<>();
+    }
+
+    /** This man's own order: the company's, unless he was told apart. */
+    public static Mode modeOf(GarrisonEntity man) {
+        Order o = peek(man.owner());
+        if (o == null) return Mode.FOLLOW;
+        if (o.apart.containsKey(man.getUUID())) return o.apart.get(man.getUUID()) != null ? Mode.HOLD : Mode.FOLLOW;
+        return o.mode;
+    }
+
+    /** Where this man holds or sweeps, if anywhere. */
+    @Nullable
+    public static BlockPos posOf(GarrisonEntity man) {
+        Order o = peek(man.owner());
+        if (o == null) return null;
+        if (o.apart.containsKey(man.getUUID())) return o.apart.get(man.getUUID());
+        return o.pos;
+    }
+
+    /**
+     * The baton on one of your own men: he's told apart from the rest, or back in with them. While the
+     * company follows you he holds where he stands; while it holds a spot he comes with you.
+     */
+    public static void toggle(ServerLevel level, Player player, GarrisonEntity man) {
+        Order o = of(player.getUUID());
+        String name = man.getDisplayName().getString();
+        if (o.apart.containsKey(man.getUUID())) {
+            o.apart.remove(man.getUUID());
+        } else {
+            boolean companyHolds = (o.mode == Mode.HOLD || o.mode == Mode.CLEAR) && o.pos != null;
+            o.apart.put(man.getUUID(), companyHolds ? null : man.blockPosition());
+            man.setTarget(null);
+            man.getNavigation().stop();
+            int with = 0, staying = 0;
+            for (GarrisonEntity g : company(level, player)) {
+                if (modeOf(g) == Mode.HOLD || modeOf(g) == Mode.CLEAR) staying++;
+                else with++;
+            }
+            say(player, name + (companyHolds ? " comes with you." : " holds here.") + " " + with + " with you, " + staying + " holding.",
+                    ChatFormatting.GOLD);
+            return;
+        }
+        int with = 0, staying = 0;
+        for (GarrisonEntity g : company(level, player)) {
+            if (modeOf(g) == Mode.HOLD || modeOf(g) == Mode.CLEAR) staying++;
+            else with++;
+        }
+        say(player, name + " rejoins the others. " + with + " with you, " + staying + " holding.", ChatFormatting.GOLD);
     }
 
     public static final int CLEAR_XZ = 14, CLEAR_Y = 7;
@@ -90,11 +143,12 @@ public final class Orders {
         if (owner == null) return true;
         Order o = ORDERS.get(owner);
         if (o != null && o.target != null && o.target.equals(e.getUUID())) return true;
-        Mode m = o == null ? Mode.FOLLOW : o.mode;
+        Mode m = modeOf(man);
+        BlockPos at = posOf(man);
         Player p = man.ownerPlayer();
         return switch (m) {
-            case CLEAR -> o.pos != null && clearArea(o.pos).contains(e.position());
-            case HOLD -> o.pos != null && e.distanceToSqr(Vec3.atCenterOf(o.pos)) < HOLD_RANGE * HOLD_RANGE;
+            case CLEAR -> at != null && clearArea(at).contains(e.position());
+            case HOLD -> at != null && e.distanceToSqr(Vec3.atCenterOf(at)) < HOLD_RANGE * HOLD_RANGE;
             case AGGRESSIVE -> p != null && e.distanceToSqr(p) < AGGRESSIVE_RANGE * AGGRESSIVE_RANGE;
             default -> p != null ? e.distanceToSqr(p) < FOLLOW_RANGE * FOLLOW_RANGE : e.distanceToSqr(man) < 100;
         };
@@ -132,6 +186,7 @@ public final class Orders {
             return 0;
         }
         Order o = of(player.getUUID());
+        o.apart.clear();
         o.mode = Mode.CLEAR;
         o.pos = pos;
         o.target = null;
@@ -151,6 +206,7 @@ public final class Orders {
             return 0;
         }
         Order o = of(player.getUUID());
+        o.apart.clear();
         o.mode = Mode.HOLD;
         o.pos = pos;
         o.target = null;
@@ -164,6 +220,7 @@ public final class Orders {
     public static int fallIn(ServerLevel level, Player player) {
         List<GarrisonEntity> men = company(level, player);
         Order o = of(player.getUUID());
+        o.apart.clear();
         o.mode = Mode.FOLLOW;
         o.pos = null;
         o.target = null;

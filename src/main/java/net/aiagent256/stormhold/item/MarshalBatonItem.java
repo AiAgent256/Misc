@@ -27,7 +27,8 @@ import java.util.List;
 
 /**
  * Command the men around you. Point at something and use it:
- * a creature or enemy soldier, and every man goes for it; a block, and they clear the building around it
+ * one of your own men, and he's told apart from the rest (holds where he stands while they follow you,
+ * or comes with you while they hold) or back in with them; a creature or enemy soldier, and every man goes for it; a block, and they clear the building around it
  * (sneak: they hold that spot); the open air, and they switch between following and attacking anything
  * hostile near you (sneak: fall in).
  */
@@ -52,9 +53,11 @@ public class MarshalBatonItem extends Item {
         Vec3 reach = block.getType() == HitResult.Type.MISS ? end : block.getLocation();
         AABB sweep = player.getBoundingBox().expandTowards(reach.subtract(eye)).inflate(1.0);
         EntityHitResult hit = ProjectileUtil.getEntityHitResult(player, eye, reach, sweep,
-                e -> e instanceof LivingEntity le && le.isAlive() && e != player && !mine(e, player) && !e.isSpectator(),
+                e -> e instanceof LivingEntity le && le.isAlive() && e != player && !e.isSpectator(),
                 eye.distanceToSqr(reach));
-        if (hit != null && hit.getEntity() instanceof LivingEntity target) {
+        if (hit != null && hit.getEntity() instanceof GarrisonEntity man && mine(man, player)) {
+            Orders.toggle(sl, sp, man);                    // one of yours: told apart from the rest, or back with them
+        } else if (hit != null && hit.getEntity() instanceof LivingEntity target) {
             Orders.attack(sl, sp, target);
         } else if (block.getType() == HitResult.Type.BLOCK) {
             BlockPos at = block.getBlockPos().relative(block.getDirection());
@@ -77,5 +80,6 @@ public class MarshalBatonItem extends Item {
         tip.add(Component.translatable("item.stormhold.marshal_baton.tip1"));
         tip.add(Component.translatable("item.stormhold.marshal_baton.tip2"));
         tip.add(Component.translatable("item.stormhold.marshal_baton.tip3"));
+        tip.add(Component.translatable("item.stormhold.marshal_baton.tip4"));
     }
 }

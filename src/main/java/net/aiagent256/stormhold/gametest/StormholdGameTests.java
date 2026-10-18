@@ -334,6 +334,111 @@ public class StormholdGameTests {
     }
 
     @GameTest(template = "arena")
+    public static void illagerWarbandMustersClimbsAndSacks(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        // a yard and a curtain wall high over the arena (the arenas lie underground, the warband reads the heightmap)
+        var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
+        var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+        BlockPos a = g.absolutePos(BlockPos.ZERO);
+        BlockPos o = new BlockPos(a.getX(), 300, a.getZ());
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                level.setBlock(o.offset(x, 1, z), stone, 3);
+                for (int y = 2; y < 12; y++) level.setBlock(o.offset(x, y, z), x == 4 && z >= 2 && z <= 13 && y <= 8 ? stone : air, 3);
+            }
+        }
+        Holding h = sample(g);
+        h.box = new net.minecraft.world.level.levelgen.structure.BoundingBox(o.getX(), o.getY(), o.getZ(), o.getX() + 15, o.getY() + 15, o.getZ() + 15);
+        h.owner = Sides.player(UUID.randomUUID());
+        h.tier = 3;
+        // the muster: a captain, a ravager for the gate, more than a dozen men for a great castle
+        var band = net.aiagent256.stormhold.holding.Warbands.muster(level, h);
+        int n = band.values().stream().mapToInt(Integer::intValue).sum();
+        if (band.getOrDefault("captain", 0) != 1 || band.getOrDefault("minecraft:ravager", 0) < 1 || n < 14)
+            throw new IllegalStateException("a great castle's warband is " + band);
+        // the wall: found from the field side, and a ladder up its face
+        var face = net.aiagent256.stormhold.holding.Warbands.wallFace(level, h, new net.minecraft.world.phys.Vec3(o.getX() + 1.5, o.getY() + 2, o.getZ() + 8.5));
+        if (face == null || face.foot().getX() != o.getX() + 3 || face.in() != net.minecraft.core.Direction.EAST)
+            throw new IllegalStateException("the wall face is " + face);
+        int rungs = net.aiagent256.stormhold.holding.Warbands.raise(level, face);
+        if (rungs < 6 || !level.getBlockState(face.foot().above(3)).is(net.minecraft.world.level.block.Blocks.LADDER))
+            throw new IllegalStateException("a ladder of " + rungs + " rungs");
+        // a man of the warband: the captain with the banner, and his death comes off the count
+        var c = new net.aiagent256.stormhold.holding.Campaign();
+        c.kind = net.aiagent256.stormhold.holding.Campaign.Kind.ILLAGERS;
+        c.side = net.aiagent256.stormhold.holding.Warbands.SIDE;
+        c.target = h.id;
+        c.band.put("captain", 1);
+        c.band.put("minecraft:vindicator", 2);
+        mgr.campaigns.add(c);
+        try {
+            var cap = net.aiagent256.stormhold.holding.Warbands.spawn(level, c, "captain", o.offset(9, 2, 6));
+            if (!(cap instanceof net.minecraft.world.entity.raid.Raider r) || !r.isPatrolLeader()
+                    || !r.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.HEAD).is(net.minecraft.world.item.Items.WHITE_BANNER))
+                throw new IllegalStateException("the captain is " + cap);
+            if (c.total() != 3) throw new IllegalStateException("the band counts " + c.total());
+            cap.kill();
+            if (c.total() != 2 || c.bandLive.containsKey(cap.getUUID())) throw new IllegalStateException("the captain's death left " + c.total());
+        } finally {
+            mgr.campaigns.remove(c);
+        }
+        // the sack: a quarter of the stores and a third of the garrison
+        var em = new net.minecraft.resources.ResourceLocation("minecraft", "emerald");
+        h.addStock(em, 100 - h.stock(em));
+        int knights = h.count(Role.KNIGHT);
+        if (knights < 1) throw new IllegalStateException("no knights to lose");
+        var c2 = new net.aiagent256.stormhold.holding.Campaign();
+        c2.kind = net.aiagent256.stormhold.holding.Campaign.Kind.ILLAGERS;
+        net.aiagent256.stormhold.holding.Warbands.sack(level, mgr, h, c2);
+        if (h.stock(em) != 75 || h.count(Role.KNIGHT) != knights - (int) Math.ceil(knights / 3.0))
+            throw new IllegalStateException("the sack left " + h.stock(em) + " emeralds and " + h.count(Role.KNIGHT) + " of " + knights + " knights");
+        g.succeed();
+    }
+
+    @GameTest(template = "arena")
+    public static void batonSplitsTheCompany(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        player.moveTo(g.absolutePos(new BlockPos(3, 2, 3)).getCenter());
+        UUID me = player.getUUID();
+        List<Entity> spawned = new ArrayList<>();
+        try {
+            GarrisonEntity a = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(5, 2, 5)), Sides.player(me), false);
+            GarrisonEntity b = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(7, 2, 5)), Sides.player(me), false);
+            if (a == null || b == null) throw new IllegalStateException("no men");
+            spawned.add(a);
+            spawned.add(b);
+            a.setOwner(me);
+            b.setOwner(me);
+            net.aiagent256.stormhold.holding.Orders.toggle(level, player, a);
+            if (net.aiagent256.stormhold.holding.Orders.modeOf(a) != net.aiagent256.stormhold.holding.Orders.Mode.HOLD
+                    || net.aiagent256.stormhold.holding.Orders.modeOf(b) != net.aiagent256.stormhold.holding.Orders.Mode.FOLLOW
+                    || !a.blockPosition().equals(net.aiagent256.stormhold.holding.Orders.posOf(a)))
+                throw new IllegalStateException("told apart, he " + net.aiagent256.stormhold.holding.Orders.modeOf(a));
+            net.aiagent256.stormhold.holding.Orders.toggle(level, player, a);
+            if (net.aiagent256.stormhold.holding.Orders.modeOf(a) != net.aiagent256.stormhold.holding.Orders.Mode.FOLLOW)
+                throw new IllegalStateException("back in, he " + net.aiagent256.stormhold.holding.Orders.modeOf(a));
+            // the company holds the cave mouth; one comes along
+            net.aiagent256.stormhold.holding.Orders.hold(level, player, g.absolutePos(new BlockPos(8, 2, 8)));
+            net.aiagent256.stormhold.holding.Orders.toggle(level, player, b);
+            if (net.aiagent256.stormhold.holding.Orders.modeOf(a) != net.aiagent256.stormhold.holding.Orders.Mode.HOLD
+                    || net.aiagent256.stormhold.holding.Orders.modeOf(b) != net.aiagent256.stormhold.holding.Orders.Mode.FOLLOW)
+                throw new IllegalStateException("holding with one along: " + net.aiagent256.stormhold.holding.Orders.modeOf(a) + ", "
+                        + net.aiagent256.stormhold.holding.Orders.modeOf(b));
+            net.aiagent256.stormhold.holding.Orders.fallIn(level, player);
+            if (net.aiagent256.stormhold.holding.Orders.modeOf(a) != net.aiagent256.stormhold.holding.Orders.Mode.FOLLOW
+                    || net.aiagent256.stormhold.holding.Orders.modeOf(b) != net.aiagent256.stormhold.holding.Orders.Mode.FOLLOW)
+                throw new IllegalStateException("fall in left someone apart");
+        } finally {
+            for (Entity e : spawned) e.discard();
+            net.aiagent256.stormhold.holding.Orders.forget(me);
+        }
+        g.succeed();
+    }
+
+    @GameTest(template = "arena")
     public static void shopsFoldAndRegularsPayLess(GameTestHelper g) {
         ServerLevel level = g.getLevel();
         String[][] folded = {{"baker", "provisioner"}, {"butcher", "provisioner"}, {"fish", "provisioner"}, {"cloth", "general"},
@@ -371,14 +476,17 @@ public class StormholdGameTests {
             if (arm == null) throw new IllegalStateException("no armourer");
             spawned.add(arm);
             net.aiagent256.stormhold.holding.Shops.applyDiscount(arm, 25);
-            int price = -1;
+            int price = -1, list = -1;
             for (var o : arm.getOffers()) {
                 if (o.getResult().is(net.minecraft.world.item.Items.DIAMOND_CHESTPLATE)) {
                     price = o.getCostA().getCount();                // the plain one comes first; the frontier's follow
+                    list = o.getBaseCostA().getCount();
                     break;
                 }
             }
-            if (price != 16) throw new IllegalStateException("a 21-emerald chestplate at 25% off costs " + price);
+            if (list != (int) Math.round(21 * net.aiagent256.stormhold.holding.Shops.PRICE))
+                throw new IllegalStateException("the diamond chestplate lists at " + list);
+            if (price != list - list / 4) throw new IllegalStateException("a " + list + "-emerald chestplate at 25% off costs " + price);
             // and every shop buys something dear
             boolean diamonds = false;
             for (var o : arm.getOffers()) if (o.getBaseCostA().is(net.minecraft.world.item.Items.DIAMOND) && o.getResult().is(net.minecraft.world.item.Items.EMERALD)) diamonds = true;

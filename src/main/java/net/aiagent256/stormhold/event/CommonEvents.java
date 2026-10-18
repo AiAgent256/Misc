@@ -80,8 +80,19 @@ public final class CommonEvents {
     /** Every hostile mob, bosses too, is made as hard as the frontier zone it joins the world in. */
     @SubscribeEvent
     public static void joined(net.minecraftforge.event.entity.EntityJoinLevelEvent e) {
-        if (e.getLevel() instanceof ServerLevel level && e.getEntity() instanceof net.minecraft.world.entity.Mob mob)
-            net.aiagent256.stormhold.holding.Frontier.onJoin(level, mob);
+        if (!(e.getLevel() instanceof ServerLevel level) || !(e.getEntity() instanceof net.minecraft.world.entity.Mob mob)) return;
+        if (net.aiagent256.stormhold.holding.Warbands.stray(level, mob)) {
+            e.setCanceled(true);                        // a warband man saved with the world: his warband brings him up itself
+            return;
+        }
+        net.aiagent256.stormhold.holding.Frontier.onJoin(level, mob);
+    }
+
+    /** A warband man sent up a ladder climbs it. */
+    @SubscribeEvent
+    public static void livingTick(net.minecraftforge.event.entity.living.LivingEvent.LivingTickEvent e) {
+        if (e.getEntity() instanceof net.minecraft.world.entity.raid.Raider r && !r.level().isClientSide)
+            net.aiagent256.stormhold.holding.Warbands.climb(r);
     }
 
     @SubscribeEvent
@@ -110,6 +121,8 @@ public final class CommonEvents {
     @SubscribeEvent
     public static void death(LivingDeathEvent e) {
         if (e.getEntity() instanceof GarrisonEntity g && !g.level().isClientSide) HoldingEvents.onDeath(g);
+        if (e.getEntity().level() instanceof ServerLevel wl && e.getEntity().getPersistentData().hasUUID(net.aiagent256.stormhold.holding.Warbands.TAG))
+            net.aiagent256.stormhold.holding.Warbands.onDeath(wl, e.getEntity());
         if (e.getEntity().level() instanceof ServerLevel dl && net.aiagent256.stormhold.holding.Dragons.isDragon(e.getEntity()))
             net.aiagent256.stormhold.holding.Dragons.onDeath(dl, e.getEntity(), e.getSource().getEntity());
         if (e.getEntity() instanceof net.minecraft.world.entity.npc.Villager v && v.level() instanceof ServerLevel level) {
