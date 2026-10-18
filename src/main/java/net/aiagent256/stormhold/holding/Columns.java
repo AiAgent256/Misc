@@ -49,7 +49,7 @@ public final class Columns {
         c.origin = h.id;
         c.player = player.getUUID();
         c.tier = h.tier;
-        c.renown = h.renown;
+        c.renown = Frontier.level(level, h);
         c.from = Campaigns.gateOutside(h);
         c.to = player.blockPosition();
         for (var e : want.entrySet()) {

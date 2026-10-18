@@ -149,6 +149,67 @@ public class StormholdGameTests {
     }
 
     @GameTest(template = "arena")
+    public static void frontierZonesKitAndStock(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        int[][] want = {{0, 1}, {2499, 1}, {2500, 2}, {10000, 5}, {17500, 8}, {19999, 8}, {20000, 9}, {1000000, 9}};
+        for (int[] w : want) {
+            int z = net.aiagent256.stormhold.holding.Frontier.zoneAt(w[0]);
+            if (z != w[1]) throw new IllegalStateException(w[0] + " blocks out is zone " + z + ", not " + w[1]);
+        }
+        double d = net.aiagent256.stormhold.holding.Frontier.distance(level, 3000, 4000, BlockPos.ZERO);
+        if (Math.abs(d - 5000) > 0.01) throw new IllegalStateException("3000, 4000 is " + d + " blocks out");
+
+        // knights: diamond at 5, netherite from 7, netherite Protection IV at the world's edge
+        HoldingManager mgr = HoldingManager.get(level);
+        BlockPos p = g.absolutePos(new BlockPos(4, 2, 4));
+        GarrisonEntity k = Garrisons.spawn(level, mgr, null, Role.KNIGHT, p, Sides.house("testhouse"), true);
+        if (k == null) throw new IllegalStateException("no knight");
+        try {
+            int[][] kit = {{5, 0, 4}, {7, 1, 2}, {8, 1, 3}, {9, 1, 4}};
+            for (int[] c : kit) {
+                net.aiagent256.stormhold.entity.Loadouts.equip(k, Role.KNIGHT, 3, c[0], net.minecraft.world.item.DyeColor.RED, null);
+                var chest = k.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST);
+                boolean nether = chest.is(net.minecraft.world.item.Items.NETHERITE_CHESTPLATE);
+                int prot = net.minecraft.world.item.enchantment.EnchantmentHelper.getItemEnchantmentLevel(
+                        net.minecraft.world.item.enchantment.Enchantments.ALL_DAMAGE_PROTECTION, chest);
+                if (nether != (c[1] == 1) || prot != c[2])
+                    throw new IllegalStateException("a level " + c[0] + " knight wears " + chest + " at Protection " + prot);
+            }
+        } finally {
+            k.discard();
+        }
+
+        // wild mobs: three times the health and eight more armour at the edge, once however often it's asked
+        var zombie = net.minecraft.world.entity.EntityType.ZOMBIE.create(level);
+        if (zombie == null) throw new IllegalStateException("no zombie");
+        double base = zombie.getMaxHealth(), armour = zombie.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ARMOR);
+        net.aiagent256.stormhold.holding.Frontier.scale(zombie, 9);
+        net.aiagent256.stormhold.holding.Frontier.scale(zombie, 9);
+        if (Math.abs(zombie.getMaxHealth() - base * 3) > 0.01 || zombie.getHealth() < zombie.getMaxHealth() - 0.01)
+            throw new IllegalStateException("an edge zombie has " + zombie.getHealth() + "/" + zombie.getMaxHealth() + " health from " + base);
+        if (zombie.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ARMOR) < armour + 8)
+            throw new IllegalStateException("an edge zombie has armour " + zombie.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ARMOR));
+        var creeper = net.minecraft.world.entity.EntityType.CREEPER.create(level);
+        if (creeper == null) throw new IllegalStateException("no creeper");
+        net.aiagent256.stormhold.holding.Frontier.scale(creeper, 9);
+        var ct = new net.minecraft.nbt.CompoundTag();
+        creeper.addAdditionalSaveData(ct);
+        if (ct.getByte("ExplosionRadius") <= 3) throw new IllegalStateException("an edge creeper blows " + ct.getByte("ExplosionRadius"));
+        zombie.discard();
+        creeper.discard();
+
+        // markets: the armoury sells netherite plate only out on the frontier
+        var armoury = net.aiagent256.stormhold.holding.Shops.type("armoury");
+        boolean home = false, edge = false;
+        for (var o : net.aiagent256.stormhold.holding.Shops.offers(armoury, 1))
+            if (o.getResult().is(net.minecraft.world.item.Items.NETHERITE_CHESTPLATE)) home = true;
+        for (var o : net.aiagent256.stormhold.holding.Shops.offers(armoury, 9))
+            if (o.getResult().is(net.minecraft.world.item.Items.NETHERITE_CHESTPLATE)) edge = true;
+        if (home || !edge) throw new IllegalStateException("netherite plate in the heartland " + home + ", at the edge " + edge);
+        g.succeed();
+    }
+
+    @GameTest(template = "arena")
     public static void castleMarketGoesUp(GameTestHelper g) {
         ServerLevel level = g.getLevel();
         var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();

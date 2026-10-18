@@ -19,6 +19,7 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.alchemy.Potion;
 import net.minecraft.world.item.alchemy.PotionUtils;
 import net.minecraft.world.item.alchemy.Potions;
+import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.ChunkPos;
@@ -89,6 +90,85 @@ public final class Shops {
 
     private static ItemStack potion(Item kind, Potion p) {
         return PotionUtils.setPotion(new ItemStack(kind), p);
+    }
+
+    /** A dear thing: emeralds and emerald blocks. */
+    private static MerchantOffer dear(ItemStack result, int emeralds, int blocks) {
+        int uses = blocks >= 4 ? 2 : 3;
+        return new MerchantOffer(new ItemStack(Items.EMERALD, emeralds), blocks > 0 ? new ItemStack(Items.EMERALD_BLOCK, blocks) : ItemStack.EMPTY,
+                result, uses, 5, 0.05F);
+    }
+
+    /** An item with enchantments: pairs of enchantment and level. */
+    private static ItemStack ench(Item item, Object... pairs) {
+        ItemStack s = new ItemStack(item);
+        for (int i = 0; i + 1 < pairs.length; i += 2) s.enchant((net.minecraft.world.item.enchantment.Enchantment) pairs[i], (Integer) pairs[i + 1]);
+        return s;
+    }
+
+    private static ItemStack book(net.minecraft.world.item.enchantment.Enchantment e, int lvl) {
+        return net.minecraft.world.item.EnchantedBookItem.createForEnchantment(new net.minecraft.world.item.enchantment.EnchantmentInstance(e, lvl));
+    }
+
+    record Extra(int zone, MerchantOffer offer) {
+    }
+
+    private static Map<String, List<Extra>> frontier;
+
+    /** What a shop adds the farther out it stands: the frontier's markets carry the frontier's goods. */
+    private static Map<String, List<Extra>> frontierStock() {
+        if (frontier != null) return frontier;
+        var P = Enchantments.ALL_DAMAGE_PROTECTION;
+        var U = Enchantments.UNBREAKING;
+        var S = Enchantments.SHARPNESS;
+        Map<String, List<Extra>> m = new LinkedHashMap<>();
+        m.put("armoury", List.of(
+                new Extra(4, sell(ench(Items.DIAMOND_HELMET, P, 2), 14)), new Extra(4, dear(ench(Items.DIAMOND_CHESTPLATE, P, 2), 28, 0)),
+                new Extra(4, dear(ench(Items.DIAMOND_LEGGINGS, P, 2), 24, 0)), new Extra(4, sell(ench(Items.DIAMOND_BOOTS, P, 2), 12)),
+                new Extra(6, dear(new ItemStack(Items.NETHERITE_HELMET), 32, 2)), new Extra(6, dear(new ItemStack(Items.NETHERITE_CHESTPLATE), 48, 4)),
+                new Extra(6, dear(new ItemStack(Items.NETHERITE_LEGGINGS), 40, 3)), new Extra(6, dear(new ItemStack(Items.NETHERITE_BOOTS), 32, 2)),
+                new Extra(8, dear(ench(Items.NETHERITE_HELMET, P, 4, U, 3), 64, 4)), new Extra(8, dear(ench(Items.NETHERITE_CHESTPLATE, P, 4, U, 3), 64, 8)),
+                new Extra(8, dear(ench(Items.NETHERITE_LEGGINGS, P, 4, U, 3), 64, 6)), new Extra(8, dear(ench(Items.NETHERITE_BOOTS, P, 4, U, 3), 64, 4))));
+        m.put("weapons", List.of(
+                new Extra(4, dear(ench(Items.DIAMOND_SWORD, S, 3), 16, 0)), new Extra(4, dear(ench(Items.DIAMOND_AXE, S, 3), 16, 0)),
+                new Extra(6, dear(new ItemStack(Items.NETHERITE_SWORD), 40, 2)), new Extra(6, dear(new ItemStack(Items.NETHERITE_AXE), 40, 2)),
+                new Extra(8, dear(ench(Items.NETHERITE_SWORD, S, 5, U, 3, Enchantments.FIRE_ASPECT, 2), 64, 4)),
+                new Extra(8, dear(ench(Items.BOW, Enchantments.POWER_ARROWS, 5, U, 3), 24, 0)),
+                new Extra(8, dear(ench(Items.CROSSBOW, Enchantments.QUICK_CHARGE, 3, Enchantments.MULTISHOT, 1), 24, 0))));
+        m.put("smith", List.of(
+                new Extra(5, dear(ench(Items.DIAMOND_PICKAXE, Enchantments.BLOCK_EFFICIENCY, 4), 24, 0)),
+                new Extra(6, dear(new ItemStack(Items.NETHERITE_INGOT), 32, 2)),
+                new Extra(6, sell(new ItemStack(Items.NETHERITE_UPGRADE_SMITHING_TEMPLATE), 24)),
+                new Extra(8, dear(ench(Items.NETHERITE_PICKAXE, Enchantments.BLOCK_EFFICIENCY, 5, Enchantments.BLOCK_FORTUNE, 3, U, 3), 64, 4))));
+        m.put("fletcher", List.of(
+                new Extra(5, dear(ench(Items.BOW, Enchantments.POWER_ARROWS, 4), 12, 0)),
+                new Extra(6, sell(potion(Items.TIPPED_ARROW, Potions.STRONG_HARMING).copyWithCount(8), 6)),
+                new Extra(8, dear(ench(Items.BOW, Enchantments.POWER_ARROWS, 5, Enchantments.INFINITY_ARROWS, 1, U, 3), 32, 0))));
+        m.put("apothecary", List.of(
+                new Extra(4, sell(potion(Items.POTION, Potions.STRONG_STRENGTH), 6)), new Extra(4, sell(potion(Items.SPLASH_POTION, Potions.STRONG_HEALING), 6)),
+                new Extra(4, sell(potion(Items.POTION, Potions.STRONG_REGENERATION), 8)), new Extra(6, sell(Items.GOLDEN_APPLE, 1, 4)),
+                new Extra(8, dear(new ItemStack(Items.TOTEM_OF_UNDYING), 48, 4)), new Extra(9, dear(new ItemStack(Items.ENCHANTED_GOLDEN_APPLE), 64, 8))));
+        m.put("general", List.of(
+                new Extra(4, sell(Items.ENDER_PEARL, 4, 4)), new Extra(5, sell(Items.EXPERIENCE_BOTTLE, 8, 6)),
+                new Extra(7, dear(new ItemStack(Items.SHULKER_SHELL), 24, 0))));
+        m.put("chandler", List.of(
+                new Extra(5, dear(book(P, 4), 24, 0)), new Extra(5, sell(book(U, 3), 16)),
+                new Extra(6, dear(book(Enchantments.BLOCK_EFFICIENCY, 5), 24, 0)), new Extra(7, dear(book(S, 5), 32, 0)),
+                new Extra(8, dear(book(Enchantments.MENDING, 1), 48, 2))));
+        m.put("quartermaster", List.of(
+                new Extra(4, sell(Items.GOLDEN_CARROT, 8, 4)), new Extra(6, sell(Items.GOLDEN_APPLE, 1, 4)),
+                new Extra(8, dear(new ItemStack(Items.TOTEM_OF_UNDYING), 48, 4))));
+        m.put("tanner", List.of(new Extra(6, sell(Items.DIAMOND_HORSE_ARMOR, 1, 12))));
+        m.put("farmer", List.of(new Extra(4, sell(Items.GOLDEN_CARROT, 8, 4))));
+        frontier = m;
+        return m;
+    }
+
+    /** A keeper's stock in a zone: the trade's own, and what the frontier adds out there. */
+    public static MerchantOffers offers(Type t, int zone) {
+        MerchantOffers o = t.offers();
+        for (Extra f : frontierStock().getOrDefault(t.id(), List.of())) if (zone >= f.zone()) o.add(new MerchantOffer(f.offer().createTag()));
+        return o;
     }
 
     private static Map<String, Type> build() {
@@ -242,7 +322,7 @@ public final class Shops {
                     if (v.distanceToSqr(post.getX() + 0.5, post.getY(), post.getZ() + 0.5) > 1.0) {
                         v.teleportTo(post.getX() + 0.5, post.getY(), post.getZ() + 0.5);
                     }
-                    if (newDay) restock(v);
+                    if (newDay) restock(level, v, e.getKey(), post);
                     continue;
                 }
                 if (h.shopkeepers.containsKey(post) && !newDay) continue;      // killed: his stall stands empty till morning
@@ -353,7 +433,7 @@ public final class Shops {
         v.setVillagerXp(250);
         CompoundTag tag = new CompoundTag();
         v.addAdditionalSaveData(tag);
-        tag.put("Offers", t.offers().createTag());
+        tag.put("Offers", offers(t, Frontier.zone(level, post)).createTag());
         v.readAdditionalSaveData(tag);
         v.setNoAi(true);
         v.setPersistenceRequired();
@@ -372,6 +452,18 @@ public final class Shops {
     /** Every offer back in stock. */
     public static void restock(Villager v) {
         for (MerchantOffer o : v.getOffers()) o.resetUses();
+    }
+
+    /** A new morning: the keeper's stock laid out fresh, as his trade and his zone keep it. */
+    public static void restock(ServerLevel level, Villager v, String kind, BlockPos post) {
+        Type t = type(kind);
+        if (t == null) {
+            restock(v);
+            return;
+        }
+        MerchantOffers fresh = offers(t, Frontier.zone(level, post));
+        v.getOffers().clear();
+        v.getOffers().addAll(fresh);
     }
 
     /** Which way a keeper faces: toward his counter (a trapdoor or a fence beside him), else the open side. */

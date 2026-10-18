@@ -178,7 +178,7 @@ public final class Garrisons {
         House house = mgr.houseOf(side);
         DyeColor color = mgr.colorOf(side);
         int tier = h != null ? h.tier : 2;
-        int renown = h != null ? h.renown : 2;
+        int renown = Frontier.level(level, h);              // renown, or the frontier zone if higher
         e.setup(side, h != null ? h.id : null, tier, renown, color, p, hold);
         e.moveTo(p.getX() + 0.5, p.getY(), p.getZ() + 0.5, level.random.nextFloat() * 360F, 0);
         e.finalizeSpawn(level, level.getCurrentDifficultyAt(p), MobSpawnType.EVENT, null, null);

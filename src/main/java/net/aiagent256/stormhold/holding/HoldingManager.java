@@ -44,6 +44,9 @@ public class HoldingManager extends SavedData {
     public final List<Events.Matter> matters = new ArrayList<>();
     public final List<Dragons.Sighting> dragons = new ArrayList<>();
     public long lastDawn = -1, lastPolitics, lastMend;
+    /** The frontier's centre, kept in the overworld's record: zones count out from here (see Frontier). */
+    public boolean frontierSet;
+    public int frontierX, frontierZ;
 
     public static HoldingManager get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(HoldingManager::load, HoldingManager::new, NAME);
@@ -158,11 +161,20 @@ public class HoldingManager extends SavedData {
         tag.putLong("LastDawn", lastDawn);
         tag.putLong("LastPolitics", lastPolitics);
         tag.putLong("LastMend", lastMend);
+        if (frontierSet) {
+            tag.putInt("FrontierX", frontierX);
+            tag.putInt("FrontierZ", frontierZ);
+        }
         return tag;
     }
 
     public static HoldingManager load(CompoundTag tag) {
         HoldingManager m = new HoldingManager();
+        if (tag.contains("FrontierX")) {
+            m.frontierSet = true;
+            m.frontierX = tag.getInt("FrontierX");
+            m.frontierZ = tag.getInt("FrontierZ");
+        }
         ListTag hl = tag.getList("Holdings", Tag.TAG_COMPOUND);
         for (int i = 0; i < hl.size(); i++) {
             Holding h = Holding.load(hl.getCompound(i));

@@ -71,6 +71,9 @@ public final class StormholdCommand {
                     else for (var line : net.aiagent256.stormhold.holding.Guide.lines(p.serverLevel(), mgr, h, p)) p.sendSystemMessage(line);
                     return 1;
                 }))
+                .then(Commands.literal("frontier").executes(StormholdCommand::frontier)
+                        .then(Commands.literal("here").requires(s -> s.hasPermission(2) || !frontierSet(s))
+                                .executes(StormholdCommand::frontierHere)))
                 .then(Commands.literal("befriend").requires(s -> s.hasPermission(2)).executes(StormholdCommand::befriend))
                 .then(Commands.literal("capture").requires(s -> s.hasPermission(2)).executes(StormholdCommand::capture))
                 .then(Commands.literal("raid").requires(s -> s.hasPermission(2)).executes(StormholdCommand::raid))
@@ -255,5 +258,40 @@ public final class StormholdCommand {
     }
 
     private StormholdCommand() {
+    }
+
+    private static boolean frontierSet(net.minecraft.commands.CommandSourceStack s) {
+        return HoldingManager.get(s.getServer().overworld()).frontierSet;
+    }
+
+    /** Where the frontier counts from, how far out you are and what zone you're in. */
+    private static int frontier(com.mojang.brigadier.context.CommandContext<net.minecraft.commands.CommandSourceStack> c) {
+        var src = c.getSource();
+        BlockPos centre = net.aiagent256.stormhold.holding.Frontier.centre(src.getServer());
+        boolean set = frontierSet(src);
+        net.minecraft.server.level.ServerLevel level = src.getLevel();
+        var at = src.getPosition();
+        double d = net.aiagent256.stormhold.holding.Frontier.distance(level, at.x, at.z);
+        int z = net.aiagent256.stormhold.holding.Frontier.zone(level, at.x, at.z);
+        int band = net.aiagent256.stormhold.Config.FRONTIER_BAND.get();
+        String next = z >= net.aiagent256.stormhold.holding.Frontier.MAX ? "This is the last zone."
+                : "Zone " + (z + 1) + " starts " + (int) Math.max(0, z * band - d) + " blocks farther out.";
+        src.sendSuccess(() -> Component.literal("Frontier centre: " + centre.getX() + ", " + centre.getZ()
+                + (set ? "" : " (world spawn; /stormhold frontier here to move it, once)") + ".\n"
+                + "You are " + (int) d + " blocks out, in " + net.aiagent256.stormhold.holding.Frontier.name(z) + ", zone " + z + " of "
+                + net.aiagent256.stormhold.holding.Frontier.MAX + ". " + next), false);
+        return 1;
+    }
+
+    /** Count the zones out from where you stand. Free the first time; after that it takes an operator. */
+    private static int frontierHere(com.mojang.brigadier.context.CommandContext<net.minecraft.commands.CommandSourceStack> c) {
+        var src = c.getSource();
+        var at = src.getPosition();
+        net.aiagent256.stormhold.holding.Frontier.setCentre(src.getServer(), src.getLevel(), at.x, at.z);
+        BlockPos centre = net.aiagent256.stormhold.holding.Frontier.centre(src.getServer());
+        src.sendSuccess(() -> Component.literal("The frontier now counts out from " + centre.getX() + ", " + centre.getZ()
+                + ". Every " + net.aiagent256.stormhold.Config.FRONTIER_BAND.get() + " blocks out is a zone harder, to zone 9 at "
+                + 8 * net.aiagent256.stormhold.Config.FRONTIER_BAND.get() + ".").withStyle(net.minecraft.ChatFormatting.GOLD), false);
+        return 1;
     }
 }

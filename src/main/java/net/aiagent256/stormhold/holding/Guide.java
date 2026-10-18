@@ -55,6 +55,13 @@ public final class Guide {
             out.add(Component.literal("  " + owner + " holds you " + word + " (" + st + "). ").withStyle(ChatFormatting.GRAY)
                     .append(Component.literal(means).withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC)));
         }
+        if (Frontier.enabled()) {
+            int z = Frontier.zone(level, h.center()), lvl = Frontier.level(level, h);
+            String kit = lvl >= 9 ? "netherite, Protection IV" : lvl >= 7 ? "netherite" : lvl >= 4 ? "diamond" : lvl >= 2 ? "iron" : "chain";
+            out.add(Component.literal("  " + Frontier.name(z).substring(0, 1).toUpperCase() + Frontier.name(z).substring(1)
+                    + ", zone " + z + " of " + Frontier.MAX + ": its knights wear " + kit
+                    + (z >= 4 ? ", and its markets carry the frontier's goods" : "") + ".").withStyle(ChatFormatting.GRAY));
+        }
         if (!h.gatePos.equals(BlockPos.ZERO)) out.add(line("Gate", from, h.gatePos, ""));
         if (!h.isCity() && !h.isTown() && !h.rallyPos.equals(BlockPos.ZERO)) out.add(line("Yard", from, h.rallyPos, "Where the garrison musters"));
         if (!h.lordPos.equals(BlockPos.ZERO) && h.lordAlive) {

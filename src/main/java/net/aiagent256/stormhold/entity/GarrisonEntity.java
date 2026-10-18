@@ -166,7 +166,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         this.side = side;
         this.holdingId = holdingId;
         this.tier = tier;
-        this.renown = Math.max(1, Math.min(5, renown));
+        this.renown = Math.max(1, Math.min(9, renown));
         this.color = color;
         this.post = post;
         this.holdPosition = hold;
@@ -749,7 +749,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         if (tag.hasUUID("Holding")) holdingId = tag.getUUID("Holding");
         if (tag.contains("Post")) post = NbtUtils.readBlockPos(tag.getCompound("Post"));
         tier = Math.max(1, tag.getInt("Tier"));
-        if (tag.contains("Renown")) renown = Math.max(1, Math.min(5, tag.getInt("Renown")));
+        if (tag.contains("Renown")) renown = Math.max(1, Math.min(9, tag.getInt("Renown")));
         color = DyeColor.byId(tag.getInt("Color"));
         if (tag.hasUUID("Owner")) setOwner(tag.getUUID("Owner"));
         baseName = tag.getString("BaseName");

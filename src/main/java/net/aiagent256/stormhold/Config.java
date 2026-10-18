@@ -30,6 +30,9 @@ public final class Config {
     public static final ForgeConfigSpec.BooleanValue FIEFS_ENABLED;
     public static final ForgeConfigSpec.BooleanValue COMPANY_RECRUITS;
     public static final ForgeConfigSpec.BooleanValue EPIC_KNIGHTS_GEAR;
+    public static final ForgeConfigSpec.BooleanValue FRONTIER_ENABLED;
+    public static final ForgeConfigSpec.IntValue FRONTIER_BAND;
+    public static final ForgeConfigSpec.BooleanValue FRONTIER_MOBS;
 
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -88,6 +91,15 @@ public final class Config {
         RAID_MAX_DAYS = b.defineInRange("maxDays", 5, 1, 100);
         ABSTRACT_RAIDS = b.comment("If true, raids on castles you are far from are fought out abstractly. If false they wait until you are near.")
                 .define("resolveWhileAway", true);
+        b.pop();
+        b.push("frontier");
+        FRONTIER_ENABLED = b.comment("The farther from the frontier's centre (world spawn until /stormhold frontier here sets it), the harder",
+                        "the world: knights' gear, castles' markets and wild mobs climb a zone at a time, 1 to 9.")
+                .define("enabled", true);
+        FRONTIER_BAND = b.comment("Blocks per zone. Zone 9, netherite Protection IV on every knight, starts at 8 bands out.")
+                .defineInRange("blocksPerZone", 2500, 250, 20000);
+        FRONTIER_MOBS = b.comment("Hostile mobs, bosses too, get more health, damage and armour, and better gear, by zone.")
+                .define("mobs", true);
         b.pop();
         b.push("roads");
         ROADS_ENABLED = b.comment("Paint a road from each castle to the nearest village as chunks load.").define("enabled", true);

@@ -65,7 +65,15 @@ public final class CommonEvents {
     public static void playerTick(net.minecraftforge.event.TickEvent.PlayerTickEvent e) {
         if (e.phase == net.minecraftforge.event.TickEvent.Phase.END && e.player instanceof ServerPlayer sp && sp.tickCount % 10 == 0) {
             LAST_POS.put(sp.getUUID(), sp.blockPosition());
+            if (sp.tickCount % 40 == 0) net.aiagent256.stormhold.holding.Frontier.watch(sp);
         }
+    }
+
+    /** Every hostile mob, bosses too, is made as hard as the frontier zone it joins the world in. */
+    @SubscribeEvent
+    public static void joined(net.minecraftforge.event.entity.EntityJoinLevelEvent e) {
+        if (e.getLevel() instanceof ServerLevel level && e.getEntity() instanceof net.minecraft.world.entity.Mob mob)
+            net.aiagent256.stormhold.holding.Frontier.onJoin(level, mob);
     }
 
     @SubscribeEvent

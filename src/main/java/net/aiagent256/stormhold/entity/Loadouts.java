@@ -78,44 +78,67 @@ public final class Loadouts {
     }
 
     /**
-     * Renown decides the metal and the magic. 1: chain and leather. 2: iron. 3: iron with Protection I,
-     * diamond captains. 4: diamond, Protection II, Sharpness I-II. 5: diamond Protection IV, Sharpness III,
-     * Unbreaking, netherite lords. Archers and crossbowmen keep light armour but their bows climb too.
+     * The level (a castle's renown, or its frontier zone if higher; 1 to 9) decides the metal and the magic.
+     * 1: chain and leather. 2: iron. 3: iron with Protection I, diamond captains. 4: diamond, Protection II,
+     * Sharpness I-II. 5: diamond Protection IV, Sharpness III, Unbreaking, netherite lords. 6: diamond swords
+     * at Sharpness IV, netherite captains. 7: netherite knights, Protection II. 8: Protection III,
+     * Sharpness V. 9, the world's edge: netherite Protection IV on every knight, Fire Aspect, Thorns.
+     * Archers and crossbowmen keep light armour but their bows climb too. Epic Knights has no netherite
+     * plate, so netherite men wear the vanilla kind.
      */
     public static void equip(GarrisonEntity e, Role role, int tier, int renown, DyeColor color, @Nullable House house) {
         RandomSource r = e.getRandom();
         DyeColor c = house != null ? house.base : color;
-        int rn = Math.max(1, Math.min(5, renown));
+        int rn = Math.max(1, Math.min(9, renown));
         for (EquipmentSlot s : EquipmentSlot.values()) e.setItemSlot(s, ItemStack.EMPTY);
         switch (role) {
             case LORD -> {
-                boolean nether = rn >= 5 || (rn == 4 && r.nextBoolean());
-                set(e, pick("grand_bascinet", nether ? Items.NETHERITE_HELMET : Items.DIAMOND_HELMET),
-                        pick("gothic_chestplate", nether ? Items.NETHERITE_CHESTPLATE : Items.DIAMOND_CHESTPLATE),
-                        pick("gothic_leggings", nether ? Items.NETHERITE_LEGGINGS : Items.DIAMOND_LEGGINGS),
-                        pick("gothic_boots", nether ? Items.NETHERITE_BOOTS : Items.DIAMOND_BOOTS));
-                protect(e, Math.max(1, rn - 1), rn >= 4);
-                ItemStack sword = weapon(nether ? "netherite" : "diamond", "flamebladedsword", nether ? Items.NETHERITE_SWORD : Items.DIAMOND_SWORD);
+                if (rn >= 6) {
+                    netherite(e);
+                    protect(e, 4, true);
+                } else {
+                    boolean nether = rn >= 5 || (rn == 4 && r.nextBoolean());
+                    set(e, pick("grand_bascinet", nether ? Items.NETHERITE_HELMET : Items.DIAMOND_HELMET),
+                            pick("gothic_chestplate", nether ? Items.NETHERITE_CHESTPLATE : Items.DIAMOND_CHESTPLATE),
+                            pick("gothic_leggings", nether ? Items.NETHERITE_LEGGINGS : Items.DIAMOND_LEGGINGS),
+                            pick("gothic_boots", nether ? Items.NETHERITE_BOOTS : Items.DIAMOND_BOOTS));
+                    protect(e, Math.max(1, rn - 1), rn >= 4);
+                }
+                boolean netherSword = rn >= 4;
+                ItemStack sword = weapon(netherSword && rn >= 5 ? "netherite" : "diamond", "flamebladedsword",
+                        netherSword && rn >= 5 ? Items.NETHERITE_SWORD : Items.DIAMOND_SWORD);
                 sword.enchant(Enchantments.SHARPNESS, Math.min(5, Math.max(1, rn)));
-                if (rn >= 4) sword.enchant(Enchantments.FIRE_ASPECT, 1);
+                if (rn >= 4) sword.enchant(Enchantments.FIRE_ASPECT, rn >= 7 ? 2 : 1);
                 if (rn >= 5) sword.enchant(Enchantments.UNBREAKING, 3);
                 e.setItemSlot(EquipmentSlot.MAINHAND, sword);
                 e.setItemSlot(EquipmentSlot.OFFHAND, shield(c, house));
             }
             case CAPTAIN -> {
-                boolean diamond = rn >= 3;
-                set(e, pick("maximilian_helmet", diamond ? Items.DIAMOND_HELMET : Items.IRON_HELMET),
-                        pick("maximilian_chestplate", diamond ? Items.DIAMOND_CHESTPLATE : Items.IRON_CHESTPLATE),
-                        pick("maximilian_leggings", diamond ? Items.DIAMOND_LEGGINGS : Items.IRON_LEGGINGS),
-                        pick("maximilian_boots", diamond ? Items.DIAMOND_BOOTS : Items.IRON_BOOTS));
-                if (rn >= 3) protect(e, rn - 2, rn >= 5);
-                ItemStack sword = weapon(diamond ? "diamond" : "iron", "bastardsword", diamond ? Items.DIAMOND_SWORD : Items.IRON_SWORD);
-                if (rn >= 2) sword.enchant(Enchantments.SHARPNESS, Math.min(4, rn - 1));
+                if (rn >= 6) {
+                    netherite(e);
+                    protect(e, rn >= 7 ? 4 : 3, true);
+                } else {
+                    boolean diamond = rn >= 3;
+                    set(e, pick("maximilian_helmet", diamond ? Items.DIAMOND_HELMET : Items.IRON_HELMET),
+                            pick("maximilian_chestplate", diamond ? Items.DIAMOND_CHESTPLATE : Items.IRON_CHESTPLATE),
+                            pick("maximilian_leggings", diamond ? Items.DIAMOND_LEGGINGS : Items.IRON_LEGGINGS),
+                            pick("maximilian_boots", diamond ? Items.DIAMOND_BOOTS : Items.IRON_BOOTS));
+                    if (rn >= 3) protect(e, rn - 2, rn >= 5);
+                }
+                String metal = rn >= 6 ? "netherite" : rn >= 3 ? "diamond" : "iron";
+                ItemStack sword = weapon(metal, "bastardsword",
+                        rn >= 6 ? Items.NETHERITE_SWORD : rn >= 3 ? Items.DIAMOND_SWORD : Items.IRON_SWORD);
+                if (rn >= 2) sword.enchant(Enchantments.SHARPNESS, Math.min(5, rn - 1));
+                if (rn >= 7) sword.enchant(Enchantments.FIRE_ASPECT, 1);
                 e.setItemSlot(EquipmentSlot.MAINHAND, sword);
                 e.setItemSlot(EquipmentSlot.OFFHAND, shield(c, house));
             }
             case KNIGHT -> {
-                if (rn <= 1) {
+                if (rn >= 7) {
+                    netherite(e);
+                    protect(e, rn - 5, true);                                 // II, III, IV at the edge
+                    if (rn >= 9) e.getItemBySlot(EquipmentSlot.CHEST).enchant(Enchantments.THORNS, 2);
+                } else if (rn <= 1) {
                     set(e, pick("kettlehat", Items.CHAINMAIL_HELMET), pick("chainmail_chestplate", Items.CHAINMAIL_CHESTPLATE),
                             pick("chainmail_leggings", Items.CHAINMAIL_LEGGINGS), pick("chainmail_boots", Items.CHAINMAIL_BOOTS));
                 } else {
@@ -126,34 +149,36 @@ public final class Loadouts {
                             pick("knight_leggings", diamond ? Items.DIAMOND_LEGGINGS : Items.IRON_LEGGINGS),
                             pick("knight_boots", diamond ? Items.DIAMOND_BOOTS : Items.IRON_BOOTS));
                 }
-                if (rn >= 3) protect(e, rn == 3 ? 1 : rn == 4 ? 2 : 4, rn >= 5);
-                boolean dsword = rn >= 4 || (rn == 3 && r.nextFloat() < 0.3F);
-                ItemStack sword = weapon(dsword ? "diamond" : "iron", KNIGHT_ARMS[r.nextInt(KNIGHT_ARMS.length)],
-                        dsword ? Items.DIAMOND_SWORD : Items.IRON_SWORD);
-                if (rn >= 3) sword.enchant(Enchantments.SHARPNESS, rn == 3 ? 1 : rn == 4 ? 1 + r.nextInt(2) : 3);
-                if (rn >= 5) sword.enchant(Enchantments.UNBREAKING, 2);
+                if (rn >= 3 && rn <= 6) protect(e, rn == 3 ? 1 : rn == 4 ? 2 : 4, rn >= 5);
+                String metal = rn >= 7 ? "netherite" : rn >= 4 || (rn == 3 && r.nextFloat() < 0.3F) ? "diamond" : "iron";
+                ItemStack sword = weapon(metal, KNIGHT_ARMS[r.nextInt(KNIGHT_ARMS.length)],
+                        metal.equals("netherite") ? Items.NETHERITE_SWORD : metal.equals("diamond") ? Items.DIAMOND_SWORD : Items.IRON_SWORD);
+                if (rn >= 3) sword.enchant(Enchantments.SHARPNESS, rn == 3 ? 1 : rn == 4 ? 1 + r.nextInt(2) : rn == 5 ? 3 : rn <= 7 ? 4 : 5);
+                if (rn >= 5) sword.enchant(Enchantments.UNBREAKING, rn >= 7 ? 3 : 2);
+                if (rn >= 9) sword.enchant(Enchantments.FIRE_ASPECT, 2);
                 e.setItemSlot(EquipmentSlot.MAINHAND, sword);
                 e.setItemSlot(EquipmentSlot.OFFHAND, shield(c, house));
             }
             case ARCHER -> {
                 set(e, dyed(pick("coif", Items.LEATHER_HELMET), c), dyed(pick("gambeson_chestplate", Items.LEATHER_CHESTPLATE), c),
                         dyed(new ItemStack(Items.LEATHER_LEGGINGS), c), dyed(new ItemStack(Items.LEATHER_BOOTS), c));
-                if (rn >= 4) protect(e, rn - 3, false);
+                if (rn >= 4) protect(e, rn - 3, rn >= 7);
                 ItemStack bow = pick("longbow", Items.BOW);
                 if (!(bow.getItem() instanceof BowItem)) bow = new ItemStack(Items.BOW);
                 if (rn >= 2) bow.enchant(Enchantments.POWER_ARROWS, Math.min(5, rn - 1));
-                if (rn >= 4) bow.enchant(Enchantments.PUNCH_ARROWS, 1);
+                if (rn >= 4) bow.enchant(Enchantments.PUNCH_ARROWS, rn >= 8 ? 2 : 1);
                 if (rn >= 5) bow.enchant(Enchantments.FLAMING_ARROWS, 1);
                 e.setItemSlot(EquipmentSlot.MAINHAND, bow);
             }
             case CROSSBOWMAN -> {
-                set(e, pick("kettlehat", Items.IRON_HELMET), pick("brigandine_chestplate", rn >= 4 ? Items.IRON_CHESTPLATE : Items.CHAINMAIL_CHESTPLATE),
+                Item chest = rn >= 8 ? Items.NETHERITE_CHESTPLATE : rn >= 6 ? Items.DIAMOND_CHESTPLATE : rn >= 4 ? Items.IRON_CHESTPLATE : Items.CHAINMAIL_CHESTPLATE;
+                set(e, pick("kettlehat", Items.IRON_HELMET), rn >= 6 ? new ItemStack(chest) : pick("brigandine_chestplate", chest),
                         pick("chainmail_leggings", Items.CHAINMAIL_LEGGINGS), dyed(new ItemStack(Items.LEATHER_BOOTS), c));
-                if (rn >= 4) protect(e, rn - 3, false);
+                if (rn >= 4) protect(e, rn - 3, rn >= 7);
                 ItemStack xbow = pick("heavy_crossbow", Items.CROSSBOW);
                 if (!(xbow.getItem() instanceof CrossbowItem)) xbow = new ItemStack(Items.CROSSBOW);
                 if (rn >= 3) xbow.enchant(Enchantments.QUICK_CHARGE, Math.min(3, rn - 2));
-                if (rn >= 4) xbow.enchant(Enchantments.PIERCING, rn - 3);
+                if (rn >= 4) xbow.enchant(Enchantments.PIERCING, Math.min(4, rn - 3));
                 e.setItemSlot(EquipmentSlot.MAINHAND, xbow);
             }
             case COURIER -> {
@@ -162,6 +187,12 @@ public final class Loadouts {
                 e.setItemSlot(EquipmentSlot.OFFHAND, new ItemStack(Items.BUNDLE));
             }
         }
+    }
+
+    /** Full netherite plate: the frontier's own, which Epic Knights doesn't make. */
+    private static void netherite(GarrisonEntity e) {
+        set(e, new ItemStack(Items.NETHERITE_HELMET), new ItemStack(Items.NETHERITE_CHESTPLATE),
+                new ItemStack(Items.NETHERITE_LEGGINGS), new ItemStack(Items.NETHERITE_BOOTS));
     }
 
     /** Protection on every worn piece, plus Unbreaking when asked. */

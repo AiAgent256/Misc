@@ -97,7 +97,7 @@ public final class Company {
      * bread in his pouch from the realm's stores if there is any.
      */
     public static void enlist(ServerLevel level, HoldingManager mgr, GarrisonEntity e, Player player, @org.jetbrains.annotations.Nullable Holding from) {
-        e.setup(Sides.player(player.getUUID()), null, from != null ? from.tier : e.tier(), from != null ? from.renown : e.renown(),
+        e.setup(Sides.player(player.getUUID()), null, from != null ? from.tier : e.tier(), from != null ? Frontier.level(level, from) : e.renown(),
                 e.color(), null, false);
         e.setOwner(player.getUUID());
         e.setPost(null);
