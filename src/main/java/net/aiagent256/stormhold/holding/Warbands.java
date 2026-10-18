@@ -160,6 +160,7 @@ public final class Warbands {
         c.from = new BlockPos(center.getX() + (int) (Math.cos(ang) * reach), center.getY(), center.getZ() + (int) (Math.sin(ang) * reach));
         c.to = Campaigns.gateOutside(h);
         mgr.campaigns.add(c);
+        Vassals.help(level, mgr, h);
         HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("An illager warband of " + c.total() + " marches on " + h.name
                 + " from the " + Guide.way(center, c.from).replaceAll("^\\d+ blocks ", "") + "!").withStyle(ChatFormatting.RED));
         Chronicle.log(level, mgr, Chronicle.WAR, "Illagers march on " + h.name + ", " + c.total() + " strong.", h.ownerPlayer());
@@ -549,6 +550,7 @@ public final class Warbands {
                 + (taken.isEmpty() ? "nothing worth having" : String.join(", ", taken)) + ", and a third of the garrison is lost.")
                 .withStyle(ChatFormatting.DARK_RED));
         Chronicle.log(level, mgr, Chronicle.WAR, "Illagers sack " + h.name + ".", h.ownerPlayer());
+        Vassals.slight(level, mgr, h, 25, "illagers sacked " + h.name + " and nobody came");
         c.stage = Campaign.Stage.DONE;
         mgr.setDirty();
     }

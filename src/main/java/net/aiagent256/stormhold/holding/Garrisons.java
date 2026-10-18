@@ -85,7 +85,7 @@ public final class Garrisons {
             }
         }
         int budget = 6;
-        if (h.isHouseOwned() && h.lordAlive && liveCount(h.live, Role.LORD) == 0 && level.isLoaded(h.lordPos)) {
+        if ((h.isHouseOwned() || Vassals.is(h)) && h.lordAlive && liveCount(h.live, Role.LORD) == 0 && level.isLoaded(h.lordPos)) {
             spawn(level, mgr, h, Role.LORD, h.lordPos, h.owner, true);
             budget--;
         }

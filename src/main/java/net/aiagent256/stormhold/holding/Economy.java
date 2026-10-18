@@ -68,6 +68,7 @@ public final class Economy {
             Fief.census(level, mgr, h, now);
             Labour.daily(level, mgr, h);
             Growth.daily(level, mgr, h, now);
+            Vassals.daily(level, mgr, h);
             h.nextProduce = now + 24000;
             if (h.supplyTarget != null) ship(level, mgr, h);
             mgr.setDirty();
@@ -77,6 +78,17 @@ public final class Economy {
         if (now >= h.nextReplenish) {
             h.nextReplenish = now + (h.mode == Holding.Mode.DEFEND ? 1200 : 2400);
             java.util.UUID owner = h.ownerPlayer();
+            if (Vassals.is(h)) {
+                // the vassal keeps his own garrison up, out of his own purse
+                for (Role r : new Role[]{Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN, Role.CAPTAIN}) {
+                    if (h.count(r) < h.capacity(r)) {
+                        h.add(r, 1);
+                        mgr.setDirty();
+                        break;
+                    }
+                }
+                return;
+            }
             for (Role r : new Role[]{Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN, Role.CAPTAIN}) {
                 if (h.count(r) < h.capacity(r) && Stores.realmStock(mgr, h, owner, BREAD) >= 4 && Stores.realmStock(mgr, h, owner, IRON) >= 2) {
                     Stores.take(mgr, h, owner, BREAD, 4);

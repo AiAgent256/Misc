@@ -61,6 +61,7 @@ public final class Rewards {
         };
         int n = base + Math.max(1, h.renown) + Math.min(8, h.fiefPop / 3) + 2 * (Frontier.zone(level, h.center()) - 1);
         if (h.mode == Holding.Mode.PRODUCE) n += n / 4;
+        if (Vassals.is(h)) n = (int) Math.round(n * Vassals.share(h));
         return n;
     }
 
@@ -77,7 +78,7 @@ public final class Rewards {
             }
             int r = rent(level, h);
             total += r;
-            parts.add(h.name + " " + r);
+            parts.add(h.name + " " + r + (Vassals.is(h) ? " (vassal)" : ""));
         }
         if (total <= 0 && besieged.isEmpty()) return null;
         int inPack = pay(level, mgr, player, total, mine.get(0));

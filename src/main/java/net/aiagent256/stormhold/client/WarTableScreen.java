@@ -79,6 +79,24 @@ public class WarTableScreen extends Screen {
                 .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Take up to 64 emeralds from the realm's stores into your pack. "
                         + "Spoils, the steward's sales and rents paid while you're away collect there.")))
                 .bounds(x0 + 6, y0 + H - 50, 112, 20).build());
+        if (h != null) {
+            boolean vassal = h.status().contains("Vassal: ");
+            int gift = net.aiagent256.stormhold.holding.Vassals.GIFT;
+            this.addRenderableWidget(Button.builder(Component.literal(vassal ? "Gift vassal (" + gift + ")" : "Grant to vassal"),
+                    b -> Net.sendAction(h.id(), Net.VASSAL, BlockPos.ZERO, 0))
+                    .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(vassal
+                            ? "A purse of " + gift + " emeralds for the lord who holds " + h.name() + " for you, from your pack and then the stores: "
+                            + "loyalty +" + net.aiagent256.stormhold.holding.Vassals.GIFT_LOYALTY + ". Loyal vassals send more rent and ride to your aid."
+                            : "Raise one of " + h.name() + "'s knights to hold it in your name. He sits in the hall and fights for it, keeps the garrison "
+                            + "up from his own purse, rides with his knights to your other places when they're attacked (within "
+                            + net.aiagent256.stormhold.holding.Vassals.HELP_RANGE + " blocks), and sends you 30% to 80% of its rents by his loyalty. "
+                            + "Loyalty grows in peace and with gifts, falls when his place is sacked; at nothing he breaks faith.")))
+                    .bounds(x0 + 6, y0 + H - 98, 112, 20).build());
+            if (vassal) this.addRenderableWidget(Button.builder(Component.literal("Revoke grant"), b -> Net.sendAction(h.id(), Net.REVOKE, BlockPos.ZERO, 0))
+                    .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Take " + h.name() + " back into your own hands. "
+                            + "He returns to the ranks as a knight.")))
+                    .bounds(x0 + 6, y0 + H - 74, 112, 20).build());
+        }
         if (h == null) return;
         int rx = x0 + 128;
         int y = y0 + 128;

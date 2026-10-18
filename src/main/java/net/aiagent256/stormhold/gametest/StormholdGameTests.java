@@ -338,6 +338,57 @@ public class StormholdGameTests {
     }
 
     @GameTest(template = "arena")
+    public static void vassalsHoldPayHelpAndRevolt(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        UUID me = player.getUUID();
+        Holding h = sample(g);
+        h.owner = Sides.player(me);
+        h.lordAlive = false;
+        h.mode = Holding.Mode.DEFEND;
+        h.add(Role.KNIGHT, 6);
+        Holding other = sample(g);
+        other.id = UUID.randomUUID();
+        other.key = h.key + "/other";
+        other.owner = h.owner;
+        other.name = "Otherhold";
+        mgr.holdings.put(h.id, h);
+        mgr.holdings.put(other.id, other);
+        try {
+            int rentBefore = net.aiagent256.stormhold.holding.Rewards.rent(level, h);
+            int knights = h.count(Role.KNIGHT);
+            if (!net.aiagent256.stormhold.holding.Vassals.grant(level, mgr, h, player)) throw new IllegalStateException("no grant");
+            if (!net.aiagent256.stormhold.holding.Vassals.is(h) || !h.lordAlive || h.count(Role.KNIGHT) != knights - 1 || h.loyalty != 70)
+                throw new IllegalStateException("the grant: " + h.vassal + " alive " + h.lordAlive + " knights " + h.count(Role.KNIGHT) + " loyalty " + h.loyalty);
+            int rentAfter = net.aiagent256.stormhold.holding.Rewards.rent(level, h);
+            if (rentAfter != (int) Math.round(rentBefore * net.aiagent256.stormhold.holding.Vassals.share(h)) || rentAfter >= rentBefore)
+                throw new IllegalStateException("rents " + rentBefore + " then " + rentAfter);
+            // a gift: from the pack first
+            player.getInventory().add(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.EMERALD, 40));
+            net.aiagent256.stormhold.holding.Vassals.gift(level, mgr, h, player);
+            if (h.loyalty != 70 + net.aiagent256.stormhold.holding.Vassals.GIFT_LOYALTY
+                    || player.getInventory().countItem(net.minecraft.world.item.Items.EMERALD) != 40 - net.aiagent256.stormhold.holding.Vassals.GIFT)
+                throw new IllegalStateException("the gift: loyalty " + h.loyalty);
+            // his knights ride to the lord's other place when it's attacked
+            int there = other.count(Role.KNIGHT), here = h.count(Role.KNIGHT);
+            net.aiagent256.stormhold.holding.Vassals.help(level, mgr, other);
+            int sent = Math.min(2 + h.tier, here - 2);
+            if (other.count(Role.KNIGHT) != there + sent || h.count(Role.KNIGHT) != here - sent)
+                throw new IllegalStateException("help: " + other.count(Role.KNIGHT) + " from " + there + ", sent " + sent);
+            // pushed too far, he breaks faith
+            net.aiagent256.stormhold.holding.Vassals.slight(level, mgr, h, 200, "a test");
+            if (net.aiagent256.stormhold.holding.Vassals.is(h) || !h.isHouseOwned() || !h.lordAlive || !h.houseId.startsWith("rebel_"))
+                throw new IllegalStateException("no revolt: owner " + h.owner + " vassal " + h.vassal);
+        } finally {
+            mgr.holdings.remove(h.id);
+            mgr.holdings.remove(other.id);
+            mgr.houses.keySet().removeIf(k -> k.startsWith("rebel_"));
+        }
+        g.succeed();
+    }
+
+    @GameTest(template = "arena")
     public static void spoilsRentsAndPurses(GameTestHelper g) {
         ServerLevel level = g.getLevel();
         HoldingManager mgr = HoldingManager.get(level);

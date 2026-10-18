@@ -90,6 +90,7 @@ public final class Campaigns {
         HoldingEvents.tell(level, h.ownerPlayer(), Component.literal(mgr.house(h.houseId).title() + " marches on "
                 + h.name + " with " + c.total() + " men!").withStyle(ChatFormatting.RED));
         alliedHelp(level, mgr, h);
+        Vassals.help(level, mgr, h);
         mgr.setDirty();
         return c;
     }
@@ -298,6 +299,7 @@ public final class Campaigns {
         }
         if (c.total() <= 0) {
             int spoils = Rewards.raidSpoils(c, true);
+            Vassals.favour(level, mgr, h, 10, "you fought for " + h.name);
             boolean pack = Rewards.pay(level, mgr, h.ownerPlayer(), spoils, h) > 0;
             HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The raid on " + h.name + " is broken! The spoils of the field: "
                     + spoils + " emeralds" + (pack ? "." : ", to its stores.")).withStyle(ChatFormatting.GREEN));

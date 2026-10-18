@@ -114,8 +114,10 @@ public final class Chronicle {
                 }
             }
         }
-        // the stewards' tallies
+        // the stewards' tallies, and vassals growing restless
         for (Holding h : mine) {
+            Component w = Vassals.warning(h);
+            if (w != null) out.add(w);
             Component s = Steward.report(h);
             if (s != null) out.add(s);
         }

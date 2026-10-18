@@ -31,13 +31,13 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 public final class Net {
-    private static final String VERSION = "3";
+    private static final String VERSION = "4";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(Stormhold.id("main"),
             () -> VERSION, VERSION::equals, VERSION::equals);
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
             MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19,
-            SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23, TREASURY = 24;
+            SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23, TREASURY = 24, VASSAL = 25, REVOKE = 26;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -113,6 +113,8 @@ public final class Net {
                 } else if (h.fortify > 0) {
                     status.append("Fortified, stage ").append(h.fortify).append(". ");
                 }
+                if (net.aiagent256.stormhold.holding.Vassals.is(h)) status.append("Vassal: ").append(h.lordName).append(", loyalty ")
+                        .append(h.loyalty).append(", sends ").append(Math.round(net.aiagent256.stormhold.holding.Vassals.share(h) * 100)).append("% of rents. ");
                 if (h.reinforceKeep > 0) status.append("Supply line: keeps ").append(h.reinforceKeep).append(" men with you. ");
                 if (h.nextRaid > 0) {
                     long days = Math.max(0, (h.nextRaid - level.getGameTime()) / 24000);
@@ -241,6 +243,11 @@ public final class Net {
                 case REPAIR -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.REPAIR, player);
                 case FORTIFY -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.FORTIFY, player);
                 case SCOUT -> net.aiagent256.stormhold.holding.Scouts.send(level, mgr, h, player, a.pos());
+                case VASSAL -> {
+                    if (net.aiagent256.stormhold.holding.Vassals.is(h)) net.aiagent256.stormhold.holding.Vassals.gift(level, mgr, h, player);
+                    else net.aiagent256.stormhold.holding.Vassals.grant(level, mgr, h, player);
+                }
+                case REVOKE -> net.aiagent256.stormhold.holding.Vassals.revoke(level, mgr, h, player);
                 case TREASURY -> {
                     var em = new net.minecraft.resources.ResourceLocation("minecraft", "emerald");
                     int have = net.aiagent256.stormhold.holding.Stores.realmStock(mgr, h, player.getUUID(), em);

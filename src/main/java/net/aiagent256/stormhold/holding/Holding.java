@@ -176,6 +176,9 @@ public class Holding {
     public int spoilsTaken;
     /** Scouts' maps waiting to go up in the hall. */
     public final List<net.minecraft.world.item.ItemStack> pendingMaps = new ArrayList<>();
+    /** The vassal lord who holds it in the owner's name (his first name), and his loyalty, 0 to 100. */
+    @Nullable public String vassal;
+    public int loyalty;
     /** The places the builder has laid a road to from here. */
     public final java.util.Set<UUID> roadsTo = new java.util.LinkedHashSet<>();
 
@@ -260,7 +263,7 @@ public class Holding {
     public double strength() {
         double s = 0;
         for (Role r : Role.TROOPS) s += count(r) * r.strength() * (1.0 + 0.15 * (renown - 1));
-        if (lordAlive && isHouseOwned()) s += Role.LORD.strength();
+        if (lordAlive && (isHouseOwned() || Vassals.is(this))) s += Role.LORD.strength();
         return s;
     }
 
@@ -432,6 +435,8 @@ public class Holding {
         for (UUID r : roadsTo) roadTags.add(NbtUtils.createUUID(r));
         t.put("RoadsTo", roadTags);
         t.putString("Steward", stewardName);
+        if (vassal != null) t.putString("Vassal", vassal);
+        t.putInt("Loyalty", loyalty);
         ListTag mapTags = new ListTag();
         for (var m : pendingMaps) mapTags.add(m.save(new CompoundTag()));
         t.put("PendingMaps", mapTags);
@@ -565,6 +570,8 @@ public class Holding {
         h.workDone = t.getInt("WorkDone");
         for (var r : t.getList("RoadsTo", 11)) h.roadsTo.add(NbtUtils.loadUUID(r));
         h.stewardName = t.getString("Steward");
+        h.vassal = t.contains("Vassal") ? t.getString("Vassal") : null;
+        h.loyalty = t.getInt("Loyalty");
         for (var m : t.getList("PendingMaps", 10)) h.pendingMaps.add(net.minecraft.world.item.ItemStack.of((CompoundTag) m));
         h.builderName = t.getString("BuilderName");
         if (t.hasUUID("Builder")) h.builder = t.getUUID("Builder");

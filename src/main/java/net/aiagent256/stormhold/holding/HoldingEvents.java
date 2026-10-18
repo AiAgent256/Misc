@@ -102,7 +102,9 @@ public final class HoldingEvents {
                     Standing.change(level, mgr, h.houseId, killer.getUUID(),
                             role == Role.LORD ? Standing.TOOK_CASTLE / 2 : Standing.KILLED_GUARD, "you killed their " + role.name().toLowerCase());
                 }
-                if (role == Role.LORD) {
+                if (role == Role.LORD && Vassals.is(h)) {
+                    Vassals.fallen(level, mgr, h);
+                } else if (role == Role.LORD) {
                     h.lordAlive = false;
                     level.getServer().getPlayerList().broadcastSystemMessage(gold(h.lordName + " has fallen at " + h.name
                             + ". Raise a War Banner on the keep's banner stand to claim it."), false);
@@ -315,6 +317,7 @@ public final class HoldingEvents {
         Garrisons.discardLive(level, h.live, true);
         h.usedPosts.clear();
         clearContest(h);
+        h.vassal = null;
         h.owner = newSide;
         h.contestSide = null;
         h.claimant = null;
