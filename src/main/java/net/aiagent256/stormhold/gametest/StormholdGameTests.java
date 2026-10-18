@@ -338,6 +338,70 @@ public class StormholdGameTests {
     }
 
     @GameTest(template = "arena")
+    public static void ruinsCrumbleAndAreRestored(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        // a tower of stone bricks, glass and a door, through the ruin processor without placing it
+        var proc = new net.aiagent256.stormhold.worldgen.RuinProcessor(12345L, 101, 24);
+        var settings = new net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings();
+        List<net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo> in = new ArrayList<>();
+        var bricks = net.minecraft.world.level.block.Blocks.STONE_BRICKS.defaultBlockState();
+        var glass = net.minecraft.world.level.block.Blocks.GLASS_PANE.defaultBlockState();
+        var door = net.minecraft.world.level.block.Blocks.OAK_DOOR.defaultBlockState();
+        for (int x = 0; x < 24; x++)
+            for (int z = 0; z < 24; z++) {
+                in.add(new net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo(new BlockPos(x, 100, z), bricks, null));
+                boolean wall = x == 0 || z == 0 || x == 23 || z == 23;
+                if (!wall) continue;
+                for (int y = 101; y <= 124; y++)
+                    in.add(new net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo(new BlockPos(x, y, z),
+                            y % 5 == 0 && x % 4 == 2 ? glass : x == 12 && z == 0 && y < 103 ? door : bricks, null));
+            }
+        List<net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo> out = new ArrayList<>();
+        for (var b : in) {
+            var r = proc.processBlock(level, BlockPos.ZERO, BlockPos.ZERO, b, b, settings);
+            if (r != null) out.add(r);
+        }
+        out = proc.finalizeProcessing(level, BlockPos.ZERO, BlockPos.ZERO, in, out, settings);
+        int walls = 0, high = 0, moss = 0, vines = 0, plants = 0;
+        for (var b : out) {
+            var st = b.state();
+            if (st.is(net.minecraft.world.level.block.Blocks.GLASS_PANE) || st.is(net.minecraft.tags.BlockTags.DOORS))
+                throw new IllegalStateException("a ruin with " + st + " in it");
+            if (st.is(net.minecraft.world.level.block.Blocks.VINE)) vines++;
+            else if (st.is(net.minecraft.world.level.block.Blocks.GRASS) || st.is(net.minecraft.world.level.block.Blocks.FERN)
+                    || st.is(net.minecraft.world.level.block.Blocks.MOSS_CARPET) || st.is(net.minecraft.world.level.block.Blocks.DANDELION)
+                    || st.is(net.minecraft.world.level.block.Blocks.OXEYE_DAISY)) plants++;
+            else if (b.pos().getY() > 100) {
+                walls++;
+                if (b.pos().getY() > 118) high++;
+                if (st.is(net.minecraft.world.level.block.Blocks.MOSSY_STONE_BRICKS)) moss++;
+            }
+        }
+        int whole = 0;
+        for (var b : in) if (b.pos().getY() > 100) whole++;
+        if (walls >= whole * 0.8 || walls < whole * 0.15 || high >= walls / 4 || moss == 0 || vines == 0 || plants == 0)
+            throw new IllegalStateException("the ruin: " + walls + " of " + whole + " wall blocks stand, " + high + " high, " + moss + " mossy, "
+                    + vines + " vines, " + plants + " plants");
+        // a holding found in ruins: brigands on the ground, nobody on the walls; restored, a full castle
+        Holding h = sample(g);
+        var lay = DataRegistries.layout("watchtower_a");
+        BlockPos o = g.absolutePos(BlockPos.ZERO);
+        net.aiagent256.stormhold.holding.Detector.applyLayout(h, lay, o);
+        h.layout = lay.name;
+        net.aiagent256.stormhold.holding.Ruins.found(h, lay);
+        if (!h.ruined || !h.owner.equals(Sides.OUTLAWS) || h.lordAlive || h.capacity(Role.ARCHER) != 0
+                || !h.posts.getOrDefault(Role.ARCHER, List.of()).isEmpty() || h.count(Role.KNIGHT) < 2)
+            throw new IllegalStateException("found: owner " + h.owner + " archers " + h.capacity(Role.ARCHER) + " knights " + h.count(Role.KNIGHT));
+        if (!h.kindName().startsWith("Ruined")) throw new IllegalStateException("called " + h.kindName());
+        HoldingManager mgr = HoldingManager.get(level);
+        h.owner = Sides.player(UUID.randomUUID());
+        net.aiagent256.stormhold.holding.Ruins.restore(level, mgr, h);
+        if (h.ruined || h.posts.getOrDefault(Role.ARCHER, List.of()).isEmpty() || h.capacity(Role.ARCHER) == 0 || h.surroundingsDone)
+            throw new IllegalStateException("restored: archer posts " + h.posts.getOrDefault(Role.ARCHER, List.of()).size());
+        g.succeed();
+    }
+
+    @GameTest(template = "arena")
     public static void vassalsHoldPayHelpAndRevolt(GameTestHelper g) {
         ServerLevel level = g.getLevel();
         HoldingManager mgr = HoldingManager.get(level);

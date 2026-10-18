@@ -37,7 +37,8 @@ public class CastleStructure extends Structure {
             Variant.CODEC.listOf().fieldOf("layouts").forGetter(s -> s.variants),
             Codec.STRING.optionalFieldOf("theme", "north").forGetter(s -> s.theme),
             Codec.INT.optionalFieldOf("max_slope", 14).forGetter(s -> s.maxSlope),
-            Codec.BOOL.optionalFieldOf("nether", false).forGetter(s -> s.nether)
+            Codec.BOOL.optionalFieldOf("nether", false).forGetter(s -> s.nether),
+            Codec.BOOL.optionalFieldOf("ruined", false).forGetter(s -> s.ruined)
     ).apply(i, CastleStructure::new));
 
     /** Game tests run in a flat world where terrain scoring is meaningless. */
@@ -49,21 +50,32 @@ public class CastleStructure extends Structure {
     private final int maxSlope;
     /** Sited on the floor of the Nether (under its roof, above the lava) instead of on the world surface. */
     private final boolean nether;
+    /** Left to the weather: placed through the ruin processor, and held by brigands until someone restores it. */
+    private final boolean ruined;
 
     public CastleStructure(StructureSettings settings, List<Variant> variants, String theme, int maxSlope) {
-        this(settings, variants, theme, maxSlope, false);
+        this(settings, variants, theme, maxSlope, false, false);
     }
 
     public CastleStructure(StructureSettings settings, List<Variant> variants, String theme, int maxSlope, boolean nether) {
+        this(settings, variants, theme, maxSlope, nether, false);
+    }
+
+    public CastleStructure(StructureSettings settings, List<Variant> variants, String theme, int maxSlope, boolean nether, boolean ruined) {
         super(settings);
         this.variants = variants;
         this.theme = theme;
         this.maxSlope = maxSlope;
         this.nether = nether;
+        this.ruined = ruined;
     }
 
     public boolean nether() {
         return nether;
+    }
+
+    public boolean ruined() {
+        return ruined;
     }
 
     public String theme() {
@@ -274,7 +286,7 @@ public class CastleStructure extends Structure {
         int nx = (v.sizeX() + 31) / 32, nz = (v.sizeZ() + 31) / 32;
         for (int tx = 0; tx < nx; tx++) {
             for (int tz = 0; tz < nz; tz++) {
-                builder.addPiece(new CastleTilePiece(mgr, v.name(), theme, tx, tz, origin, v.ground()));
+                builder.addPiece(new CastleTilePiece(mgr, v.name(), theme, tx, tz, origin, v.ground(), ruined));
             }
         }
     }

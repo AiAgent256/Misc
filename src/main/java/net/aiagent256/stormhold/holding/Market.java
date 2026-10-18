@@ -59,7 +59,7 @@ public final class Market {
 
     /** Whether a place gets a yard market: Stormhold's own great castles. */
     public static boolean wants(Holding h) {
-        return h.layout != null && h.layout.startsWith("great_castle") && !h.isTown() && !h.isCity();
+        return h.layout != null && h.layout.startsWith("great_castle") && !h.isTown() && !h.isCity() && !h.ruined;
     }
 
     /** Put the market up once, when the castle's chunks are all loaded. */

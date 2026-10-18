@@ -212,6 +212,7 @@ public final class Builder {
 
     public static void tick(ServerLevel level, HoldingManager mgr, Holding h) {
         if (!h.isPlayerOwned()) {
+            if (h.ruined) return;   // nobody mends a ruin but a lord's builder
             // a house's own masons: once the castle has been quiet for a minute after taking damage, they put it back
             if (h.work.equals(NONE)) {
                 long now = level.getGameTime();
@@ -287,7 +288,7 @@ public final class Builder {
             BlockState now = level.getBlockState(j.pos);
             if (j.expect != null && !now.is(j.expect)) continue;   // someone's been at it since the survey
             if (j.onlyIfAir && !(now.isAir() || now.is(CommonEvents.SIEGE_PLACEABLE) || !now.getFluidState().isEmpty()
-                    || now.is(Blocks.FIRE) || now.canBeReplaced())) continue;
+                    || now.is(Blocks.FIRE) || now.canBeReplaced() || (h.work.equals(REPAIR) && now.is(BlockTags.LEAVES)))) continue;
             if (h.work.equals(LIGHT) && h.workDone % TORCHES_PER_COAL == 0 && !takeCoal(mgr, h)) {
                 tell(level, h, "Master Builder " + h.builderName + " has run out of coal at " + h.name + " with " + (h.workQueue.size() + 1)
                         + " dark spots left. Bring more and order it again.");
@@ -311,6 +312,7 @@ public final class Builder {
     }
 
     private static void finish(ServerLevel level, HoldingManager mgr, Holding h) {
+        if (h.work.equals(REPAIR) && h.ruined && h.isPlayerOwned()) Ruins.restore(level, mgr, h);
         if (h.work.equals(LIGHT)) {
             tell(level, h, "Master Builder " + h.builderName + " has lit " + h.name + ": " + h.workDone
                     + " torches, and nothing spawns inside the walls now. Crypts and cellars stay dark.");
@@ -379,7 +381,7 @@ public final class Builder {
                     if (have.getBlock() == want.getBlock()) continue;
                     differ++;
                     if (!(have.isAir() || have.is(CommonEvents.SIEGE_PLACEABLE) || !have.getFluidState().isEmpty() || have.is(Blocks.FIRE)
-                            || have.canBeReplaced())) continue;
+                            || have.canBeReplaced() || have.is(BlockTags.LEAVES))) continue;
                     jobs.add(new Job(pos, want, true));
                 }
             }

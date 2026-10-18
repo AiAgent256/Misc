@@ -39,8 +39,15 @@ public class CastleTilePiece extends StructurePiece {
     /** Layout y of the first air block above the castle's ground; everything below is foundation. */
     private final int ground;
     private final BlockPos templatePosition;
+    /** Placed as a ruin (see {@link RuinProcessor}). */
+    private final boolean ruined;
 
     public CastleTilePiece(StructureTemplateManager manager, String layout, String theme, int tx, int tz, BlockPos origin, int ground) {
+        this(manager, layout, theme, tx, tz, origin, ground, false);
+    }
+
+    public CastleTilePiece(StructureTemplateManager manager, String layout, String theme, int tx, int tz, BlockPos origin, int ground,
+                           boolean ruined) {
         super(ModStructures.CASTLE_TILE.get(), 0, box(layout, tx, tz, origin));
         this.layout = layout;
         this.theme = theme;
@@ -48,6 +55,7 @@ public class CastleTilePiece extends StructurePiece {
         this.tz = tz;
         this.castleOrigin = origin;
         this.ground = ground;
+        this.ruined = ruined;
         this.templatePosition = origin.offset(tx * TILE, 0, tz * TILE);
     }
 
@@ -57,6 +65,7 @@ public class CastleTilePiece extends StructurePiece {
         this.theme = tag.getString("Theme");
         this.castleOrigin = NbtUtils.readBlockPos(tag.getCompound("CastleOrigin"));
         this.ground = tag.getInt("Ground");
+        this.ruined = tag.getBoolean("Ruined");
         if (tag.contains("Tx")) {
             this.tx = tag.getInt("Tx");
             this.tz = tag.getInt("Tz");
@@ -113,6 +122,10 @@ public class CastleTilePiece extends StructurePiece {
         return theme;
     }
 
+    public boolean ruined() {
+        return ruined;
+    }
+
     public BlockPos castleOrigin() {
         return castleOrigin;
     }
@@ -125,6 +138,7 @@ public class CastleTilePiece extends StructurePiece {
         tag.putInt("Tz", tz);
         tag.put("CastleOrigin", NbtUtils.writeBlockPos(castleOrigin));
         tag.putInt("Ground", ground);
+        if (ruined) tag.putBoolean("Ruined", true);
     }
 
     /** Now the template is needed: read it (the manager caches it) and set it down, clipped to the chunk. */
@@ -138,6 +152,11 @@ public class CastleTilePiece extends StructurePiece {
         }
         clearAbove(level, box);
         StructurePlaceSettings settings = settings(theme).setBoundingBox(box);
+        if (ruined) {
+            Layout lay = DataRegistries.layout(layout);
+            int height = lay == null ? 32 : lay.sizeY - ground;
+            settings.addProcessor(new RuinProcessor(castleOrigin.asLong(), templatePosition.getY() + ground, height));
+        }
         t.get().placeInWorld(level, templatePosition, pivot, settings, random, 2);
     }
 

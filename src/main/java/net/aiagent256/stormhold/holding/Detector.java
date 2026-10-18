@@ -119,8 +119,9 @@ public final class Detector {
             }
             if (piece == null) return null;
             Layout l = DataRegistries.layout(piece.layout());
-            if (l == null) return null;
+            if (l == null || "landmark".equals(l.kind)) return null;
             applyLayout(h, l, piece.castleOrigin());
+            h.ruined = piece.ruined();
             h.layout = l.name;
             h.theme = piece.theme();
         } else {
@@ -142,6 +143,10 @@ public final class Detector {
         }
         h.fillGarrison(1.0);
         h.lordAlive = true;
+        if (h.ruined && h.layout != null) {
+            Layout lay = DataRegistries.layout(h.layout);
+            if (lay != null) Ruins.found(h, lay);
+        }
         mgr.add(h);
         return h;
     }

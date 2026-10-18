@@ -62,6 +62,7 @@ public final class Rewards {
         int n = base + Math.max(1, h.renown) + Math.min(8, h.fiefPop / 3) + 2 * (Frontier.zone(level, h.center()) - 1);
         if (h.mode == Holding.Mode.PRODUCE) n += n / 4;
         if (Vassals.is(h)) n = (int) Math.round(n * Vassals.share(h));
+        if (h.ruined) n = Math.max(1, (int) Math.round(n * Ruins.RENT));
         return n;
     }
 
@@ -98,7 +99,8 @@ public final class Rewards {
             default -> 60;
         };
         double zone = 1 + 0.25 * (Frontier.zone(level, h.center()) - 1);
-        return (int) Math.round((base + 5 * Math.max(1, h.renown)) * zone);
+        int n = (int) Math.round((base + 5 * Math.max(1, h.renown)) * zone);
+        return h.ruined ? n / 2 : n;   // the brigands' hoard, not a lord's treasury
     }
 
     /** The castle is yours: its treasury with it. */

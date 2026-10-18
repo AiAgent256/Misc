@@ -15,6 +15,8 @@ import java.util.Locale;
 public class Layout {
     public final String name;
     public final int tier;
+    /** "castle" (anything that's held: castles, towns, cities) or "landmark" (a place with no holding: a temple ruin). */
+    public final String kind;
     public final int sizeX, sizeY, sizeZ, ground;
     /** Beds in the castle: the garrison it can sleep. 0 for layouts without the count. */
     public final int beds;
@@ -31,6 +33,7 @@ public class Layout {
     private Layout(JsonObject o) {
         name = o.get("name").getAsString();
         tier = o.get("tier").getAsInt();
+        kind = o.has("kind") ? o.get("kind").getAsString() : "castle";
         JsonArray size = o.getAsJsonArray("size");
         sizeX = size.get(0).getAsInt();
         sizeY = size.get(1).getAsInt();

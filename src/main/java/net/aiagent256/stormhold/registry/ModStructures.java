@@ -25,6 +25,8 @@ public final class ModStructures {
             PIECES.register("castle_tile", () -> (StructurePieceType.StructureTemplateType) CastleTilePiece::new);
     public static final RegistryObject<StructureProcessorType<ThemeProcessor>> THEME =
             PROCESSORS.register("theme", () -> () -> ThemeProcessor.CODEC);
+    public static final RegistryObject<StructureProcessorType<net.aiagent256.stormhold.worldgen.RuinProcessor>> RUIN =
+            PROCESSORS.register("ruin", () -> () -> net.aiagent256.stormhold.worldgen.RuinProcessor.CODEC);
 
     private ModStructures() {
     }

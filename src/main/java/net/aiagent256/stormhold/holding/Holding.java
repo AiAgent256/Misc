@@ -47,7 +47,8 @@ public class Holding {
     }
 
     public String kindName() {
-        return isTown() ? "Market town" : isNether() ? "Nether holdfast" : tierName(tier);
+        return (ruined ? "Ruined " + (isTown() ? "market town" : isNether() ? "Nether holdfast" : tierName(tier).toLowerCase(java.util.Locale.ROOT))
+                : isTown() ? "Market town" : isNether() ? "Nether holdfast" : tierName(tier));
     }
 
     public String lordTitle() {
@@ -176,6 +177,8 @@ public class Holding {
     public int spoilsTaken;
     /** Scouts' maps waiting to go up in the hall. */
     public final List<net.minecraft.world.item.ItemStack> pendingMaps = new ArrayList<>();
+    /** A ruin (see {@link Ruins}): brigand-held, a few men on the ground, until the Master Builder restores it. */
+    public boolean ruined;
     /** The vassal lord who holds it in the owner's name (his first name), and his loyalty, 0 to 100. */
     @Nullable public String vassal;
     public int loyalty;
@@ -230,6 +233,7 @@ public class Holding {
     /** Capacity for this castle: the tier's, no more men than it has beds, plus 15% per stage of fortification. */
     public int capacity(Role role) {
         int base = capacity(tier, role);
+        if (ruined) return Ruins.capacity(base, role);
         if (role == Role.CAPTAIN) return base;
         Layout l = layout != null ? DataRegistries.layout(layout) : null;
         if (l != null && l.beds > 0) {
@@ -436,6 +440,7 @@ public class Holding {
         t.put("RoadsTo", roadTags);
         t.putString("Steward", stewardName);
         if (vassal != null) t.putString("Vassal", vassal);
+        if (ruined) t.putBoolean("Ruined", true);
         t.putInt("Loyalty", loyalty);
         ListTag mapTags = new ListTag();
         for (var m : pendingMaps) mapTags.add(m.save(new CompoundTag()));
@@ -571,6 +576,7 @@ public class Holding {
         for (var r : t.getList("RoadsTo", 11)) h.roadsTo.add(NbtUtils.loadUUID(r));
         h.stewardName = t.getString("Steward");
         h.vassal = t.contains("Vassal") ? t.getString("Vassal") : null;
+        h.ruined = t.getBoolean("Ruined");
         h.loyalty = t.getInt("Loyalty");
         for (var m : t.getList("PendingMaps", 10)) h.pendingMaps.add(net.minecraft.world.item.ItemStack.of((CompoundTag) m));
         h.builderName = t.getString("BuilderName");
