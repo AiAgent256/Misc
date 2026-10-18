@@ -140,6 +140,8 @@ def write_layout(g, meta, tiles, path):
         "banners": [list(b) for b in g.banners if g.get(*b).endswith("wall_banner" ) or "wall_banner" in g.get(*b)],
         "footprint": footprint(g, meta["GL"]),
     }
+    if meta.get("kind") == "landmark":
+        layout["kind"] = "landmark"            # a place, not a holding: the game makes no garrison for it
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         json.dump(layout, f, separators=(",", ":"))
