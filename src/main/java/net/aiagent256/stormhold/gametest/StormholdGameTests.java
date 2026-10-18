@@ -340,7 +340,7 @@ public class StormholdGameTests {
         Holding h = sample(g);
         UUID lord = UUID.randomUUID();
         h.owner = Sides.player(lord);
-        h.warTablePos = g.absolutePos(new BlockPos(5, 2, 5));
+        h.warTablePos = g.absolutePos(new BlockPos(5, 3, 5));   // the arena's floor is the second layer: y 2 is still stone
         level.setBlock(h.warTablePos, net.minecraft.world.level.block.Blocks.CRAFTING_TABLE.defaultBlockState(), 3);
         // the takings: plain goods and a sword with an enchantment both go in the chest the garrison sets up
         BlockPos at = h.warTablePos.above();
