@@ -138,10 +138,17 @@ public class CastleStructure extends Structure {
         int[] hs = new int[9];
         int k = 0;
         int wet = 0;
+        int sea = ctx.chunkGenerator().getSeaLevel();
+        // the centre first: most sites fail on it (sea, a lake, a river valley), for one noise column instead of seventeen
+        int[] mid = surfaceAndFloor(ctx, cx, cz);
+        if (mid[0] - mid[1] > 1 || mid[0] <= sea + 1) {
+            lastRejection = mid[0] - mid[1] > 1 ? "water at the centre" : "centre " + mid[0] + " vs sea " + sea;
+            return null;
+        }
         for (int a = -1; a <= 1; a++) {
             for (int b = -1; b <= 1; b++) {
                 int x = cx + a * hx, z = cz + b * hz;
-                int[] sf = surfaceAndFloor(ctx, x, z);
+                int[] sf = a == 0 && b == 0 ? mid : surfaceAndFloor(ctx, x, z);
                 int surface = sf[0], floor = sf[1];
                 if (surface - floor > 1) wet++;
                 hs[k++] = surface;
@@ -159,7 +166,6 @@ public class CastleStructure extends Structure {
             return null;
         }
         int median = sorted[4];
-        int sea = ctx.chunkGenerator().getSeaLevel();
         if (median <= sea + 1) {
             lastRejection = "median " + median + " vs sea " + sea;
             return null;
