@@ -333,6 +333,139 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** A clean stretch of sky over the arena's own footprint: the arenas lie underground and the builder reads the heightmap. */
+    private static BlockPos sky(GameTestHelper g, net.minecraft.world.level.block.state.BlockState floor) {
+        ServerLevel level = g.getLevel();
+        BlockPos a = g.absolutePos(BlockPos.ZERO);
+        BlockPos o = new BlockPos(a.getX(), 300, a.getZ());
+        var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+        for (int x = 0; x < 16; x++)
+            for (int z = 0; z < 16; z++) {
+                level.setBlock(o.offset(x, 1, z), floor, 3);
+                for (int y = 2; y < 16; y++) level.setBlock(o.offset(x, y, z), air, 3);
+            }
+        return o;
+    }
+
+    @GameTest(template = "arena", timeoutTicks = 300)
+    public static void builderLightsTheCastle(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
+        BlockPos o = sky(g, stone);
+        // a shut stone room in one corner: only a torch inside lights it
+        for (int x = 10; x <= 15; x++)
+            for (int z = 10; z <= 15; z++)
+                for (int y = 2; y <= 5; y++) {
+                    boolean shell = y == 5 || x == 10 || x == 15 || z == 10 || z == 15;
+                    if (shell) level.setBlock(o.offset(x, y, z), stone, 3);
+                }
+        Holding h = sample(g);
+        h.box = new BoundingBox(o.getX(), o.getY(), o.getZ(), o.getX() + 15, o.getY() + 15, o.getZ() + 15);
+        h.owner = Sides.player(UUID.randomUUID());
+        var coal = new net.minecraft.resources.ResourceLocation("minecraft", "coal");
+        h.addStock(coal, 8);
+        if (!net.aiagent256.stormhold.holding.Builder.dark(level, o.offset(3, 2, 3)))
+            throw new IllegalStateException("an open floor at night isn't counted dark");
+        net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.LIGHT, g.makeMockPlayer());
+        for (int k = 0; k < 60 && !h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE); k++)
+            net.aiagent256.stormhold.holding.Builder.tick(level, mgr, h);
+        if (!h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE)) throw new IllegalStateException("still lighting: " + h.work);
+        int torches = h.workDone, used = 8 - h.stock(coal);
+        if (torches < 2 || torches > 14) throw new IllegalStateException(torches + " torches for one yard and a room");
+        if (used != (torches + 3) / 4) throw new IllegalStateException(torches + " torches took " + used + " coal");
+        boolean inside = false;
+        for (int x = 11; x <= 14; x++)
+            for (int z = 11; z <= 14; z++)
+                for (int y = 2; y <= 4; y++) {
+                    var st = level.getBlockState(o.offset(x, y, z));
+                    if (st.is(net.minecraft.world.level.block.Blocks.TORCH) || st.is(net.minecraft.world.level.block.Blocks.WALL_TORCH)) inside = true;
+                }
+        if (!inside) throw new IllegalStateException("the shut room got no torch");
+        g.succeedWhen(() -> {
+            for (int x = 0; x < 16; x++)
+                for (int z = 0; z < 16; z++) {
+                    boolean room = x >= 11 && x <= 14 && z >= 11 && z <= 14;
+                    boolean shell = x >= 10 && x <= 15 && z >= 10 && z <= 15 && !room;
+                    if (shell) continue;
+                    BlockPos p = o.offset(x, 2, z);
+                    if (level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, p) <= 0)
+                        throw new net.minecraft.gametest.framework.GameTestAssertException("still dark at " + x + ", " + z);
+                }
+        });
+    }
+
+    @GameTest(template = "arena")
+    public static void builderClearsTheFieldAndLaysRoads(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        BlockPos o = sky(g, net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState());
+        var log = net.minecraft.world.level.block.Blocks.OAK_LOG.defaultBlockState();
+        var leaf = net.minecraft.world.level.block.Blocks.OAK_LEAVES.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.LeavesBlock.DISTANCE, 1);
+        // a wild tree and an orchard tree, five apart; and a barn's log beam with no leaves
+        for (int tx : new int[]{2, 7}) {
+            for (int y = 2; y <= 6; y++) level.setBlock(o.offset(tx, y, 3), log, 3);
+            for (int dx = -1; dx <= 1; dx++)
+                for (int dz = -1; dz <= 1; dz++)
+                    for (int y = 5; y <= 6; y++)
+                        if (dx != 0 || dz != 0) level.setBlock(o.offset(tx + dx, y, 3 + dz), leaf, 3);
+            level.setBlock(o.offset(tx, 7, 3), leaf, 3);
+        }
+        var beam = log.setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS, net.minecraft.core.Direction.Axis.X);
+        for (int x = 2; x <= 4; x++) level.setBlock(o.offset(x, 2, 10), beam, 3);
+        Holding h = sample(g);
+        h.box = new BoundingBox(o.getX() + 11, o.getY(), o.getZ() + 11, o.getX() + 15, o.getY() + 12, o.getZ() + 15);
+        h.gatePos = h.box.getCenter();
+        UUID me = UUID.randomUUID();
+        h.owner = Sides.player(me);
+        h.fief.add(new Holding.FiefBuilding("orchard", new BoundingBox(o.getX() + 6, o.getY(), o.getZ() + 2, o.getX() + 8, o.getY() + 9, o.getZ() + 4)));
+        net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.CLEAR, g.makeMockPlayer());
+        for (int k = 0; k < 60 && !h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE); k++)
+            net.aiagent256.stormhold.holding.Builder.tick(level, mgr, h);
+        if (!h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE)) throw new IllegalStateException("still clearing");
+        var oak = new net.minecraft.resources.ResourceLocation("minecraft", "oak_log");
+        for (int y = 2; y <= 7; y++)
+            if (!level.getBlockState(o.offset(2, y, 3)).isAir()) throw new IllegalStateException("the wild tree stands at y+" + y);
+        if (!level.getBlockState(o.offset(1, 5, 2)).isAir()) throw new IllegalStateException("its leaves are left");
+        if (!level.getBlockState(o.offset(7, 4, 3)).is(net.minecraft.world.level.block.Blocks.OAK_LOG)
+                || !level.getBlockState(o.offset(6, 5, 3)).is(net.minecraft.world.level.block.Blocks.OAK_LEAVES))
+            throw new IllegalStateException("the orchard tree was felled");
+        for (int x = 2; x <= 4; x++)
+            if (!level.getBlockState(o.offset(x, 2, 10)).is(net.minecraft.world.level.block.Blocks.OAK_LOG))
+                throw new IllegalStateException("the barn beam was cut");
+        if (h.stock(oak) < 5) throw new IllegalStateException(h.stock(oak) + " logs in the stores, not 5");
+        // the road: to the nearest other place the same lord holds, paid in stone
+        Holding far = new Holding();
+        far.name = "Farhold";
+        far.owner = h.owner;
+        BlockPos c = h.box.getCenter();
+        far.box = new BoundingBox(c.getX() + 395, c.getY() - 5, c.getZ() - 5, c.getX() + 405, c.getY() + 5, c.getZ() + 5);
+        var cobble = new net.minecraft.resources.ResourceLocation("minecraft", "cobblestone");
+        h.addStock(cobble, 64);
+        int roads = mgr.roads.size();
+        mgr.holdings.put(h.id, h);
+        mgr.holdings.put(far.id, far);
+        try {
+            net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.ROAD, g.makeMockPlayer());
+            if (!h.roadsTo.contains(far.id) || mgr.roads.size() != roads + 1)
+                throw new IllegalStateException("no road planned to " + far.name);
+            if (h.stock(cobble) != 64 - 40) throw new IllegalStateException("a 400-block road took " + (64 - h.stock(cobble)) + " stone");
+            net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.ROAD, g.makeMockPlayer());
+            if (mgr.roads.size() != roads + 1) throw new IllegalStateException("a second road to the same place");
+            // and the projects button on a busy builder: he says so and starts nothing
+            h.work = net.aiagent256.stormhold.holding.Builder.REPAIR;
+            net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.CLEAR, g.makeMockPlayer());
+            if (!h.work.equals(net.aiagent256.stormhold.holding.Builder.REPAIR)) throw new IllegalStateException("a busy builder dropped his work");
+        } finally {
+            mgr.holdings.remove(h.id);
+            mgr.holdings.remove(far.id);
+            mgr.roads.subList(roads, mgr.roads.size()).clear();
+            h.work = net.aiagent256.stormhold.holding.Builder.NONE;
+        }
+        g.succeed();
+    }
+
     @GameTest(template = "arena")
     public static void illagerWarbandMustersClimbsAndSacks(GameTestHelper g) {
         ServerLevel level = g.getLevel();

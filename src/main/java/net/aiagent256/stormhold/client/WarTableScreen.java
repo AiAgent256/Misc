@@ -192,7 +192,7 @@ public class WarTableScreen extends Screen {
                 .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("The Master Builder puts back every block of the castle's "
                         + "plans that's missing: walls, gate, portcullis, roofs. A stone from the stores per block keeps the pace; without stone it's slow. "
                         + "Your own additions are left alone.")))
-                .bounds(rx + 52, y, 64, 18).build();
+                .bounds(rx, y, 46, 18).build();
         repair.active = !busy;
         this.addRenderableWidget(repair);
         int stage = Math.min(3, fortifyStage(h) + 1);
@@ -202,21 +202,44 @@ public class WarTableScreen extends Screen {
                 .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Stage " + stage + ": "
                         + net.aiagent256.stormhold.holding.Builder.stageName(stage) + ". Costs " + cost[0] + " stone and " + cost[1]
                         + " iron from the stores. Each stage lets the castle hold 15% more men.")))
-                .bounds(rx + 118, y, 64, 18).build();
+                .bounds(rx + 48, y, 56, 18).build();
         fort.active = !busy && fortifyStage(h) < 3;
         this.addRenderableWidget(fort);
+        // ---- projects: click the name to pick one, Go to set the builder at it
+        String[] names = {"Light", "Clear", "Road"};
+        String[] tips = {
+                "Light the castle: the builder walks every floor inside the walls and sets a torch wherever a monster could spawn, "
+                        + "as few as will do, on the walls where he can. A coal or charcoal from the stores makes "
+                        + net.aiagent256.stormhold.holding.Builder.TORCHES_PER_COAL + ". Crypts and cellars stay dark.",
+                "Clear the field: woodcutters fell every wild tree within " + net.aiagent256.stormhold.holding.Builder.CLEAR_REACH
+                        + " blocks of the walls, leaves and all, so nothing comes at the gate unseen. The logs go to the stores. "
+                        + "Orchards, fief buildings and anything inside a town are left alone.",
+                "Lay a road from the gate to the nearest place you hold that hasn't one yet (up to "
+                        + net.aiagent256.stormhold.holding.Builder.ROAD_MAX + " blocks), with lamps along it. A stone from the stores per "
+                        + net.aiagent256.stormhold.holding.Builder.ROAD_PER_STONE + " blocks. It goes down as the land it crosses loads."};
+        int pi = Math.floorMod(project, names.length);
+        this.addRenderableWidget(Button.builder(Component.literal(names[pi] + " >"), b -> {
+            project = (project + 1) % names.length;
+            rebuildWidgets();
+        }).tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(tips[pi] + "\n\nClick to see the next project.")))
+                .bounds(rx + 106, y, 50, 18).build());
+        Button go = Button.builder(Component.literal("Go"), b -> Net.sendAction(h.id(), Net.PROJECT, BlockPos.ZERO, pi))
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(tips[pi])))
+                .bounds(rx + 158, y, 26, 18).build();
+        go.active = pi == 2 || !busy;
+        this.addRenderableWidget(go);
         // ---- labour: the people set to the mine and the forge (click for one more, shift-click for one fewer)
         int mx = net.aiagent256.stormhold.holding.Labour.MAX;
-        this.addRenderableWidget(Button.builder(Component.literal("Miners " + h.miners()),
+        this.addRenderableWidget(Button.builder(Component.literal("Mine " + h.miners()),
                         b -> Net.sendAction(h.id(), Net.SET_MINERS, BlockPos.ZERO, Math.max(0, Math.min(mx, h.miners() + (hasShiftDown() ? -1 : 1)))))
                 .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Click to set one more of " + h.name()
                         + "'s people to the mine, shift-click for one fewer (up to " + mx + "). Each brings up a day's ore into the stores, smelted: "
                         + "coal, iron, copper, gold, now and then redstone, lapis, emeralds and diamonds; more diamonds on the frontier, and "
                         + "ancient debris from zone 7.\n\n" + h.labour())))
-                .bounds(rx + 186, y, 58, 18).build());
+                .bounds(rx + 188, y, 52, 18).build());
         int next = Math.min(net.aiagent256.stormhold.holding.Frontier.MAX, kitLevel(h) + 1);
         int[] metal = net.aiagent256.stormhold.holding.Labour.cost(next);
-        this.addRenderableWidget(Button.builder(Component.literal("Smiths " + h.smiths()),
+        this.addRenderableWidget(Button.builder(Component.literal("Forge " + h.smiths()),
                         b -> Net.sendAction(h.id(), Net.SET_SMITHS, BlockPos.ZERO, Math.max(0, Math.min(mx, h.smiths() + (hasShiftDown() ? -1 : 1)))))
                 .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Click to set one more of " + h.name()
                         + "'s people to the forge, shift-click for one fewer (up to " + mx + "). Smiths forge the garrison's kit a level at a time: "
@@ -224,8 +247,11 @@ public class WarTableScreen extends Screen {
                         + (metal[0] > 0 ? metal[0] + " iron " : "") + (metal[1] > 0 ? metal[1] + " diamonds " : "") + (metal[2] > 0 ? metal[2] + " netherite " : "")
                         + "from the stores and " + net.aiagent256.stormhold.holding.Labour.SMITH_DAYS + " smith-days. Then every man on the walls is re-armed.\n\n"
                         + h.labour())))
-                .bounds(rx + 246, y, 56, 18).build());
+                .bounds(rx + 242, y, 56, 18).build());
     }
+
+    /** Which project the project button shows; kept between refreshes. */
+    private int project;
 
     private static int kitLevel(HoldingInfo h) {
         var m = java.util.regex.Pattern.compile("Kit level (\\d)").matcher(h.labour());
@@ -349,7 +375,6 @@ public class WarTableScreen extends Screen {
             g.drawString(this.font, "Each: 26 iron | 26 diamond | 26 diamond + 5 netherite", rx, y0 + 300, 0x9C8C6C, false);
             g.drawString(this.font, "Pack: " + iron + " iron, " + dia + " diamond, " + neth + " netherite, " + lvl + " lvl", rx, y0 + 310, 0x9C8C6C, false);
             g.drawString(this.font, h.supply() == null ? "No supply line." : "Couriers take surplus to " + h.supply().toShortString() + " daily.", rx, y0 + 320, 0x9C8C6C, false);
-            g.drawString(this.font, "Works", rx, y0 + 337, 0xF0D8A0, false);
         }
         super.render(g, mouseX, mouseY, partial);
     }

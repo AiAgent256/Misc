@@ -31,13 +31,13 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 public final class Net {
-    private static final String VERSION = "2";
+    private static final String VERSION = "3";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(Stormhold.id("main"),
             () -> VERSION, VERSION::equals, VERSION::equals);
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
             MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19,
-            SET_MINERS = 20, SET_SMITHS = 21;
+            SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -105,8 +105,7 @@ public final class Net {
                 }
                 if (!h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE)) {
                     int left = h.workQueue == null ? -1 : h.workQueue.size();
-                    status.append("Builder ").append(h.work.equals(net.aiagent256.stormhold.holding.Builder.REPAIR) ? "repairing"
-                            : "building " + net.aiagent256.stormhold.holding.Builder.stageName(h.fortify + 1))
+                    status.append("Builder ").append(net.aiagent256.stormhold.holding.Builder.doing(h))
                             .append(left < 0 ? ", surveying. " : ": " + left + " blocks to go. ");
                 } else if (h.fortify > 0) {
                     status.append("Fortified, stage ").append(h.fortify).append(". ");
@@ -238,6 +237,10 @@ public final class Net {
                         net.aiagent256.stormhold.holding.Labour.SMITH, a.amount()));
                 case REPAIR -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.REPAIR, player);
                 case FORTIFY -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.FORTIFY, player);
+                case PROJECT -> {
+                    String[] ps = net.aiagent256.stormhold.holding.Builder.PROJECTS;
+                    if (a.amount() >= 0 && a.amount() < ps.length) net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, ps[a.amount()], player);
+                }
                 case KEEP_WITH_ME -> {
                     h.reinforceKeep = Math.max(0, Math.min(80, a.amount()));
                     h.nextColumn = 0;

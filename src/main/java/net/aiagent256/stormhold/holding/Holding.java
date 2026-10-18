@@ -169,6 +169,8 @@ public class Holding {
     public String builderName = "";
     @Nullable public UUID builder;
     @Nullable public java.util.ArrayDeque<Builder.Job> workQueue;
+    /** The places the builder has laid a road to from here. */
+    public final java.util.Set<UUID> roadsTo = new java.util.LinkedHashSet<>();
 
     public int fiefLevel() {
         int cottages = 0;
@@ -419,6 +421,9 @@ public class Holding {
         t.putString("Work", work);
         t.putInt("Fortify", fortify);
         t.putInt("WorkDone", workDone);
+        ListTag roadTags = new ListTag();
+        for (UUID r : roadsTo) roadTags.add(NbtUtils.createUUID(r));
+        t.put("RoadsTo", roadTags);
         t.putString("BuilderName", builderName);
         if (builder != null) t.putUUID("Builder", builder);
         t.putString("FiefReport", fiefReport);
@@ -547,6 +552,7 @@ public class Holding {
         if (t.contains("Work")) h.work = t.getString("Work");
         h.fortify = t.getInt("Fortify");
         h.workDone = t.getInt("WorkDone");
+        for (var r : t.getList("RoadsTo", 11)) h.roadsTo.add(NbtUtils.loadUUID(r));
         h.builderName = t.getString("BuilderName");
         if (t.hasUUID("Builder")) h.builder = t.getUUID("Builder");
         h.fiefReport = t.getString("FiefReport");
