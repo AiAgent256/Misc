@@ -15,7 +15,6 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.HopperBlockEntity;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.block.entity.SignText;
 import net.minecraft.world.level.block.state.BlockState;
@@ -85,7 +84,7 @@ public final class Spoils {
             ItemEntity ie = drops.next();
             ItemStack st = ie.getItem().copy();
             int before = st.getCount();
-            if (chest != null) st = HopperBlockEntity.addItem(null, chest, st, null);
+            if (chest != null) st = put(chest, st);
             if (!st.isEmpty() && !st.hasTag()) {
                 ResourceLocation id = ForgeRegistries.ITEMS.getKey(st.getItem());
                 if (id != null) {
@@ -105,9 +104,27 @@ public final class Spoils {
         return moved;
     }
 
+    /** Into a container: onto stacks of the same thing first, then empty slots. What didn't fit. */
+    static ItemStack put(Container c, ItemStack st) {
+        int max = Math.min(st.getMaxStackSize(), c.getMaxStackSize());
+        for (int i = 0; i < c.getContainerSize() && !st.isEmpty(); i++) {
+            ItemStack in = c.getItem(i);
+            if (in.isEmpty() || in.getCount() >= max || !ItemStack.isSameItemSameTags(in, st)) continue;
+            int k = Math.min(st.getCount(), max - in.getCount());
+            in.grow(k);
+            st.shrink(k);
+        }
+        for (int i = 0; i < c.getContainerSize() && !st.isEmpty(); i++) {
+            if (!c.getItem(i).isEmpty()) continue;
+            int k = Math.min(st.getCount(), max);
+            c.setItem(i, st.split(k));
+        }
+        return st;
+    }
+
     /** A chest beside the War Table with a "Spoils" sign on it, the first time there's something to put in it. */
     @Nullable
-    static BlockPos setUp(ServerLevel level, Holding h) {
+    public static BlockPos setUp(ServerLevel level, Holding h) {
         BlockPos table = h.warTablePos;
         if (table.equals(BlockPos.ZERO) || !level.isLoaded(table)) return null;
         for (int r = 1; r <= 4; r++) {

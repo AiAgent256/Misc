@@ -350,6 +350,10 @@ public class StormholdGameTests {
         blade.enchant(net.minecraft.world.item.enchantment.Enchantments.SHARPNESS, 1);
         var sword = new net.minecraft.world.entity.item.ItemEntity(level, at.getX(), at.getY(), at.getZ(), blade);
         List<net.minecraft.world.entity.item.ItemEntity> drops = new ArrayList<>(List.of(flesh, sword));
+        BlockPos set = net.aiagent256.stormhold.holding.Spoils.setUp(level, h);
+        if (set == null || net.aiagent256.stormhold.holding.Steward.container(level, set) == null)
+            throw new IllegalStateException("no spoils chest beside the table: set " + set + ", around it "
+                    + level.getBlockState(h.warTablePos.offset(-1, 0, -1)) + " over " + level.getBlockState(h.warTablePos.offset(-1, -1, -1)));
         int moved = net.aiagent256.stormhold.holding.Spoils.take(level, mgr, h, drops.iterator());
         if (moved != 4 || !drops.isEmpty()) throw new IllegalStateException(moved + " carried, " + drops.size() + " left on the ground");
         BlockPos chestAt = net.aiagent256.stormhold.holding.Steward.spoilsChest(level, h);
@@ -608,9 +612,11 @@ public class StormholdGameTests {
         h.owner = Sides.player(me);
         h.fief.add(new Holding.FiefBuilding("orchard", new BoundingBox(o.getX() + 6, o.getY(), o.getZ() + 2, o.getX() + 8, o.getY() + 9, o.getZ() + 4)));
         net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.CLEAR, g.makeMockPlayer());
-        for (int k = 0; k < 60 && !h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE); k++)
+        // the field reaches out past the arena into whatever wood grows on the surface round it: give it time
+        for (int k = 0; k < 3000 && !h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE); k++)
             net.aiagent256.stormhold.holding.Builder.tick(level, mgr, h);
-        if (!h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE)) throw new IllegalStateException("still clearing");
+        if (!h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE))
+            throw new IllegalStateException("still clearing, " + (h.workQueue == null ? "no" : h.workQueue.size()) + " blocks to go");
         var oak = new net.minecraft.resources.ResourceLocation("minecraft", "oak_log");
         for (int y = 2; y <= 7; y++)
             if (!level.getBlockState(o.offset(2, y, 3)).isAir()) throw new IllegalStateException("the wild tree stands at y+" + y);
@@ -1884,7 +1890,8 @@ public class StormholdGameTests {
             var st = player.getInventory().getItem(i);
             if (st.is(net.minecraft.world.item.Items.EMERALD)) emeralds += st.getCount();
         }
-        if (emeralds != 20) throw new IllegalStateException("expected 20 emeralds, got " + emeralds);
+        int treasury = net.aiagent256.stormhold.holding.Rewards.treasury(level, b);
+        if (emeralds != 20 + treasury) throw new IllegalStateException("expected 20 emeralds and a treasury of " + treasury + ", got " + emeralds);
         if (net.aiagent256.stormhold.house.Standing.get(mgr, "houseb", player.getUUID()) < hb.disposition + 15)
             throw new IllegalStateException("standing with the paying house did not rise");
         // the dawn account reads
