@@ -379,8 +379,12 @@ public class StormholdGameTests {
         GarrisonEntity knight = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(4, 2, 4)), Sides.house(houseId), false);
         if (knight == null) throw new IllegalStateException("no knight");
         try {
-            if (!knight.isHostileTo(player)) throw new IllegalStateException("wary house's knight ignored a stranger");
-            net.aiagent256.stormhold.house.Standing.change(level, mgr, houseId, player.getUUID(), 40, "test");
+            // a wary house lets a stranger walk its yard; a hostile one attacks on sight
+            if (knight.isHostileTo(player)) throw new IllegalStateException("wary house's knight attacked a stranger it let in");
+            net.aiagent256.stormhold.house.Standing.change(level, mgr, houseId, player.getUUID(), -30, "test");
+            knight = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(5, 2, 4)), Sides.house(houseId), false);
+            if (!knight.isHostileTo(player)) throw new IllegalStateException("hostile house's knight ignored an enemy");
+            net.aiagent256.stormhold.house.Standing.change(level, mgr, houseId, player.getUUID(), 70, "test");
             if (!net.aiagent256.stormhold.house.Standing.friendly(mgr, houseId, player.getUUID())) throw new IllegalStateException("+40 did not make friends");
             knight = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(6, 2, 4)), Sides.house(houseId), false);
             if (knight.isHostileTo(player)) throw new IllegalStateException("friendly house's knight attacked a friend");
@@ -680,19 +684,20 @@ public class StormholdGameTests {
             man.pouch().set(0, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BREAD, 3));
             if (!man.consume(man.pouch().get(0)) || man.getHealth() <= 6 || man.pouch().get(0).getCount() != 2)
                 throw new IllegalStateException("eating did not heal: " + man.getHealth() + " pouch " + man.pouch().get(0));
-            // peace with a friendly house, war with a wary one
+            // war with a hostile house, peace with any other
             String houseId = "companypeace";
             mgr.house(houseId).disposition = 0;
             mgr.standing.remove(houseId);
+            net.aiagent256.stormhold.house.Standing.change(level, mgr, houseId, player.getUUID(), -30, "test");
             guard = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(9, 2, 9)), Sides.house(houseId), false);
-            if (!man.isHostileTo(guard) || !guard.isHostileTo(man)) throw new IllegalStateException("a wary house's guard and your man ignored each other");
-            net.aiagent256.stormhold.house.Standing.change(level, mgr, houseId, player.getUUID(), 60, "test");
+            if (!man.isHostileTo(guard) || !guard.isHostileTo(man)) throw new IllegalStateException("a hostile house's guard and your man ignored each other");
+            net.aiagent256.stormhold.house.Standing.change(level, mgr, houseId, player.getUUID(), 40, "test");
             guard.discard();
             guard = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(9, 2, 10)), Sides.house(houseId), false);
             man.discard();
             man = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(6, 2, 6)), Sides.player(player.getUUID()), false);
             net.aiagent256.stormhold.holding.Company.enlist(level, mgr, man, player, null);
-            if (man.isHostileTo(guard) || guard.isHostileTo(man)) throw new IllegalStateException("your man and a friendly house's guard fought");
+            if (man.isHostileTo(guard) || guard.isHostileTo(man)) throw new IllegalStateException("your man and a wary house's guard fought");
             // clearing a building: only foes inside count, and it reports clear once they're gone
             BlockPos room = g.absolutePos(new BlockPos(3, 2, 3));
             near = net.minecraft.world.entity.EntityType.ZOMBIE.create(level);

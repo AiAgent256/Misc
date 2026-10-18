@@ -14,8 +14,9 @@ import java.util.UUID;
 /**
  * How a house feels about a player, -100 to 100. A house's base disposition is rolled when it is
  * created (about a third start friendly); everything you do to that house moves your own number.
- * Above {@link #FRIENDLY} its guards leave you alone, its lord trades, and a fallen castle can be
- * taken by bending the knee. Below {@link #HOSTILE} they attack on sight.
+ * Above {@link #HOSTILE} its gate opens, its guards leave you alone unless you strike first, and its
+ * lord trades; above {@link #FRIENDLY} it also hires you soldiers and a fallen castle can be taken by
+ * bending the knee. At {@link #HOSTILE} or below its gate stays down and its men attack on sight.
  */
 public final class Standing {
     public static final int FRIENDLY = 25;

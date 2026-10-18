@@ -231,8 +231,9 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         if (e instanceof Player p) {
             if (p.isCreative() || p.isSpectator()) return false;
             if (!isHouse() || side.equals(Sides.player(p.getUUID()))) return false;
-            // a friendly house leaves you alone unless you've just drawn blood here
-            return alarmedAt(Sides.player(p.getUUID())) || !isFriendlyTo(p);
+            // a house leaves you alone unless it holds you hostile or you've just drawn blood here: the same
+            // rule its gate keeps, so a wary traveller let in isn't cut down in the yard
+            return alarmedAt(Sides.player(p.getUUID())) || !toleratesPlayer(p);
         }
         String rs = RecruitsCompat.sideOf(e);
         if (rs != null) return !rs.equals(side) && (isHouse() || Sides.isPlayer(rs));
@@ -273,8 +274,8 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     private boolean peaceCached;
 
     /**
-     * A house's soldier and a player's soldier leave each other alone when the house counts the player a
-     * friend, unless one of them has just been hurt or is already fighting the other's side.
+     * A house's soldier and a player's soldier leave each other alone unless the house holds the player
+     * hostile, one of them has just been hurt, or one is already fighting the other's side.
      */
     private boolean atPeaceWith(GarrisonEntity g) {
         String house = isHouse() ? side : g.isHouse() ? g.side : null;
@@ -294,7 +295,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         if (key.equals(peaceKey) && now - peaceTime < 10) return peaceCached;
         peaceKey = key;
         peaceTime = now;
-        peaceCached = net.aiagent256.stormhold.house.Standing.friendly(net.aiagent256.stormhold.holding.HoldingManager.get(sl), hid, pid);
+        peaceCached = !net.aiagent256.stormhold.house.Standing.hostile(net.aiagent256.stormhold.holding.HoldingManager.get(sl), hid, pid);
         return peaceCached;
     }
 
