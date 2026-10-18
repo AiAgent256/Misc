@@ -15,6 +15,7 @@ import net.minecraft.world.level.levelgen.structure.StructureSet;
 import net.minecraft.world.level.levelgen.structure.placement.RandomSpreadStructurePlacement;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -108,6 +109,51 @@ public final class Finder {
             }
         }
         return null;
+    }
+
+    /**
+     * Every place a castle, town or city of ours would generate within {@code radius} of {@code centre}, sited
+     * the way worldgen sites them (so where it would really stand). Stops when the time runs out.
+     */
+    public static List<Found> within(ServerLevel level, BlockPos centre, int radius, long budgetMs) {
+        List<Found> out = new java.util.ArrayList<>();
+        var sets = level.registryAccess().registryOrThrow(Registries.STRUCTURE_SET);
+        var gen = level.getChunkSource().getGenerator();
+        var src = gen.getBiomeSource();
+        var rstate = level.getChunkSource().randomState();
+        long seed = level.getSeed();
+        long end = System.currentTimeMillis() + budgetMs;
+        int biomeY = gen.getSeaLevel() + 4;
+        for (var k : KINDS.entrySet()) {
+            StructureSet set = sets.get(new ResourceLocation(k.getValue()));
+            if (set == null || !(set.placement() instanceof RandomSpreadStructurePlacement rs)) continue;
+            int spacing = Math.max(1, rs.spacing());
+            int c0x = Math.floorDiv((centre.getX() - radius) >> 4, spacing), c1x = Math.floorDiv((centre.getX() + radius) >> 4, spacing);
+            int c0z = Math.floorDiv((centre.getZ() - radius) >> 4, spacing), c1z = Math.floorDiv((centre.getZ() + radius) >> 4, spacing);
+            for (int i = c0x; i <= c1x; i++) {
+                for (int j = c0z; j <= c1z; j++) {
+                    if (System.currentTimeMillis() > end) return out;
+                    ChunkPos cp = rs.getPotentialStructureChunk(seed, i * spacing, j * spacing);
+                    int bx = cp.getMiddleBlockX(), bz = cp.getMiddleBlockZ();
+                    long dx = bx - centre.getX(), dz = bz - centre.getZ();
+                    if (dx * dx + dz * dz > (long) (radius + 64) * (radius + 64)) continue;
+                    Holder<Biome> biome = src.getNoiseBiome(QuartPos.fromBlock(bx), QuartPos.fromBlock(biomeY), QuartPos.fromBlock(bz), rstate.sampler());
+                    for (StructureSet.StructureSelectionEntry e : set.structures()) {
+                        Structure st = e.structure().value();
+                        if (!st.biomes().contains(biome)) continue;
+                        var ctx = new Structure.GenerationContext(level.registryAccess(), gen, src, rstate, level.getStructureManager(),
+                                seed, cp, level, b -> true);
+                        var point = st.findValidGenerationPoint(ctx);
+                        if (point.isPresent()) {
+                            BlockPos p = point.get().position();
+                            out.add(new Found(st instanceof CastleStructure c ? k.getKey() + " (" + c.theme() + ")" : k.getKey(), p.getX(), p.getZ(), false));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        return out;
     }
 
     private Finder() {

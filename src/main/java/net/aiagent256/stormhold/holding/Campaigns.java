@@ -212,6 +212,7 @@ public final class Campaigns {
             else if (c.kind == Campaign.Kind.CAMP) tickCamp(level, mgr, c);
             else if (c.kind == Campaign.Kind.COLUMN) Columns.tick(level, mgr, c);
             else if (c.kind == Campaign.Kind.ILLAGERS) Warbands.tick(level, mgr, c);
+            else if (c.kind == Campaign.Kind.SCOUT) Scouts.tick(level, mgr, c);
             else tickParty(level, mgr, c, now);
         }
         if (mgr.campaigns.removeIf(c -> c.stage == Campaign.Stage.DONE)) mgr.setDirty();

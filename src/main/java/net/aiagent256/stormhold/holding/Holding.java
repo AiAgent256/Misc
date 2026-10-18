@@ -169,6 +169,9 @@ public class Holding {
     public String builderName = "";
     @Nullable public UUID builder;
     @Nullable public java.util.ArrayDeque<Builder.Job> workQueue;
+    /** The steward's name, and what he's done since the morning's account (not saved). */
+    public String stewardName = "";
+    public int stewardSold, stewardEarned, stewardStored, stewardSent, stewardStocked, stewardBought, stewardSpent;
     /** The places the builder has laid a road to from here. */
     public final java.util.Set<UUID> roadsTo = new java.util.LinkedHashSet<>();
 
@@ -424,6 +427,7 @@ public class Holding {
         ListTag roadTags = new ListTag();
         for (UUID r : roadsTo) roadTags.add(NbtUtils.createUUID(r));
         t.put("RoadsTo", roadTags);
+        t.putString("Steward", stewardName);
         t.putString("BuilderName", builderName);
         if (builder != null) t.putUUID("Builder", builder);
         t.putString("FiefReport", fiefReport);
@@ -553,6 +557,7 @@ public class Holding {
         h.fortify = t.getInt("Fortify");
         h.workDone = t.getInt("WorkDone");
         for (var r : t.getList("RoadsTo", 11)) h.roadsTo.add(NbtUtils.loadUUID(r));
+        h.stewardName = t.getString("Steward");
         h.builderName = t.getString("BuilderName");
         if (t.hasUUID("Builder")) h.builder = t.getUUID("Builder");
         h.fiefReport = t.getString("FiefReport");

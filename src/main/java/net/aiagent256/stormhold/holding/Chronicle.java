@@ -112,6 +112,11 @@ public final class Chronicle {
                 }
             }
         }
+        // the stewards' tallies
+        for (Holding h : mine) {
+            Component s = Steward.report(h);
+            if (s != null) out.add(s);
+        }
         // what the day brought: the chronicle's lines since yesterday
         int shown = 0;
         for (int i = mgr.chronicle.size() - 1; i >= 0 && shown < 5; i--) {

@@ -102,8 +102,20 @@ public class WarTableScreen extends Screen {
             BlockPos p = parse(ax, null, az);
             if (p != null) Net.sendAction(h.id(), Net.SET_ATTACK, p, 0);
         }).bounds(rx + 204, y, 28, 18).build());
-        this.addRenderableWidget(Button.builder(Component.literal("March now"), b -> Net.sendAction(h.id(), Net.MARCH_NOW, BlockPos.ZERO, 0))
-                .bounds(rx + 234, y, 56, 18).build());
+        this.addRenderableWidget(Button.builder(Component.literal("March"), b -> Net.sendAction(h.id(), Net.MARCH_NOW, BlockPos.ZERO, 0))
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Send a war party at the target now.")))
+                .bounds(rx + 234, y, 34, 18).build());
+        Button scout = Button.builder(Component.literal("Scout"), b -> {
+            BlockPos p = parse(ax, null, az);
+            if (p != null) Net.sendAction(h.id(), Net.SCOUT, p, 0);
+        }).tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Two riders from the garrison ride to the x and z above "
+                        + "(up to " + net.aiagent256.stormhold.holding.Scouts.MAX_RANGE + " blocks), look over the country for "
+                        + net.aiagent256.stormhold.holding.Scouts.RADIUS + " blocks round it and ride home to tell you every castle, town and city there: "
+                        + "who holds it, how many men, how they stand with you, and where the castles nobody has seen yet will be found. "
+                        + "What they find goes on the Realm page. Hostile country and the far frontier cost riders.")))
+                .bounds(rx + 270, y, 30, 18).build();
+        scout.active = !h.status().contains("Scouts out");
+        this.addRenderableWidget(scout);
         y += 30;
         BlockPos depot = markedDepot();
         BlockPos sup = h.supply() != null ? h.supply() : depot != null ? depot : me.below();

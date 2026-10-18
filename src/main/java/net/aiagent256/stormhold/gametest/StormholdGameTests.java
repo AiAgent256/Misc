@@ -333,6 +333,138 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    @GameTest(template = "arena")
+    public static void scoutsRideOutAndReport(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        Holding h = sample(g);
+        h.owner = Sides.player(player.getUUID());
+        int men = h.troops();
+        if (men < 4) throw new IllegalStateException("only " + men + " men to scout with");
+        BlockPos home = h.center();
+        Holding other = new Holding();
+        other.name = "Scoutedhold";
+        other.owner = Sides.house("testhouse");
+        other.houseId = "testhouse";
+        other.tier = 2;
+        other.box = new BoundingBox(home.getX() + 590, home.getY() - 5, home.getZ() + 190, home.getX() + 610, home.getY() + 5, home.getZ() + 210);
+        other.add(Role.KNIGHT, 12);
+        mgr.holdings.put(h.id, h);
+        mgr.holdings.put(other.id, other);
+        net.aiagent256.stormhold.holding.Campaign c = null;
+        try {
+            // too close, then a real ride
+            if (net.aiagent256.stormhold.holding.Scouts.send(level, mgr, h, player, home.offset(20, 0, 0)) != null)
+                throw new IllegalStateException("scouts sent 20 blocks");
+            c = net.aiagent256.stormhold.holding.Scouts.send(level, mgr, h, player, home.offset(600, 0, 0));
+            if (c == null || c.total() != 2 || h.troops() != men - 2) throw new IllegalStateException("the riders: " + (c == null ? "none" : c.total()));
+            if (net.aiagent256.stormhold.holding.Scouts.send(level, mgr, h, player, home.offset(0, 0, 600)) != null)
+                throw new IllegalStateException("a second party while the first is out");
+            double risk = net.aiagent256.stormhold.holding.Scouts.risk(level, mgr, h, c);
+            if (risk < 0 || risk > 0.6) throw new IllegalStateException("risk " + risk);
+            // the ride out takes its time
+            net.aiagent256.stormhold.holding.Scouts.tick(level, mgr, c);
+            if (c.stage != net.aiagent256.stormhold.holding.Campaign.Stage.MARCH || c.progress <= 0 || c.progress >= 0.1)
+                throw new IllegalStateException("after a second: " + c.stage + " " + c.progress);
+            // home, with the report
+            c.stage = net.aiagent256.stormhold.holding.Campaign.Stage.RETURN;
+            var lines = net.aiagent256.stormhold.holding.Scouts.report(level, mgr, h, c);
+            boolean named = false;
+            for (var l : lines) if (l.getString().contains("Scoutedhold") && l.getString().contains("12 men")) named = true;
+            if (!named) throw new IllegalStateException("the report: " + lines.stream().map(net.minecraft.network.chat.Component::getString).toList());
+            if (!other.greeted.contains(player.getUUID())) throw new IllegalStateException("the scouted castle isn't on the realm page");
+            net.aiagent256.stormhold.holding.Scouts.home(level, mgr, h, c);
+            if (h.troops() != men || c.stage != net.aiagent256.stormhold.holding.Campaign.Stage.DONE)
+                throw new IllegalStateException("back home: " + h.troops() + " of " + men + ", " + c.stage);
+        } finally {
+            if (c != null) mgr.campaigns.remove(c);
+            mgr.holdings.remove(h.id);
+            mgr.holdings.remove(other.id);
+        }
+        g.succeed();
+    }
+
+    /** A chest at {@code at} with a standing sign on it reading {@code lines}. */
+    private static net.minecraft.world.Container signedChest(GameTestHelper g, BlockPos at, String... lines) {
+        ServerLevel level = g.getLevel();
+        BlockPos p = g.absolutePos(at);
+        level.setBlock(p, net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState(), 3);
+        level.setBlock(p.above(), net.minecraft.world.level.block.Blocks.OAK_SIGN.defaultBlockState(), 3);
+        if (!(level.getBlockEntity(p.above()) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign))
+            throw new IllegalStateException("no sign at " + p.above());
+        var text = new net.minecraft.world.level.block.entity.SignText();
+        for (int i = 0; i < lines.length && i < 4; i++) text = text.setMessage(i, net.minecraft.network.chat.Component.literal(lines[i]));
+        sign.setText(text, true);
+        return (net.minecraft.world.Container) level.getBlockEntity(p);
+    }
+
+    private static int count(net.minecraft.world.Container c, net.minecraft.world.item.Item item) {
+        int n = 0;
+        for (int i = 0; i < c.getContainerSize(); i++) if (c.getItem(i).is(item)) n += c.getItem(i).getCount();
+        return n;
+    }
+
+    @GameTest(template = "arena")
+    public static void stewardSellsStoresKeepsAndBuys(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        // the signs
+        var sell = net.aiagent256.stormhold.holding.Steward.parse(new String[]{"sell", "when full", "", ""});
+        if (sell == null || !sell.kind().equals("sell") || !sell.whenFull()) throw new IllegalStateException("sell when full read as " + sell);
+        var keep = net.aiagent256.stormhold.holding.Steward.parse(new String[]{"keep", "64 bread", "arrows", "iron ingots 12"});
+        if (keep == null || keep.want().getOrDefault(net.minecraft.world.item.Items.BREAD, 0) != 64
+                || keep.want().getOrDefault(net.minecraft.world.item.Items.ARROW, 0) != 64
+                || keep.want().getOrDefault(net.minecraft.world.item.Items.IRON_INGOT, 0) != 12)
+            throw new IllegalStateException("keep read as " + keep);
+        var send = net.aiagent256.stormhold.holding.Steward.parse(new String[]{"send to wenton", "over 32", "", ""});
+        if (send == null || !send.place().equals("wenton") || send.over() != 32) throw new IllegalStateException("send read as " + send);
+        if (net.aiagent256.stormhold.holding.Steward.parse(new String[]{"general", "store", "", ""}) != null)
+            throw new IllegalStateException("a shop's sign read as an order");
+        // the chests
+        Holding h = sample(g);
+        h.owner = Sides.player(UUID.randomUUID());
+        var prices = net.aiagent256.stormhold.holding.Steward.sellPrices();
+        var buys = net.aiagent256.stormhold.holding.Steward.buyPrices();
+        if (prices.size() < 10 || buys.size() < 20) throw new IllegalStateException(prices.size() + " things sell, " + buys.size() + " buy");
+        var wheat = prices.containsKey(net.minecraft.world.item.Items.WHEAT) ? net.minecraft.world.item.Items.WHEAT : prices.keySet().iterator().next();
+        int[] wp = prices.get(wheat);
+        var c1 = signedChest(g, new BlockPos(3, 2, 3), "Sell");
+        c1.setItem(0, new net.minecraft.world.item.ItemStack(wheat, Math.min(64, wp[0] * 2 + 1)));
+        int lots = Math.min(64, wp[0] * 2 + 1) / wp[0];
+        var c2 = signedChest(g, new BlockPos(7, 2, 3), "Stores");
+        c2.setItem(0, new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.COBBLESTONE, 10));
+        var sword = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_SWORD);
+        sword.enchant(net.minecraft.world.item.enchantment.Enchantments.SHARPNESS, 2);
+        c2.setItem(1, sword);
+        var c3 = signedChest(g, new BlockPos(11, 2, 3), "Keep", "16 bread");
+        var bread = new net.minecraft.resources.ResourceLocation("minecraft", "bread");
+        h.addStock(bread, 40 - h.stock(bread));
+        var torch = buys.containsKey(net.minecraft.world.item.Items.TORCH) ? net.minecraft.world.item.Items.TORCH : buys.keySet().iterator().next();
+        int[] tp = buys.get(torch);
+        String torchName = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(torch).getPath().replace('_', ' ');
+        var c4 = signedChest(g, new BlockPos(3, 2, 9), "Buy", (tp[0] * 2) + " " + torchName);
+        var em = new net.minecraft.resources.ResourceLocation("minecraft", "emerald");
+        h.addStock(em, tp[1] * 2 + 5 - h.stock(em));
+        var cobble = new net.minecraft.resources.ResourceLocation("minecraft", "cobblestone");
+        int cobbleWas = h.stock(cobble);
+        net.aiagent256.stormhold.holding.Steward.tick(level, mgr, h);
+        if (count(c1, wheat) != Math.min(64, wp[0] * 2 + 1) - lots * wp[0] || count(c1, net.minecraft.world.item.Items.EMERALD) != lots * wp[1])
+            throw new IllegalStateException("sold: " + count(c1, wheat) + " " + wheat + " left, " + count(c1, net.minecraft.world.item.Items.EMERALD) + " emeralds");
+        if (h.stock(cobble) != cobbleWas + 10 || count(c2, net.minecraft.world.item.Items.IRON_SWORD) != 1)
+            throw new IllegalStateException("stored: " + h.stock(cobble) + " cobble, sword " + count(c2, net.minecraft.world.item.Items.IRON_SWORD));
+        if (count(c3, net.minecraft.world.item.Items.BREAD) != 16 || h.stock(bread) != 24)
+            throw new IllegalStateException("kept: " + count(c3, net.minecraft.world.item.Items.BREAD) + " bread in the chest, " + h.stock(bread) + " in the stores");
+        if (count(c4, torch) != tp[0] * 2 || h.stock(em) != 5)
+            throw new IllegalStateException("bought: " + count(c4, torch) + " " + torch + ", " + h.stock(em) + " emeralds left");
+        var report = net.aiagent256.stormhold.holding.Steward.report(h);
+        if (report == null || !report.getString().contains("sold")) throw new IllegalStateException("the steward's account: " + report);
+        // a second look changes nothing: the keep chest is full up, the sell chest has only its odd lot
+        net.aiagent256.stormhold.holding.Steward.tick(level, mgr, h);
+        if (count(c3, net.minecraft.world.item.Items.BREAD) != 16 || h.stock(bread) != 24) throw new IllegalStateException("kept twice");
+        g.succeed();
+    }
+
     /** A clean stretch of sky over the arena's own footprint: the arenas lie underground and the builder reads the heightmap. */
     private static BlockPos sky(GameTestHelper g, net.minecraft.world.level.block.state.BlockState floor) {
         ServerLevel level = g.getLevel();

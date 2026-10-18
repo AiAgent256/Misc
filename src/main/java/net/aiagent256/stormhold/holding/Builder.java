@@ -633,7 +633,9 @@ public final class Builder {
         // what's somebody's: every castle and town near, and the buildings of the fiefs
         var near = ring.inflatedBy(40);
         List<net.minecraft.world.level.levelgen.structure.BoundingBox> keep = new ArrayList<>();
-        for (Holding o : mgr.holdings.values()) {
+        List<Holding> all = new ArrayList<>(mgr.holdings.values());
+        if (!all.contains(h)) all.add(h);
+        for (Holding o : all) {
             if (o.box.intersects(near)) keep.add(o.box);
             for (Holding.FiefBuilding b : o.fief) if (b.box().intersects(near)) keep.add(b.box().inflatedBy(1));
         }

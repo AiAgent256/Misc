@@ -37,7 +37,7 @@ public final class Net {
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
             MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19,
-            SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22;
+            SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -100,6 +100,9 @@ public final class Net {
                     if (c.kind == Campaign.Kind.ILLAGERS && h.id.equals(c.target)) status.append("Illager warband at the walls: ").append(c.total()).append(". ");
                     if (c.kind == Campaign.Kind.PARTY && h.id.equals(c.origin)) status.append("War party out: ").append(c.total()).append(" men, ")
                             .append(c.stage.name().toLowerCase()).append(". ");
+                    if (c.kind == Campaign.Kind.SCOUT && h.id.equals(c.origin)) status.append("Scouts out, back in about ")
+                            .append(net.aiagent256.stormhold.holding.Scouts.time((int) Math.ceil(((c.stage == Campaign.Stage.MARCH ? 2 : 1) - c.progress)
+                                    * c.length() / net.aiagent256.stormhold.holding.Scouts.SPEED))).append(". ");
                     if (c.kind == Campaign.Kind.COLUMN && h.id.equals(c.origin)) status.append("Column of ").append(c.total())
                             .append(" riding to you, ").append(net.aiagent256.stormhold.holding.Columns.eta(c)).append(" out. ");
                 }
@@ -237,6 +240,7 @@ public final class Net {
                         net.aiagent256.stormhold.holding.Labour.SMITH, a.amount()));
                 case REPAIR -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.REPAIR, player);
                 case FORTIFY -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.FORTIFY, player);
+                case SCOUT -> net.aiagent256.stormhold.holding.Scouts.send(level, mgr, h, player, a.pos());
                 case PROJECT -> {
                     String[] ps = net.aiagent256.stormhold.holding.Builder.PROJECTS;
                     if (a.amount() >= 0 && a.amount() < ps.length) net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, ps[a.amount()], player);

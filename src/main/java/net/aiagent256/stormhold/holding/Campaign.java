@@ -13,7 +13,7 @@ import java.util.UUID;
 
 /** An army on the move: a house raid against a player's castle, or a player's war party. */
 public class Campaign {
-    public enum Kind {RAID, PARTY, CAMP, COLUMN, ILLAGERS}
+    public enum Kind {RAID, PARTY, CAMP, COLUMN, ILLAGERS, SCOUT}
 
     public enum Stage {MARCH, SIEGE, RETURN, DONE}
 
