@@ -30,7 +30,7 @@ AVOID_EXTRA += ["valarian_conquest:bandit_camp", "valarian_conquest:neutral_tent
 THEME_WEIGHT = {"north": 3, "riverlands": 3, "reach": 2, "dorne": 2, "stormlands": 2, "nether": 1}
 
 
-def write(root, layout_meta):
+def write(root, layout_meta, export_name=lambda n: n):
     base = os.path.join(root, "src/main/resources/data/stormhold")
     sdir = os.path.join(base, "worldgen/structure")
     setdir = os.path.join(base, "worldgen/structure_set")
@@ -50,7 +50,7 @@ def write(root, layout_meta):
             layouts = []
             for ln in cfg["layouts"]:
                 m = layout_meta[ln]
-                layouts.append({"name": ln, "size_x": m["size"][0], "size_z": m["size"][2],
+                layouts.append({"name": export_name(ln), "size_x": m["size"][0], "size_z": m["size"][2],
                                 "ground": m["ground"], "weight": 1})
             st = {
                 "type": "stormhold:castle",

@@ -38,6 +38,9 @@ def audit(g, meta, cells=None):
     spiral = getattr(g, "spiral_cells", set())
     narrow_stairs, narrow, narrow_axis = [], [], {}
     for (x, y, z) in cells:
+        # a cell under water is swum, not walked: the canal bed and the harbour floor aren't passages
+        if "water" in g.get(x, y, z) or "water" in g.get(x, y + 1, z):
+            continue
         below = g.get(x, y - 1, z)
         if "stairs" in below and "half=bottom" in below:
             if (x, z) in spiral:
@@ -82,21 +85,27 @@ def audit(g, meta, cells=None):
         import furnish
         rooms = furnish.find_rooms(g, meta["GL"], set())
         for r in rooms:
-            lit = False
-            for (x, z) in r.cells:
-                for yy in range(r.y, min(g.Y, r.y + 8)):
-                    s = g.get(x, yy, z)
-                    if any(k in s for k in LIGHT):
-                        lit = True
-                        break
-                if lit:
-                    break
-            if not lit:
+            if not room_lit(g, r):
                 dark.append((r.x0, r.y, r.z0, r.w(), r.d()))
     except Exception:
         pass
     return {"narrow_stairs": narrow_stairs, "narrow_spirals": [0] * getattr(g, "narrow_spirals", 0), "pinches": pinches,
             "alleys": alleys, "dark_rooms": dark}
+
+
+def room_lit(g, r):
+    """A light in the room or in its walls: a lantern standing on the floor takes a cell out of the room, and a
+    shroomlight set in a stair core lights the flight round it."""
+    near = set()
+    for (x, z) in r.cells:
+        near.add((x, z))
+        for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            near.add((x + dx, z + dz))
+    for (x, z) in near:
+        for yy in range(r.y, min(g.Y, r.y + 8)):
+            if any(k in g.get(x, yy, z) for k in LIGHT):
+                return True
+    return False
 
 
 def summary(res):

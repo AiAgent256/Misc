@@ -54,11 +54,26 @@ SCALE_LIMITS = {"*": {"narrow_stairs": 0, "pinches": 3, "dark_rooms": 0},
                 "great_castle_b2": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
                 "great_castle_c": {"narrow_stairs": 1, "pinches": 6, "dark_rooms": 0},
                 "great_castle_c2": {"narrow_stairs": 1, "pinches": 6, "dark_rooms": 0},
-                "town_walled": {"narrow_stairs": 0, "pinches": 7, "dark_rooms": 1},
-                "town_cross": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 1},
-                "town_green": {"narrow_stairs": 0, "pinches": 5, "dark_rooms": 1},
-                "great_city": {"narrow_stairs": 6, "pinches": 20, "dark_rooms": 8},
-                "canal_city": {"narrow_stairs": 6, "pinches": 70, "dark_rooms": 9}}
+                "town_walled": {"narrow_stairs": 0, "pinches": 7, "dark_rooms": 0},
+                "town_cross": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
+                "town_green": {"narrow_stairs": 0, "pinches": 5, "dark_rooms": 0},
+                # second revisions: the quay houses moved against the wall with their doors on the quay, the
+                # terrace trees stood off the keep wall, every tower room lit. What's left is house doors
+                # against party walls and a few gaps on the walks.
+                "great_city": {"narrow_stairs": 0, "pinches": 15, "dark_rooms": 0},
+                "canal_city": {"narrow_stairs": 0, "pinches": 17, "dark_rooms": 0}}
+
+
+# Plans rebuilt since they first went out into worlds. A rebuilt plan is exported under a new name
+# (great_city_r2), so the castles already standing, and the half-generated ones whose chunks are still
+# to come, keep the tiles they were started with and the Master Builder repairs them to their own plans.
+# New castles use the newest revision. Bump a plan's number whenever its blocks change.
+REVISIONS = {"great_city": 2, "canal_city": 2, "town_walled": 2, "town_cross": 2, "town_green": 2}
+
+
+def export_name(name):
+    rev = REVISIONS.get(name, 1)
+    return name if rev == 1 else f"{name}_r{rev}"
 
 
 def builds():
@@ -101,7 +116,7 @@ def main():
                 raise SystemExit(f"{name}: no room for a crypt under the keep")
             kinds.update(cr)
         g.markers.pop("dwelling", None)              # homes not put up for sale are just homes
-        kinds["lit"] = fixup.light_rooms(g, meta["GL"])
+        kinds["lit"] = fixup.light_rooms(g, meta["GL"], rev=REVISIONS.get(name, 1))
         opened = fixup.clear_blocked_doorways(g, meta["GL"], tuple(meta.get("levels", ())))
         dropped = fixup.drop_buried_markers(g)
         bad, checked = walk.audit(g, meta)
@@ -125,8 +140,10 @@ def main():
         if kinds["beds"] < kinds["men"]:
             raise SystemExit(f"{name}: {kinds['beds']} beds for {kinds['men']} men")
         if not args.no_export:
-            tiles = export.write_tiles(g, os.path.join(STRUCT_DIR, name), name)
-            layout = export.write_layout(g, meta, tiles, os.path.join(LAYOUT_DIR, f"{name}.json"))
+            out = export_name(name)
+            meta["name"] = out
+            tiles = export.write_tiles(g, os.path.join(STRUCT_DIR, out), out)
+            layout = export.write_layout(g, meta, tiles, os.path.join(LAYOUT_DIR, f"{out}.json"))
             metas[name] = layout
             print(f"  tiles {len(tiles)}, blocks {sum(t['blocks'] for t in tiles)}, posts " +
                   ", ".join(f"{k}={len(v)}" for k, v in layout["posts"].items()) +
@@ -139,7 +156,7 @@ def main():
             print(f"  renders done in {time.time() - t:.1f}s")
 
     if not args.only and not args.no_export:
-        worldgen.write(ROOT, metas)
+        worldgen.write(ROOT, metas, export_name)
 
 
 if __name__ == "__main__":

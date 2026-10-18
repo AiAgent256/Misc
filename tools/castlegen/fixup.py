@@ -69,14 +69,19 @@ def drop_buried_markers(g, keep=("gate", "lord", "war_table", "banner_stand", "r
     return n
 
 
-def light_rooms(g, GL):
-    """Every room gets a light: a lantern hung from the ceiling over its middle, where one is missing."""
+def light_rooms(g, GL, rev=1):
+    """Every room gets a light: a lantern hung from the ceiling over its middle, where one is missing.
+    From the second revision of a plan a light set in the room's walls counts, and a room with nothing over
+    its middle to hang from gets a lantern standing in a corner. The first revision is kept exactly as it
+    was, so plans already out in the world rebuild to the same blocks."""
     import furnish
-    from scale_audit import LIGHT
+    from scale_audit import LIGHT, room_lit
     n = 0
     for r in furnish.find_rooms(g, GL, set()):
-        lit = any(any(k in g.get(x, yy, z) for k in LIGHT) for (x, z) in r.cells for yy in range(r.y, min(g.Y, r.y + 8)))
-        if lit:
+        if rev >= 2:
+            if room_lit(g, r):
+                continue
+        elif any(any(k in g.get(x, yy, z) for k in LIGHT) for (x, z) in r.cells for yy in range(r.y, min(g.Y, r.y + 8))):
             continue
         cx, cz = (r.x0 + r.x1) // 2, (r.z0 + r.z1) // 2
         if (cx, cz) not in r.cells:
@@ -90,4 +95,34 @@ def light_rooms(g, GL):
             g.fill(cx, ly + 1, cz, cx, yy, cz, "minecraft:chain[axis=y]") if yy > ly else None
             g.set(cx, ly, cz, "minecraft:lantern[hanging=true]")
             n += 1
+            continue
+        if rev < 2:
+            continue
+        # nothing over the middle to hang it from (a roof of stairs, a tower top): a lantern on the floor in
+        # a corner, out of the way, with walls on two sides and no door beside it
+        spot = _corner(g, r)
+        if spot is not None:
+            g.set(spot[0], r.y, spot[1], "minecraft:lantern[hanging=false]")
+            n += 1
     return n
+
+
+def _corner(g, r):
+    best, best_walls = None, 1
+    for (x, z) in sorted(r.cells):
+        if g.get(x, r.y, z) != "minecraft:air":
+            continue
+        walls, door = 0, False
+        for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            s = g.get(x + dx, r.y, z + dz)
+            if "door" in s or "gate" in s:
+                door = True
+            if g.is_solid(x + dx, r.y, z + dz) and "door" not in s:
+                walls += 1
+        if door or (x, z + 0) not in r.cells:
+            continue
+        if walls > best_walls:
+            best, best_walls = (x, z), walls
+            if walls >= 2:
+                break
+    return best

@@ -7,21 +7,21 @@
  "theme": "dorne",
  "layouts": [
   {
-   "name": "town_walled",
+   "name": "town_walled_r2",
    "size_x": 100,
    "size_z": 100,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "town_cross",
+   "name": "town_cross_r2",
    "size_x": 104,
    "size_z": 88,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "town_green",
+   "name": "town_green_r2",
    "size_x": 96,
    "size_z": 96,
    "ground": 5,

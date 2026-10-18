@@ -35,7 +35,9 @@ public class StormholdGameTests {
     private static final String[] LAYOUTS = {"great_castle_a", "great_castle_b", "great_castle_c", "holdfast_a",
             "holdfast_b", "watchtower_a", "watchtower_b", "great_castle_a2", "great_castle_b2", "great_castle_c2",
             "holdfast_a2", "holdfast_b2", "watchtower_a2", "watchtower_b2", "holdfast_c", "holdfast_c2", "watchtower_c",
-            "watchtower_c2", "town_walled", "town_cross", "town_green", "great_city", "canal_city"};
+            "watchtower_c2", "town_walled", "town_cross", "town_green", "great_city", "canal_city",
+            // second revisions: new castles use these, the old ones keep their plans for repairs and half-built chunks
+            "town_walled_r2", "town_cross_r2", "town_green_r2", "great_city_r2", "canal_city_r2"};
 
     @GameTest(template = "arena")
     public static void castleDataLoads(GameTestHelper g) {
@@ -52,7 +54,8 @@ public class StormholdGameTests {
             if (DataRegistries.theme(t).isEmpty()) throw new IllegalStateException("missing theme " + t);
         }
         // every town and city has its shops, its notice board and homes for sale
-        for (String n : new String[]{"town_walled", "town_cross", "town_green", "great_city", "canal_city"}) {
+        for (String n : new String[]{"town_walled", "town_cross", "town_green", "great_city", "canal_city",
+                "town_walled_r2", "town_cross_r2", "town_green_r2", "great_city_r2", "canal_city_r2"}) {
             var lay = DataRegistries.layout(n);
             int shops = 0;
             java.util.Set<String> kinds = new java.util.HashSet<>();
@@ -69,7 +72,8 @@ public class StormholdGameTests {
             if (lay.extras.get("notice_board") == null) throw new IllegalStateException(n + " has no notice board");
         }
         // every keep has its crypt: the marker the generator leaves at the founder's tomb
-        for (String n : new String[]{"holdfast_a", "holdfast_b", "holdfast_c", "great_castle_a", "great_castle_b", "great_castle_c", "great_city", "canal_city"}) {
+        for (String n : new String[]{"holdfast_a", "holdfast_b", "holdfast_c", "great_castle_a", "great_castle_b", "great_castle_c", "great_city", "canal_city",
+                "great_city_r2", "canal_city_r2"}) {
             var crypt = DataRegistries.layout(n).extras.get("crypt");
             if (crypt == null || crypt.isEmpty()) throw new IllegalStateException("no crypt under " + n);
         }

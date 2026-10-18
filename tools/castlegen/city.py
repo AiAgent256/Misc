@@ -670,13 +670,14 @@ def great_city(seed=77):
         g.set(px + 2, GL, 251, "minecraft:lantern[hanging=false]")
         g.set(px + 1, GL, 240, "minecraft:barrel[facing=up]"); g.set(px + 3, GL, 244, "minecraft:barrel[facing=up]")
     for x in range(14, 242, 24):
-        lamp_post(g, x, 236, GL)
+        lamp_post(g, x, 237, GL)
     for x in (20, 68, 180, 228):
-        building(g, x, 229, x + 16, 236, GL, 6, "x", door_cells=((x + 8, 229),), wall_block=STONE)
-        g.barrel(x + 2, GL, 234, LOOT + "town_house"); g.barrel(x + 14, GL, 234, LOOT + "town_house")
+        # against the foot of the wall, doors on the quay: no slot behind them and a street three wide in front
+        building(g, x, 228, x + 16, 234, GL, 6, "x", door_cells=((x + 8, 234),), wall_block=STONE)
+        g.barrel(x + 2, GL, 232, LOOT + "town_house"); g.barrel(x + 14, GL, 232, LOOT + "town_house")
     lighthouse(g, 8, 232, GL)
     lighthouse(g, 247, 232, GL)
-    g.mark("knight", 128, GL, 233); g.mark("knight", 60, GL, 233); g.mark("knight", 196, GL, 233)
+    g.mark("knight", 128, GL, 236); g.mark("knight", 60, GL, 236); g.mark("knight", 196, GL, 236)
 
     # ---- terraces ----
     upper = rect(g, 64, 14, 191, 113)
@@ -808,8 +809,10 @@ def great_city(seed=77):
     doors += row_x(g, 86, 118, 84, 12, GL2, rng, "south", lot=(14, 18), gap=3, wall=NOBLE, h=11)
     doors += row_x(g, 138, 170, 84, 12, GL2, rng, "south", lot=(14, 18), gap=3, wall=NOBLE, h=11)
     for z in range(26, 76, 10):
-        for x in (85, 171):
-            tree_oak(g, x + int(rng.integers(0, 2)), z + int(rng.integers(0, 4)), GL2, rng)
+        for x in (84, 172):
+            rng.integers(0, 2)          # the old jitter, drawn so the rest of the city comes out the same
+            # three clear of the terrace wall, so the walk between them is two wide
+            tree_oak(g, x, z + int(rng.integers(0, 4)), GL2, rng)
     for (x, z) in ((86, 40), (170, 40), (86, 60), (170, 60)):
         g.set(x, GL2, z, "minecraft:stone_brick_wall"); g.set(x, GL2 + 1, z, "minecraft:lantern[hanging=false]")
     # the grand stair to the keep: 14 blocks of rise in a wide sweep, flanked by statues
