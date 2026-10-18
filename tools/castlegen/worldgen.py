@@ -6,9 +6,11 @@ from themes import BIOMES, OVERWORLD
 
 TIERS = {
     "great_castle": {"layouts": ["great_castle_a", "great_castle_b", "great_castle_c",
-                                 "great_castle_a2", "great_castle_b2", "great_castle_c2"],
+                                 "great_castle_a2", "great_castle_b2", "great_castle_c2",
+                                 "great_castle_a_moat", "great_castle_c_moat", "great_castle_d", "great_castle_d2"],
                      "spacing": 64, "separation": 28, "salt": 718213044},
-    "holdfast": {"layouts": ["holdfast_a", "holdfast_b", "holdfast_c", "holdfast_a2", "holdfast_b2", "holdfast_c2"], "spacing": 44, "separation": 18, "salt": 515870611},
+    "holdfast": {"layouts": ["holdfast_a", "holdfast_b", "holdfast_c", "holdfast_a2", "holdfast_b2", "holdfast_c2",
+                             "holdfast_b_moat", "holdfast_c_moat"], "spacing": 44, "separation": 18, "salt": 515870611},
     "watchtower": {"layouts": ["watchtower_a", "watchtower_b", "watchtower_c", "watchtower_a2", "watchtower_b2", "watchtower_c2"], "spacing": 30, "separation": 12, "salt": 93011254},
     # the market towns between the castles: commoner, closer together, on flat ground
     "town": {"layouts": ["town_walled", "town_cross", "town_green"], "spacing": 36, "separation": 14, "salt": 611290377},
@@ -17,6 +19,16 @@ TIERS = {
     # the Nether holdfast: the holdfast plans in blackstone and nether brick, sited on the floor of the Nether
     "nether_holdfast": {"layouts": ["holdfast_a", "holdfast_b", "holdfast_c", "holdfast_a2", "holdfast_b2", "holdfast_c2"], "spacing": 40, "separation": 16,
                         "salt": 884120977, "themes": ["nether"], "nether": True, "max_slope": 24},
+    # ruins: the same plans, fallen in. The game collapses them as they're placed (ruined=true) and the Master
+    # Builder of whoever claims one rebuilds it to the plan, so they need no tiles of their own. Towers and
+    # holdfasts are the common ruins, a great castle fallen in is rarer.
+    "ruin": {"layouts": ["watchtower_a", "watchtower_b", "watchtower_c", "watchtower_a2", "watchtower_b2", "watchtower_c2",
+                         "holdfast_a", "holdfast_b", "holdfast_c", "holdfast_a2", "holdfast_b2", "holdfast_c2",
+                         "great_castle_a", "great_castle_b", "great_castle_c"],
+             "weights": {"great_castle_a": 1, "great_castle_b": 1, "great_castle_c": 1}, "default_weight": 3,
+             "spacing": 40, "separation": 16, "salt": 271828183, "ruined": True, "max_slope": 20, "tag": True},
+    # the old world's temples: nobody's, overgrown, a pool before the steps and something under the altar
+    "temple_ruin": {"layouts": ["temple_ruin"], "spacing": 48, "separation": 20, "salt": 314159265, "max_slope": 20, "tag": True},
 }
 # Castles keep clear of these (and smaller castles keep clear of bigger ones). Siting shifts a castle
 # away from a possible village rather than dropping it. Modded entries are optional.
@@ -51,7 +63,7 @@ def write(root, layout_meta, export_name=lambda n: n):
             for ln in cfg["layouts"]:
                 m = layout_meta[ln]
                 layouts.append({"name": export_name(ln), "size_x": m["size"][0], "size_z": m["size"][2],
-                                "ground": m["ground"], "weight": 1})
+                                "ground": m["ground"], "weight": cfg.get("weights", {}).get(ln, cfg.get("default_weight", 1))})
             st = {
                 "type": "stormhold:castle",
                 "biomes": f"#stormhold:has_castle/{theme}",
@@ -65,6 +77,8 @@ def write(root, layout_meta, export_name=lambda n: n):
                 st["max_slope"] = cfg["max_slope"]
             if cfg.get("nether"):
                 st["nether"] = True
+            if cfg.get("ruined"):
+                st["ruined"] = True
             with open(os.path.join(sdir, f"{sid}.json"), "w") as f:
                 json.dump(st, f, indent=1)
             entries.append({"structure": f"stormhold:{sid}", "weight": THEME_WEIGHT[theme]})
@@ -79,6 +93,11 @@ def write(root, layout_meta, export_name=lambda n: n):
             json.dump(sset, f, indent=1)
     avoid_dir = os.path.join(base, "tags/worldgen/structure")
     os.makedirs(avoid_dir, exist_ok=True)
+    # a tag per newer tier, for /locate (the older tiers' tags are kept by hand)
+    for tier, cfg in TIERS.items():
+        if cfg.get("tag"):
+            with open(os.path.join(avoid_dir, f"{tier}.json"), "w") as f:
+                json.dump({"replace": False, "values": [f"stormhold:{tier}_{th}" for th in cfg.get("themes", OVERWORLD)]}, f, indent=1)
     vals = ["#minecraft:village"] + [{"id": i, "required": False} for i in AVOID_EXTRA]
     vals += [f"stormhold:{t}_{th}" for t, cfg in TIERS.items() for th in cfg.get("themes", OVERWORLD)]
     with open(os.path.join(avoid_dir, "castle_avoid.json"), "w") as f:

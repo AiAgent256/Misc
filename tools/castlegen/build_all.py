@@ -25,6 +25,7 @@ import render
 import themes
 import walk
 import worldgen
+import variety
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 STRUCT_DIR = os.path.join(ROOT, "src/main/resources/data/stormhold/structures")
@@ -33,10 +34,13 @@ LAYOUT_DIR = os.path.join(ROOT, "src/main/resources/data/stormhold/castle_layout
 
 LAYOUTS = (castle.great_castle_a, castle2.great_castle_b, castle2.great_castle_c,
            castle.holdfast_a, castle2.holdfast_b, castle2.holdfast_c, castle.watchtower_a, castle2.watchtower_b, castle2.watchtower_c, city.great_city, city2.canal_city,
-           market_town.town_walled, market_town.town_cross, market_town.town_green)
+           market_town.town_walled, market_town.town_cross, market_town.town_green,
+           variety.temple_ruin, variety.great_castle_d,
+           variety.moated(castle2.holdfast_b, "spire"), variety.moated(castle2.holdfast_c, "cone"),
+           variety.moated(castle.great_castle_a, "spire"), variety.moated(castle2.great_castle_c, "hoard"))
 # A second build of each castle with a different seed, roof style and temper, so two castles of the same
 # plan don't read as copies. The city is one of a kind.
-VARIANTS = {"great_castle_a": ("hoard", 2), "great_castle_b": ("spire", 3), "great_castle_c": ("low", 1),
+VARIANTS = {"great_castle_d": ("cone", 3), "great_castle_a": ("hoard", 2), "great_castle_b": ("spire", 3), "great_castle_c": ("low", 1),
             "holdfast_a": ("pyramid", 4), "holdfast_b": ("hoard", 2), "holdfast_c": ("spire", 3),
             "watchtower_a": ("flat", 3), "watchtower_b": ("spire", 1), "watchtower_c": ("hoard", 2)}
 
@@ -61,7 +65,11 @@ SCALE_LIMITS = {"*": {"narrow_stairs": 0, "pinches": 3, "dark_rooms": 0},
                 # terrace trees stood off the keep wall, every tower room lit. What's left is house doors
                 # against party walls and a few gaps on the walks.
                 "great_city": {"narrow_stairs": 0, "pinches": 15, "dark_rooms": 0},
-                "canal_city": {"narrow_stairs": 0, "pinches": 17, "dark_rooms": 0}}
+                "canal_city": {"narrow_stairs": 0, "pinches": 17, "dark_rooms": 0},
+                # a ruin is meant to be broken: gaps between fallen drums, shade under the last of the entablature
+                "temple_ruin": {"narrow_stairs": 0, "pinches": 10, "dark_rooms": 3},
+                "great_castle_d": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
+                "great_castle_d2": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0}}
 
 
 # Plans rebuilt since they first went out into worlds. A rebuilt plan is exported under a new name
@@ -78,7 +86,7 @@ def export_name(name):
 
 def builds():
     for fn in LAYOUTS:
-        yield fn, fn.__name__, "cone", None
+        yield fn, fn.__name__, getattr(fn, "cap_style", "cone"), None
         if fn.__name__ in VARIANTS:
             style, seed_shift = VARIANTS[fn.__name__]
             yield fn, fn.__name__ + "2", style, seed_shift
@@ -104,8 +112,10 @@ def main():
         meta["name"] = name
         character = meta.get("character") or rooms.character_for(name, seed_shift or 0)
         meta["character"] = character
-        widened = scale.widen_doorways(g, meta["GL"])
-        kinds = rooms.furnish(g, meta["GL"], character, tier=meta.get("tier", 2))
+        landmark = meta.get("kind") == "landmark"
+        # a landmark is built as it stands: no widening the gaps between its columns, nobody's furniture in it
+        widened = 0 if landmark else scale.widen_doorways(g, meta["GL"])
+        kinds = {"beds": 0, "men": 0} if landmark else rooms.furnish(g, meta["GL"], character, tier=meta.get("tier", 2))
         kinds["doorways_widened"] = widened
         meta["beds"] = kinds["beds"]
         if meta.get("tier", 2) >= 2 and meta.get("kind") != "town":
@@ -116,8 +126,8 @@ def main():
                 raise SystemExit(f"{name}: no room for a crypt under the keep")
             kinds.update(cr)
         g.markers.pop("dwelling", None)              # homes not put up for sale are just homes
-        kinds["lit"] = fixup.light_rooms(g, meta["GL"], rev=REVISIONS.get(name, 1))
-        opened = fixup.clear_blocked_doorways(g, meta["GL"], tuple(meta.get("levels", ())))
+        kinds["lit"] = 0 if landmark else fixup.light_rooms(g, meta["GL"], rev=REVISIONS.get(name, 1))
+        opened = 0 if landmark else fixup.clear_blocked_doorways(g, meta["GL"], tuple(meta.get("levels", ())))
         dropped = fixup.drop_buried_markers(g)
         bad, checked = walk.audit(g, meta)
         unreachable = sum(len(v) for v in bad.values())
@@ -133,11 +143,12 @@ def main():
         for k, v in sc.items():
             if v:
                 print(f"    {k}: {sorted(v)[:5]}")
-        limit = SCALE_LIMITS.get(name, SCALE_LIMITS["*"])
+        # a moated plan holds to its castle's limits
+        limit = SCALE_LIMITS.get(name) or SCALE_LIMITS.get(name.replace("_moat", ""), SCALE_LIMITS["*"])
         over = [k for k in ("narrow_stairs", "pinches", "dark_rooms") if len(sc[k]) > limit[k]]
         if over:
             raise SystemExit(f"{name}: cramped: " + ", ".join(f"{k} {len(sc[k])} > {limit[k]}" for k in over))
-        if kinds["beds"] < kinds["men"]:
+        if kinds["beds"] < kinds["men"] and meta.get("kind") != "landmark":
             raise SystemExit(f"{name}: {kinds['beds']} beds for {kinds['men']} men")
         if not args.no_export:
             out = export_name(name)

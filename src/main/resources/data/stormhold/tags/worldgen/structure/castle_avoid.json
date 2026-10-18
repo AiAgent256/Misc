@@ -139,6 +139,16 @@
   "stormhold:great_city_reach",
   "stormhold:great_city_dorne",
   "stormhold:great_city_stormlands",
-  "stormhold:nether_holdfast_nether"
+  "stormhold:nether_holdfast_nether",
+  "stormhold:ruin_north",
+  "stormhold:ruin_riverlands",
+  "stormhold:ruin_reach",
+  "stormhold:ruin_dorne",
+  "stormhold:ruin_stormlands",
+  "stormhold:temple_ruin_north",
+  "stormhold:temple_ruin_riverlands",
+  "stormhold:temple_ruin_reach",
+  "stormhold:temple_ruin_dorne",
+  "stormhold:temple_ruin_stormlands"
  ]
 }

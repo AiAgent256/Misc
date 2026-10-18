@@ -1,0 +1,18 @@
+{
+ "type": "stormhold:castle",
+ "biomes": "#stormhold:has_castle/stormlands",
+ "step": "surface_structures",
+ "terrain_adaptation": "beard_box",
+ "spawn_overrides": {},
+ "theme": "stormlands",
+ "layouts": [
+  {
+   "name": "temple_ruin",
+   "size_x": 52,
+   "size_z": 52,
+   "ground": 4,
+   "weight": 1
+  }
+ ],
+ "max_slope": 20
+}

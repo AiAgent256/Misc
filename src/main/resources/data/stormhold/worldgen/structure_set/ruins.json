@@ -1,0 +1,30 @@
+{
+ "structures": [
+  {
+   "structure": "stormhold:ruin_north",
+   "weight": 3
+  },
+  {
+   "structure": "stormhold:ruin_riverlands",
+   "weight": 3
+  },
+  {
+   "structure": "stormhold:ruin_reach",
+   "weight": 2
+  },
+  {
+   "structure": "stormhold:ruin_dorne",
+   "weight": 2
+  },
+  {
+   "structure": "stormhold:ruin_stormlands",
+   "weight": 2
+  }
+ ],
+ "placement": {
+  "type": "minecraft:random_spread",
+  "spacing": 40,
+  "separation": 16,
+  "salt": 271828183
+ }
+}

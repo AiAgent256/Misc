@@ -1,0 +1,10 @@
+{
+ "replace": false,
+ "values": [
+  "stormhold:temple_ruin_north",
+  "stormhold:temple_ruin_riverlands",
+  "stormhold:temple_ruin_reach",
+  "stormhold:temple_ruin_dorne",
+  "stormhold:temple_ruin_stormlands"
+ ]
+}
