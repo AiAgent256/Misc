@@ -7,7 +7,7 @@ from themes import BIOMES, OVERWORLD
 TIERS = {
     "great_castle": {"layouts": ["great_castle_a", "great_castle_b", "great_castle_c",
                                  "great_castle_a2", "great_castle_b2", "great_castle_c2",
-                                 "great_castle_a_moat", "great_castle_c_moat"],
+                                 "great_castle_a_moat", "great_castle_c_moat", "great_castle_d", "great_castle_d2"],
                      "spacing": 64, "separation": 28, "salt": 718213044},
     "holdfast": {"layouts": ["holdfast_a", "holdfast_b", "holdfast_c", "holdfast_a2", "holdfast_b2", "holdfast_c2",
                              "holdfast_b_moat", "holdfast_c_moat"], "spacing": 44, "separation": 18, "salt": 515870611},

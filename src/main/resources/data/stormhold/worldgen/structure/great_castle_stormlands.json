@@ -47,6 +47,34 @@
    "size_z": 112,
    "ground": 6,
    "weight": 1
+  },
+  {
+   "name": "great_castle_a_moat",
+   "size_x": 148,
+   "size_z": 148,
+   "ground": 6,
+   "weight": 1
+  },
+  {
+   "name": "great_castle_c_moat",
+   "size_x": 180,
+   "size_z": 132,
+   "ground": 6,
+   "weight": 1
+  },
+  {
+   "name": "great_castle_d",
+   "size_x": 128,
+   "size_z": 128,
+   "ground": 6,
+   "weight": 1
+  },
+  {
+   "name": "great_castle_d2",
+   "size_x": 128,
+   "size_z": 128,
+   "ground": 6,
+   "weight": 1
   }
  ]
 }

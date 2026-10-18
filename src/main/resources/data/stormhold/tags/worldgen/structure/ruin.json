@@ -1,0 +1,10 @@
+{
+ "replace": false,
+ "values": [
+  "stormhold:ruin_north",
+  "stormhold:ruin_riverlands",
+  "stormhold:ruin_reach",
+  "stormhold:ruin_dorne",
+  "stormhold:ruin_stormlands"
+ ]
+}

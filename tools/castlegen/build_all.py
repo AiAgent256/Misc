@@ -35,12 +35,12 @@ LAYOUT_DIR = os.path.join(ROOT, "src/main/resources/data/stormhold/castle_layout
 LAYOUTS = (castle.great_castle_a, castle2.great_castle_b, castle2.great_castle_c,
            castle.holdfast_a, castle2.holdfast_b, castle2.holdfast_c, castle.watchtower_a, castle2.watchtower_b, castle2.watchtower_c, city.great_city, city2.canal_city,
            market_town.town_walled, market_town.town_cross, market_town.town_green,
-           variety.temple_ruin,
+           variety.temple_ruin, variety.great_castle_d,
            variety.moated(castle2.holdfast_b, "spire"), variety.moated(castle2.holdfast_c, "cone"),
            variety.moated(castle.great_castle_a, "spire"), variety.moated(castle2.great_castle_c, "hoard"))
 # A second build of each castle with a different seed, roof style and temper, so two castles of the same
 # plan don't read as copies. The city is one of a kind.
-VARIANTS = {"great_castle_a": ("hoard", 2), "great_castle_b": ("spire", 3), "great_castle_c": ("low", 1),
+VARIANTS = {"great_castle_d": ("cone", 3), "great_castle_a": ("hoard", 2), "great_castle_b": ("spire", 3), "great_castle_c": ("low", 1),
             "holdfast_a": ("pyramid", 4), "holdfast_b": ("hoard", 2), "holdfast_c": ("spire", 3),
             "watchtower_a": ("flat", 3), "watchtower_b": ("spire", 1), "watchtower_c": ("hoard", 2)}
 
@@ -67,7 +67,9 @@ SCALE_LIMITS = {"*": {"narrow_stairs": 0, "pinches": 3, "dark_rooms": 0},
                 "great_city": {"narrow_stairs": 0, "pinches": 15, "dark_rooms": 0},
                 "canal_city": {"narrow_stairs": 0, "pinches": 17, "dark_rooms": 0},
                 # a ruin is meant to be broken: gaps between fallen drums, shade under the last of the entablature
-                "temple_ruin": {"narrow_stairs": 0, "pinches": 10, "dark_rooms": 3}}
+                "temple_ruin": {"narrow_stairs": 0, "pinches": 10, "dark_rooms": 3},
+                "great_castle_d": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
+                "great_castle_d2": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0}}
 
 
 # Plans rebuilt since they first went out into worlds. A rebuilt plan is exported under a new name
