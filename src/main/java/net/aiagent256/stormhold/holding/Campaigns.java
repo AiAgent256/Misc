@@ -74,7 +74,7 @@ public final class Campaigns {
         c.side = Sides.house(h.houseId);
         c.target = h.id;
         c.tier = h.tier;
-        c.renown = Frontier.level(level, h);
+        c.renown = Frontier.baseLevel(level, h);       // the house's men: not the castle's own forge
         c.to = h.bannerPos;
         double ang = level.random.nextDouble() * Math.PI * 2;
         BlockPos center = h.center();

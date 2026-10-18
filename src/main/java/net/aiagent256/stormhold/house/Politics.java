@@ -224,7 +224,7 @@ public final class Politics {
         c.origin = from.id;
         c.target = target.id;
         c.tier = Math.max(from.tier, target.tier);
-        c.renown = net.aiagent256.stormhold.holding.Frontier.level(level, from);
+        c.renown = net.aiagent256.stormhold.holding.Frontier.baseLevel(level, from);
         c.from = from.gatePos.equals(BlockPos.ZERO) ? from.center() : from.gatePos;
         c.to = target.bannerPos.equals(BlockPos.ZERO) ? target.center() : target.bannerPos;
         // an army that can take the place: about twice the defenders' strength, lord and walls counted

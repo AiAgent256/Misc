@@ -461,6 +461,10 @@ public final class Shops {
             restock(v);
             return;
         }
+        if (v.getTradingPlayer() != null) {
+            restock(v);                                       // mid-trade: back in stock now, new goods tomorrow
+            return;
+        }
         MerchantOffers fresh = offers(t, Frontier.zone(level, post));
         v.getOffers().clear();
         v.getOffers().addAll(fresh);

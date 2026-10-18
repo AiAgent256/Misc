@@ -162,7 +162,7 @@ public final class Loadouts {
             case ARCHER -> {
                 set(e, dyed(pick("coif", Items.LEATHER_HELMET), c), dyed(pick("gambeson_chestplate", Items.LEATHER_CHESTPLATE), c),
                         dyed(new ItemStack(Items.LEATHER_LEGGINGS), c), dyed(new ItemStack(Items.LEATHER_BOOTS), c));
-                if (rn >= 4) protect(e, rn - 3, rn >= 7);
+                if (rn >= 4) protect(e, Math.min(4, rn - 3), rn >= 7);
                 ItemStack bow = pick("longbow", Items.BOW);
                 if (!(bow.getItem() instanceof BowItem)) bow = new ItemStack(Items.BOW);
                 if (rn >= 2) bow.enchant(Enchantments.POWER_ARROWS, Math.min(5, rn - 1));
@@ -174,7 +174,7 @@ public final class Loadouts {
                 Item chest = rn >= 8 ? Items.NETHERITE_CHESTPLATE : rn >= 6 ? Items.DIAMOND_CHESTPLATE : rn >= 4 ? Items.IRON_CHESTPLATE : Items.CHAINMAIL_CHESTPLATE;
                 set(e, pick("kettlehat", Items.IRON_HELMET), rn >= 6 ? new ItemStack(chest) : pick("brigandine_chestplate", chest),
                         pick("chainmail_leggings", Items.CHAINMAIL_LEGGINGS), dyed(new ItemStack(Items.LEATHER_BOOTS), c));
-                if (rn >= 4) protect(e, rn - 3, rn >= 7);
+                if (rn >= 4) protect(e, Math.min(4, rn - 3), rn >= 7);
                 ItemStack xbow = pick("heavy_crossbow", Items.CROSSBOW);
                 if (!(xbow.getItem() instanceof CrossbowItem)) xbow = new ItemStack(Items.CROSSBOW);
                 if (rn >= 3) xbow.enchant(Enchantments.QUICK_CHARGE, Math.min(3, rn - 2));

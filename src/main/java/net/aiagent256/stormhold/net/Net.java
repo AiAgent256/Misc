@@ -31,7 +31,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 public final class Net {
-    private static final String VERSION = "1";
+    private static final String VERSION = "2";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(Stormhold.id("main"),
             () -> VERSION, VERSION::equals, VERSION::equals);
 

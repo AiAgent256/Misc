@@ -125,6 +125,12 @@ public final class Frontier {
         return zone(level, p.getX() + 0.5, p.getZ() + 0.5);
     }
 
+    /** The level the land itself gives: a castle's renown or its zone, whichever is higher (1 to 9). For armies sent against it. */
+    public static int baseLevel(ServerLevel level, @Nullable Holding h) {
+        if (h == null) return 2;
+        return Math.max(h.renown, zone(level, h.center()));
+    }
+
     /** The level a castle's people are kitted at: its renown, its zone, or what its smiths have forged, whichever is highest (1 to 9). */
     public static int level(ServerLevel level, @Nullable Holding h) {
         if (h == null) return 2;
@@ -152,10 +158,10 @@ public final class Frontier {
     public static void onJoin(ServerLevel level, Mob mob) {
         if (!enabled() || !Config.FRONTIER_MOBS.get()) return;
         if (!(mob instanceof Enemy) && mob.getType().getCategory() != MobCategory.MONSTER) return;
-        ResourceLocation id = ForgeRegistries.ENTITY_TYPES.getKey(mob.getType());
-        if (id != null && id.getNamespace().equals(Stormhold.MODID)) return;   // our own people are kitted by Loadouts
         CompoundTag data = mob.getPersistentData();
         if (data.contains(TAG)) return;
+        ResourceLocation id = ForgeRegistries.ENTITY_TYPES.getKey(mob.getType());
+        if (id != null && id.getNamespace().equals(Stormhold.MODID)) return;   // our own people are kitted by Loadouts
         int z = zone(level, mob.getX(), mob.getZ());
         data.putInt(TAG, z);
         if (z > 1) scale(mob, z);

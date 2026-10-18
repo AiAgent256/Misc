@@ -4,12 +4,14 @@ import net.aiagent256.stormhold.entity.GarrisonEntity;
 import net.aiagent256.stormhold.entity.Loadouts;
 import net.aiagent256.stormhold.house.NameGen;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.VillagerProfession;
 import net.minecraft.world.phys.AABB;
+import net.minecraftforge.registries.ForgeRegistries;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -36,6 +38,7 @@ import java.util.UUID;
 public final class Labour {
     public static final String TAG = "StormholdJob";
     public static final String HOLDING_TAG = "StormholdJobHolding";
+    private static final String WAS_TAG = "StormholdJobWas";
     public static final String MINER = "miner", SMITH = "smith";
     /** Most of one trade a castle can set to work. */
     public static final int MAX = 8;
@@ -44,7 +47,8 @@ public final class Labour {
 
     private static final ResourceLocation COAL = new ResourceLocation("minecraft", "coal"),
             IRON = new ResourceLocation("minecraft", "iron_ingot"), DIAMOND = new ResourceLocation("minecraft", "diamond"),
-            NETHERITE = new ResourceLocation("minecraft", "netherite_ingot");
+            NETHERITE = new ResourceLocation("minecraft", "netherite_ingot"),
+            SCRAP = new ResourceLocation("minecraft", "netherite_scrap"), GOLD = new ResourceLocation("minecraft", "gold_ingot");
 
     public static int wanted(Holding h, String job) {
         return job.equals(MINER) ? h.miners : h.smiths;
@@ -65,9 +69,13 @@ public final class Labour {
     /** Keep the right number at each trade: take on more from the idle, let go of any too many. */
     public static void tick(ServerLevel level, HoldingManager mgr, Holding h) {
         if (h.id == null) return;
+        boolean ours = h.isPlayerOwned();
+        boolean anyone = h.minersAt > 0 || h.smithsAt > 0 || (ours && (h.miners > 0 || h.smiths > 0));
+        if (!anyone) return;
         BlockPos c = h.center();
         if (!level.isLoaded(c)) return;
-        boolean ours = h.isPlayerOwned();
+        java.util.Set<UUID> builders = new java.util.HashSet<>();
+        for (Holding o : mgr.holdings.values()) if (o.builder != null) builders.add(o.builder);
         AABB area = new AABB(c).inflate(Fief.REACH, 80, Fief.REACH);
         List<Villager> all = level.getEntitiesOfClass(Villager.class, area, v -> v.isAlive() && !v.isBaby());
         Map<String, List<Villager>> working = new LinkedHashMap<>();
@@ -78,11 +86,13 @@ public final class Labour {
             var d = v.getPersistentData();
             if (d.contains(TAG) && d.hasUUID(HOLDING_TAG) && h.id.equals(d.getUUID(HOLDING_TAG))) {
                 working.computeIfAbsent(d.getString(TAG), k -> new ArrayList<>()).add(v);
-            } else if (!d.contains(TAG) && free(h, v)) {
+            } else if (!d.contains(TAG) && free(builders, v)) {
                 idle.add(v);
             }
         }
-        idle.sort(Comparator.comparingDouble(v -> v.distanceToSqr(c.getX(), c.getY(), c.getZ())));
+        // the jobless first, then the nearest
+        idle.sort(Comparator.<Villager>comparingInt(v -> jobless(v) ? 0 : 1)
+                .thenComparingDouble(v -> v.distanceToSqr(c.getX(), c.getY(), c.getZ())));
         boolean dirty = false;
         for (String job : List.of(MINER, SMITH)) {
             List<Villager> have = working.get(job);
@@ -109,13 +119,31 @@ public final class Labour {
         if (dirty) mgr.setDirty();
     }
 
-    /** A commoner who can be spared: not a shopkeeper, not the Master Builder, not one standing at a post. */
-    private static boolean free(Holding h, Villager v) {
-        if (v.isNoAi() || v.getPersistentData().contains(Shops.TAG)) return false;
-        return h.builder == null || !h.builder.equals(v.getUUID());
+    /**
+     * A commoner who can be spared: nobody's trading partner yet (no more experience than a castle's people
+     * start with), not a shopkeeper, not any castle's Master Builder, not one standing at a post.
+     */
+    private static boolean free(java.util.Set<UUID> builders, Villager v) {
+        if (v.isNoAi() || v.getPersistentData().contains(Shops.TAG) || builders.contains(v.getUUID())) return false;
+        return v.getVillagerXp() <= 10;
+    }
+
+    private static boolean jobless(Villager v) {
+        var p = v.getVillagerData().getProfession();
+        return p == VillagerProfession.NONE || p == VillagerProfession.NITWIT;
     }
 
     private static void hire(ServerLevel level, Holding h, Villager v, String job) {
+        // what he was, to be given back when he's let go
+        CompoundTag was = new CompoundTag();
+        ResourceLocation prof = ForgeRegistries.VILLAGER_PROFESSIONS.getKey(v.getVillagerData().getProfession());
+        was.putString("Profession", prof == null ? "minecraft:none" : prof.toString());
+        was.putInt("Level", v.getVillagerData().getLevel());
+        was.putInt("Xp", v.getVillagerXp());
+        if (!v.getOffers().isEmpty()) was.put("Offers", v.getOffers().createTag());
+        if (v.hasCustomName()) was.putString("Name", Component.Serializer.toJson(v.getCustomName()));
+        was.putBoolean("NameShown", v.isCustomNameVisible());
+        v.getPersistentData().put(WAS_TAG, was);
         v.getPersistentData().putString(TAG, job);
         v.getPersistentData().putUUID(HOLDING_TAG, h.id);
         VillagerProfession prof = job.equals(MINER) ? VillagerProfession.TOOLSMITH : VillagerProfession.ARMORER;
@@ -128,11 +156,29 @@ public final class Labour {
         v.setPersistenceRequired();
     }
 
-    private static void release(Villager v) {
-        v.getPersistentData().remove(TAG);
-        v.getPersistentData().remove(HOLDING_TAG);
-        if (v.hasCustomName()) v.setCustomName(Component.literal(v.getCustomName().getString().split(" ")[0]));
-        v.setCustomNameVisible(false);
+    /** Let a worker go: back to the trade, the trades and the name he had. */
+    static void release(Villager v) {
+        var d = v.getPersistentData();
+        d.remove(TAG);
+        d.remove(HOLDING_TAG);
+        CompoundTag was = d.getCompound(WAS_TAG);
+        d.remove(WAS_TAG);
+        if (was.isEmpty()) {
+            if (v.hasCustomName()) v.setCustomName(Component.literal(v.getCustomName().getString().split(" ")[0]));
+            v.setCustomNameVisible(false);
+            return;
+        }
+        VillagerProfession prof = ForgeRegistries.VILLAGER_PROFESSIONS.getValue(new ResourceLocation(was.getString("Profession")));
+        if (prof == null) prof = VillagerProfession.NONE;
+        v.setVillagerData(v.getVillagerData().setProfession(prof).setLevel(Math.max(1, was.getInt("Level"))));
+        v.setVillagerXp(was.getInt("Xp"));
+        if (was.contains("Offers")) {
+            var offers = new net.minecraft.world.item.trading.MerchantOffers(was.getCompound("Offers"));
+            v.getOffers().clear();
+            v.getOffers().addAll(offers);
+        }
+        v.setCustomName(was.contains("Name") ? Component.Serializer.fromJson(was.getString("Name")) : null);
+        v.setCustomNameVisible(was.getBoolean("NameShown"));
     }
 
     // ------------------------------------------------------------ the day's work
@@ -141,8 +187,9 @@ public final class Labour {
     public static void daily(ServerLevel level, HoldingManager mgr, Holding h) {
         if (!h.isPlayerOwned()) return;
         List<String> said = new ArrayList<>();
-        if (h.minersAt > 0) said.add(mine(level, h, h.minersAt));
-        if (h.smithsAt > 0) said.add(forge(level, mgr, h, h.smithsAt));
+        int miners = Math.min(h.minersAt, h.miners), smiths = Math.min(h.smithsAt, h.smiths);
+        if (miners > 0) said.add(mine(level, h, miners));
+        if (smiths > 0) said.add(forge(level, mgr, h, smiths));
         h.labourReport = String.join(" ", said);
         mgr.setDirty();
     }
@@ -184,19 +231,29 @@ public final class Labour {
 
     /** One day at the forge for n smiths. Returns the report. */
     public static String forge(ServerLevel level, HoldingManager mgr, Holding h, int n) {
-        int now = Frontier.level(level, h);
-        int target = now + 1;
-        if (target > Frontier.MAX) return "Smiths " + n + ": the garrison's kit is the best there is.";
         UUID owner = h.ownerPlayer();
-        int[] c = cost(target);
-        if (!h.forgePaid) {
+        int target;
+        if (h.forgePaid && h.forgeTarget > 0) {
+            target = h.forgeTarget;                         // the level the metal was paid for
+        } else {
+            target = Frontier.level(level, h) + 1;
+            if (target > Frontier.MAX) return "Smiths " + n + ": the garrison's kit is the best there is.";
+            int[] c = cost(target);
+            int ingots = Stores.realmStock(mgr, h, owner, NETHERITE);
+            int fromScrap = Math.min(Stores.realmStock(mgr, h, owner, SCRAP) / 4, Stores.realmStock(mgr, h, owner, GOLD) / 4);
             boolean have = Stores.realmStock(mgr, h, owner, IRON) >= c[0] && Stores.realmStock(mgr, h, owner, DIAMOND) >= c[1]
-                    && Stores.realmStock(mgr, h, owner, NETHERITE) >= c[2];
-            if (!have) return "Smiths " + n + " wait on metal for " + kitName(target) + " kit (level " + target + "): " + costText(c) + ".";
+                    && ingots + fromScrap >= c[2];
+            if (!have) return "Smiths " + n + " wait on metal for " + kitName(target) + " kit (level " + target + "): " + costText(c)
+                    + (c[2] > 0 ? " (4 netherite scrap and 4 gold make an ingot)" : "") + ".";
             Stores.take(mgr, h, owner, IRON, c[0]);
             Stores.take(mgr, h, owner, DIAMOND, c[1]);
-            Stores.take(mgr, h, owner, NETHERITE, c[2]);
+            int fromIngots = Math.min(ingots, c[2]);
+            Stores.take(mgr, h, owner, NETHERITE, fromIngots);
+            int smelt = c[2] - fromIngots;
+            Stores.take(mgr, h, owner, SCRAP, 4 * smelt);
+            Stores.take(mgr, h, owner, GOLD, 4 * smelt);
             h.forgePaid = true;
+            h.forgeTarget = target;
             h.forgeWork = 0;
         }
         h.forgeWork += n;
@@ -204,9 +261,10 @@ public final class Labour {
             return "Smiths " + n + " are forging " + kitName(target) + " kit (level " + target + "): " + h.forgeWork + " of "
                     + SMITH_DAYS + " smith-days done.";
         }
-        h.forged = target;
+        h.forged = Math.max(h.forged, target);
         h.forgeWork = 0;
         h.forgePaid = false;
+        h.forgeTarget = 0;
         int armed = rearm(level, mgr, h);
         Chronicle.log(level, mgr, Chronicle.GROWTH, "The smiths of " + h.name + " have forged " + kitName(target)
                 + " kit for its garrison (level " + target + ").", owner);

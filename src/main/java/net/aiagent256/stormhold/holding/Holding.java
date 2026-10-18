@@ -116,7 +116,7 @@ public class Holding {
     /** 1 once a great castle has looked for room for its yard market (and put it up, if there was room). */
     public int marketVersion;
     /** Labour: how many of the people the War Table sets to the mine and the forge, how many are at it, and the forge's work. */
-    public int miners, smiths, minersAt, smithsAt, forged, forgeWork;
+    public int miners, smiths, minersAt, smithsAt, forged, forgeWork, forgeTarget;
     public boolean forgePaid;
     public String labourReport = "";
     public final List<Posting> postings = new ArrayList<>();
@@ -359,6 +359,7 @@ public class Holding {
         t.putInt("SmithsAt", smithsAt);
         t.putInt("Forged", forged);
         t.putInt("ForgeWork", forgeWork);
+        t.putInt("ForgeTarget", forgeTarget);
         t.putBoolean("ForgePaid", forgePaid);
         t.putString("LabourReport", labourReport);
         ListTag pl = new ListTag();
@@ -471,6 +472,7 @@ public class Holding {
         h.smithsAt = t.getInt("SmithsAt");
         h.forged = t.getInt("Forged");
         h.forgeWork = t.getInt("ForgeWork");
+        h.forgeTarget = t.getInt("ForgeTarget");
         h.forgePaid = t.getBoolean("ForgePaid");
         h.labourReport = t.getString("LabourReport");
         ListTag pl = t.getList("Postings", Tag.TAG_COMPOUND);
