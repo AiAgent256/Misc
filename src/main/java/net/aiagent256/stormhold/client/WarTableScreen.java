@@ -188,11 +188,11 @@ public class WarTableScreen extends Screen {
         // ---- works: the master builder (below the armoury notes)
         y = y0 + 332;
         boolean busy = h.status().contains("Builder ");
-        Button repair = Button.builder(Component.literal("Repair walls"), b -> Net.sendAction(h.id(), Net.REPAIR, BlockPos.ZERO, 0))
+        Button repair = Button.builder(Component.literal("Repair"), b -> Net.sendAction(h.id(), Net.REPAIR, BlockPos.ZERO, 0))
                 .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("The Master Builder puts back every block of the castle's "
                         + "plans that's missing: walls, gate, portcullis, roofs. A stone from the stores per block keeps the pace; without stone it's slow. "
                         + "Your own additions are left alone.")))
-                .bounds(rx + 52, y, 90, 18).build();
+                .bounds(rx + 52, y, 64, 18).build();
         repair.active = !busy;
         this.addRenderableWidget(repair);
         int stage = Math.min(3, fortifyStage(h) + 1);
@@ -202,9 +202,34 @@ public class WarTableScreen extends Screen {
                 .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Stage " + stage + ": "
                         + net.aiagent256.stormhold.holding.Builder.stageName(stage) + ". Costs " + cost[0] + " stone and " + cost[1]
                         + " iron from the stores. Each stage lets the castle hold 15% more men.")))
-                .bounds(rx + 146, y, 90, 18).build();
+                .bounds(rx + 118, y, 64, 18).build();
         fort.active = !busy && fortifyStage(h) < 3;
         this.addRenderableWidget(fort);
+        // ---- labour: the people set to the mine and the forge (click for one more, shift-click for one fewer)
+        int mx = net.aiagent256.stormhold.holding.Labour.MAX;
+        this.addRenderableWidget(Button.builder(Component.literal("Miners " + h.miners()),
+                        b -> Net.sendAction(h.id(), Net.SET_MINERS, BlockPos.ZERO, Math.max(0, Math.min(mx, h.miners() + (hasShiftDown() ? -1 : 1)))))
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Click to set one more of " + h.name()
+                        + "'s people to the mine, shift-click for one fewer (up to " + mx + "). Each brings up a day's ore into the stores, smelted: "
+                        + "coal, iron, copper, gold, now and then redstone, lapis, emeralds and diamonds; more diamonds on the frontier, and "
+                        + "ancient debris from zone 7.\n\n" + h.labour())))
+                .bounds(rx + 186, y, 58, 18).build());
+        int next = Math.min(net.aiagent256.stormhold.holding.Frontier.MAX, kitLevel(h) + 1);
+        int[] metal = net.aiagent256.stormhold.holding.Labour.cost(next);
+        this.addRenderableWidget(Button.builder(Component.literal("Smiths " + h.smiths()),
+                        b -> Net.sendAction(h.id(), Net.SET_SMITHS, BlockPos.ZERO, Math.max(0, Math.min(mx, h.smiths() + (hasShiftDown() ? -1 : 1)))))
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Click to set one more of " + h.name()
+                        + "'s people to the forge, shift-click for one fewer (up to " + mx + "). Smiths forge the garrison's kit a level at a time: "
+                        + "the next, level " + next + " (" + net.aiagent256.stormhold.holding.Labour.kitName(next) + "), takes "
+                        + (metal[0] > 0 ? metal[0] + " iron " : "") + (metal[1] > 0 ? metal[1] + " diamonds " : "") + (metal[2] > 0 ? metal[2] + " netherite " : "")
+                        + "from the stores and " + net.aiagent256.stormhold.holding.Labour.SMITH_DAYS + " smith-days. Then every man on the walls is re-armed.\n\n"
+                        + h.labour())))
+                .bounds(rx + 246, y, 56, 18).build());
+    }
+
+    private static int kitLevel(HoldingInfo h) {
+        var m = java.util.regex.Pattern.compile("Kit level (\\d)").matcher(h.labour());
+        return m.find() ? Integer.parseInt(m.group(1)) : 1;
     }
 
     private static int fortifyStage(HoldingInfo h) {

@@ -149,6 +149,85 @@ public class StormholdGameTests {
     }
 
     @GameTest(template = "arena")
+    public static void labourMinersAndSmiths(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = sample(g);
+        UUID me = UUID.randomUUID();
+        h.owner = Sides.player(me);
+        List<Entity> spawned = new ArrayList<>();
+        try {
+            List<net.minecraft.world.entity.npc.Villager> folk = new ArrayList<>();
+            for (int i = 0; i < 5; i++) {
+                var v = net.minecraft.world.entity.EntityType.VILLAGER.create(level);
+                if (v == null) throw new IllegalStateException("no villager");
+                BlockPos at = g.absolutePos(new BlockPos(3 + i * 2, 2, 7));
+                v.moveTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, 0, 0);
+                v.setNoAi(i == 4);                                      // a shopkeeper stands at his counter
+                if (i == 4) v.getPersistentData().putString(net.aiagent256.stormhold.holding.Shops.TAG, "general");
+                level.addFreshEntity(v);
+                folk.add(v);
+                spawned.add(v);
+            }
+            h.miners = 2;
+            h.smiths = 1;
+            net.aiagent256.stormhold.holding.Labour.tick(level, mgr, h);
+            int miners = 0, smiths = 0;
+            for (var v : folk) {
+                String job = net.aiagent256.stormhold.holding.Labour.jobOf(v);
+                if (job == null) continue;
+                if (v.isNoAi()) throw new IllegalStateException("the shopkeeper was set to " + job);
+                String name = v.getCustomName() == null ? "" : v.getCustomName().getString();
+                if (job.equals("miner")) {
+                    miners++;
+                    if (v.getVillagerData().getProfession() != net.minecraft.world.entity.npc.VillagerProfession.TOOLSMITH || !name.endsWith("the Miner"))
+                        throw new IllegalStateException("a miner is " + v.getVillagerData().getProfession() + " called " + name);
+                } else {
+                    smiths++;
+                    if (v.getVillagerData().getProfession() != net.minecraft.world.entity.npc.VillagerProfession.ARMORER || !name.endsWith("the Smith"))
+                        throw new IllegalStateException("a smith is " + v.getVillagerData().getProfession() + " called " + name);
+                }
+            }
+            if (miners != 2 || smiths != 1 || h.minersAt != 2 || h.smithsAt != 1)
+                throw new IllegalStateException(miners + " miners and " + smiths + " smiths set to work (" + h.minersAt + ", " + h.smithsAt + ")");
+            h.miners = 0;
+            net.aiagent256.stormhold.holding.Labour.tick(level, mgr, h);
+            for (var v : folk)
+                if ("miner".equals(net.aiagent256.stormhold.holding.Labour.jobOf(v))) throw new IllegalStateException("a miner kept on");
+
+            // a day in the mine
+            var coal = new net.minecraft.resources.ResourceLocation("minecraft", "coal");
+            var iron = new net.minecraft.resources.ResourceLocation("minecraft", "iron_ingot");
+            int c0 = h.stock(coal), i0 = h.stock(iron);
+            net.aiagent256.stormhold.holding.Labour.mine(level, h, 2);
+            if (h.stock(coal) - c0 != 12 || h.stock(iron) - i0 != 6)
+                throw new IllegalStateException("two miners brought up " + (h.stock(coal) - c0) + " coal, " + (h.stock(iron) - i0) + " iron");
+
+            // the forge: nothing without the metal, then the next level after six smith-days
+            int before = net.aiagent256.stormhold.holding.Frontier.level(level, h);
+            if (before < net.aiagent256.stormhold.holding.Frontier.MAX) {
+                int[] cost = net.aiagent256.stormhold.holding.Labour.cost(before + 1);
+                for (var k : List.of(iron, new net.minecraft.resources.ResourceLocation("minecraft", "diamond"),
+                        new net.minecraft.resources.ResourceLocation("minecraft", "netherite_ingot"))) h.addStock(k, -h.stock(k));
+                net.aiagent256.stormhold.holding.Labour.forge(level, mgr, h, 3);
+                if (h.forgePaid || h.forgeWork != 0) throw new IllegalStateException("the smiths worked without metal");
+                h.addStock(iron, cost[0]);
+                h.addStock(new net.minecraft.resources.ResourceLocation("minecraft", "diamond"), cost[1]);
+                h.addStock(new net.minecraft.resources.ResourceLocation("minecraft", "netherite_ingot"), cost[2]);
+                net.aiagent256.stormhold.holding.Labour.forge(level, mgr, h, 3);
+                if (!h.forgePaid || h.forgeWork != 3 || h.stock(iron) != 0) throw new IllegalStateException("the forge took the metal? paid "
+                        + h.forgePaid + ", work " + h.forgeWork + ", iron left " + h.stock(iron));
+                net.aiagent256.stormhold.holding.Labour.forge(level, mgr, h, 3);
+                int after = net.aiagent256.stormhold.holding.Frontier.level(level, h);
+                if (after != before + 1 || h.forged != before + 1) throw new IllegalStateException("kit level " + before + " forged to " + after);
+            }
+        } finally {
+            for (Entity e : spawned) e.discard();
+        }
+        g.succeed();
+    }
+
+    @GameTest(template = "arena")
     public static void frontierZonesKitAndStock(GameTestHelper g) {
         ServerLevel level = g.getLevel();
         int[][] want = {{0, 1}, {2499, 1}, {2500, 2}, {10000, 5}, {17500, 8}, {19999, 8}, {20000, 9}, {1000000, 9}};

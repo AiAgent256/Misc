@@ -115,6 +115,10 @@ public class Holding {
     public int shopsVersion;
     /** 1 once a great castle has looked for room for its yard market (and put it up, if there was room). */
     public int marketVersion;
+    /** Labour: how many of the people the War Table sets to the mine and the forge, how many are at it, and the forge's work. */
+    public int miners, smiths, minersAt, smithsAt, forged, forgeWork;
+    public boolean forgePaid;
+    public String labourReport = "";
     public final List<Posting> postings = new ArrayList<>();
     public long nextPosting;
     public boolean cityBlocksPlaced;
@@ -349,6 +353,14 @@ public class Holding {
         t.putLong("ShopsDay", shopsDay);
         t.putInt("ShopsVersion", shopsVersion);
         t.putInt("MarketVersion", marketVersion);
+        t.putInt("Miners", miners);
+        t.putInt("Smiths", smiths);
+        t.putInt("MinersAt", minersAt);
+        t.putInt("SmithsAt", smithsAt);
+        t.putInt("Forged", forged);
+        t.putInt("ForgeWork", forgeWork);
+        t.putBoolean("ForgePaid", forgePaid);
+        t.putString("LabourReport", labourReport);
         ListTag pl = new ListTag();
         for (Posting p2 : postings) pl.add(p2.save());
         t.put("Postings", pl);
@@ -453,6 +465,14 @@ public class Holding {
         h.shopsDay = t.contains("ShopsDay") ? t.getLong("ShopsDay") : -1;
         h.shopsVersion = t.getInt("ShopsVersion");
         h.marketVersion = t.getInt("MarketVersion");
+        h.miners = t.getInt("Miners");
+        h.smiths = t.getInt("Smiths");
+        h.minersAt = t.getInt("MinersAt");
+        h.smithsAt = t.getInt("SmithsAt");
+        h.forged = t.getInt("Forged");
+        h.forgeWork = t.getInt("ForgeWork");
+        h.forgePaid = t.getBoolean("ForgePaid");
+        h.labourReport = t.getString("LabourReport");
         ListTag pl = t.getList("Postings", Tag.TAG_COMPOUND);
         for (int i = 0; i < pl.size(); i++) h.postings.add(Posting.load(pl.getCompound(i)));
         h.nextPosting = t.getLong("NextPosting");

@@ -125,10 +125,10 @@ public final class Frontier {
         return zone(level, p.getX() + 0.5, p.getZ() + 0.5);
     }
 
-    /** The level a castle's people are kitted at: its renown or its zone, whichever is higher (1 to 9). */
+    /** The level a castle's people are kitted at: its renown, its zone, or what its smiths have forged, whichever is highest (1 to 9). */
     public static int level(ServerLevel level, @Nullable Holding h) {
         if (h == null) return 2;
-        return Math.max(h.renown, zone(level, h.center()));
+        return Math.max(Math.max(h.renown, h.forged), zone(level, h.center()));
     }
 
     // ------------------------------------------------------------ the zone you're in

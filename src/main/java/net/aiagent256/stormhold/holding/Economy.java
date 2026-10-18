@@ -66,6 +66,7 @@ public final class Economy {
                 }
             }
             Fief.census(level, mgr, h, now);
+            Labour.daily(level, mgr, h);
             Growth.daily(level, mgr, h, now);
             h.nextProduce = now + 24000;
             if (h.supplyTarget != null) ship(level, mgr, h);

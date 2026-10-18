@@ -36,7 +36,8 @@ public final class Net {
             () -> VERSION, VERSION::equals, VERSION::equals);
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
-            MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19;
+            MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19,
+            SET_MINERS = 20, SET_SMITHS = 21;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -119,8 +120,13 @@ public final class Net {
                         : h.fief.isEmpty() ? "No fief." : h.fiefName() + " of " + h.fief.size() + " buildings; census at dawn.")
                         : h.fiefReport;
                 if (h.fiefPlan != null && !h.fiefPlan.isEmpty() && !h.fiefReport.isEmpty()) fief += " Building: " + h.fiefPlan.get(0).replace('_', ' ') + ".";
+                int kit = net.aiagent256.stormhold.holding.Frontier.level(level, h);
+                String labour = "Kit level " + kit + " (" + net.aiagent256.stormhold.holding.Labour.kitName(kit) + "). "
+                        + (h.labourReport.isEmpty() ? "" : h.labourReport + " ")
+                        + "Working: " + h.minersAt + " of " + h.miners + " miners, " + h.smithsAt + " of " + h.smiths + " smiths.";
                 out.add(new HoldingInfo(h.id, h.name, h.isTown() ? 0 : h.tier, h.mode.name(), counts, cap, Economy.stockSummary(h), h.center(),
-                        h.attackTarget, h.supplyTarget, status.toString(), fief, Economy.realmSummary(mgr, h, player.getUUID())));
+                        h.attackTarget, h.supplyTarget, status.toString(), fief, Economy.realmSummary(mgr, h, player.getUUID()),
+                        h.miners, h.smiths, labour));
             }
         }
         return new WarTableData(out, RecruitsCompat.loaded());
@@ -225,6 +231,10 @@ public final class Net {
                         player.sendSystemMessage(HoldingEvents.gold("The people of " + h.name + " will raise a " + next.replace('_', ' ') + "."));
                     }
                 }
+                case SET_MINERS -> player.sendSystemMessage(net.aiagent256.stormhold.holding.Labour.set(h,
+                        net.aiagent256.stormhold.holding.Labour.MINER, a.amount()));
+                case SET_SMITHS -> player.sendSystemMessage(net.aiagent256.stormhold.holding.Labour.set(h,
+                        net.aiagent256.stormhold.holding.Labour.SMITH, a.amount()));
                 case REPAIR -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.REPAIR, player);
                 case FORTIFY -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.FORTIFY, player);
                 case KEEP_WITH_ME -> {

@@ -8,7 +8,8 @@ import java.util.UUID;
 
 /** What the War Table shows for one castle. */
 public record HoldingInfo(UUID id, String name, int tier, String mode, int[] counts, int[] capacity, String stock,
-                          BlockPos pos, @Nullable BlockPos attack, @Nullable BlockPos supply, String status, String fief, String realm) {
+                          BlockPos pos, @Nullable BlockPos attack, @Nullable BlockPos supply, String status, String fief, String realm,
+                          int miners, int smiths, String labour) {
 
     public void write(FriendlyByteBuf b) {
         b.writeUUID(id);
@@ -26,6 +27,9 @@ public record HoldingInfo(UUID id, String name, int tier, String mode, int[] cou
         b.writeUtf(status);
         b.writeUtf(fief);
         b.writeUtf(realm);
+        b.writeVarInt(miners);
+        b.writeVarInt(smiths);
+        b.writeUtf(labour);
     }
 
     public static HoldingInfo read(FriendlyByteBuf b) {
@@ -42,6 +46,8 @@ public record HoldingInfo(UUID id, String name, int tier, String mode, int[] cou
         String status = b.readUtf();
         String fief = b.readUtf();
         String realm = b.readUtf();
-        return new HoldingInfo(id, name, tier, mode, counts, cap, stock, pos, attack, supply, status, fief, realm);
+        int miners = b.readVarInt(), smiths = b.readVarInt();
+        String labour = b.readUtf();
+        return new HoldingInfo(id, name, tier, mode, counts, cap, stock, pos, attack, supply, status, fief, realm, miners, smiths, labour);
     }
 }

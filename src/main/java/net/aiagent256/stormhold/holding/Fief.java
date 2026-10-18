@@ -359,7 +359,8 @@ public final class Fief {
         for (Villager v : level.getEntitiesOfClass(Villager.class, area, Entity::isAlive)) {
             pop++;
             ResourceLocation id = ForgeRegistries.VILLAGER_PROFESSIONS.getKey(v.getVillagerData().getProfession());
-            String job = id == null ? "none" : id.getPath();
+            String set = Labour.jobOf(v);                    // the castle's miners and smiths: their work is Labour's
+            String job = set != null ? set : id == null ? "none" : id.getPath();
             jobs.merge(job, 1, Integer::sum);
         }
         int herd = 0;
