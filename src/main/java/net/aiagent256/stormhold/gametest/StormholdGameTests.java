@@ -119,6 +119,29 @@ public class StormholdGameTests {
                 i++;
             }
             if (i < 12) throw new IllegalStateException("only " + i + " kinds of shop");
+            // a town an older plan built: the post lands on the counter, so the keeper stands beside it
+            var stone = net.minecraft.world.level.block.Blocks.STONE.defaultBlockState();
+            var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+            for (int x = 2; x <= 12; x++) {
+                for (int z = 9; z <= 13; z++) {
+                    level.setBlock(g.absolutePos(new BlockPos(x, 1, z)), stone, 3);
+                    level.setBlock(g.absolutePos(new BlockPos(x, 2, z)), air, 3);
+                    level.setBlock(g.absolutePos(new BlockPos(x, 3, z)), air, 3);
+                }
+            }
+            BlockPos onCounter = g.absolutePos(new BlockPos(4, 2, 11));
+            level.setBlock(onCounter, net.minecraft.world.level.block.Blocks.OAK_FENCE.defaultBlockState(), 3);
+            BlockPos at = net.aiagent256.stormhold.holding.Shops.standAt(level, onCounter);
+            if (at == null || at.equals(onCounter) || at.distManhattan(onCounter) != 1)
+                throw new IllegalStateException("a post on its counter stands at " + at);
+            // a post in a wall with no counter near: no keeper rather than one in the street
+            BlockPos inWall = g.absolutePos(new BlockPos(10, 2, 11));
+            level.setBlock(inWall, stone, 3);
+            if (net.aiagent256.stormhold.holding.Shops.standAt(level, inWall) != null)
+                throw new IllegalStateException("a post with no counter near found a place to stand");
+            BlockPos clear = g.absolutePos(new BlockPos(8, 2, 11));
+            if (!clear.equals(net.aiagent256.stormhold.holding.Shops.standAt(level, clear)))
+                throw new IllegalStateException("a clear post moved");
         } finally {
             for (Entity e : spawned) e.discard();
         }

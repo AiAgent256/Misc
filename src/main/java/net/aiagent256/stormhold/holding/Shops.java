@@ -22,8 +22,10 @@ import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.world.item.trading.MerchantOffer;
 import net.minecraft.world.item.trading.MerchantOffers;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.DoorBlock;
 import net.minecraft.world.level.block.FenceBlock;
 import net.minecraft.world.level.block.SignBlock;
+import net.minecraft.world.level.block.SlabBlock;
 import net.minecraft.world.level.block.TrapDoorBlock;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.block.entity.SignText;
@@ -209,8 +211,20 @@ public final class Shops {
         boolean newDay = day != h.shopsDay;
         boolean dirty = false;
         for (var e : posts(h).entrySet()) {
-            for (BlockPos post : e.getValue()) {
+            List<BlockPos> ps = e.getValue();
+            for (int i = 0; i < ps.size(); i++) {
+                BlockPos post = ps.get(i);
                 if (!level.isLoaded(post) || !level.areEntitiesLoaded(ChunkPos.asLong(post))) continue;
+                if (!h.shopkeepers.containsKey(post)) {
+                    // a place an older plan built can have its counter a step off where today's plan puts it
+                    BlockPos at = standAt(level, post);
+                    if (at == null) continue;
+                    if (!at.equals(post)) {
+                        ps.set(i, at);
+                        post = at;
+                        dirty = true;
+                    }
+                }
                 Villager v = keeperAt(level, h, post);
                 if (v != null) {
                     if (!v.getUUID().equals(h.shopkeepers.get(post))) {
@@ -246,7 +260,7 @@ public final class Shops {
         for (ServerPlayer p : level.players()) {
             if (p.isSpectator() || !h.box.isInside(p.blockPosition())) continue;
             for (BlockPos q : plots) {
-                if (h.ownedHouses.containsKey(q) || q.distSqr(p.blockPosition()) > 25) continue;
+                if (h.ownedHouses.containsKey(q) || q.distSqr(p.blockPosition()) > 25 || !doorNear(level, q)) continue;
                 if (h.isHouseOwned() && Standing.hostile(mgr, h.houseId, p.getUUID())) break;
                 p.displayClientMessage(Component.literal("A house for sale: use its door holding " + City.housePrice(h)
                         + " emeralds to buy it.").withStyle(ChatFormatting.GOLD), true);
@@ -265,6 +279,54 @@ public final class Shops {
             return v;
         }
         return null;
+    }
+
+    /**
+     * Where a keeper stands for a post: the post itself if a man can stand there, else the nearest spot within
+     * two blocks that is clear and has a counter beside it. Null if there's no such spot.
+     */
+    @Nullable
+    public static BlockPos standAt(ServerLevel level, BlockPos post) {
+        if (standable(level, post)) return post;
+        BlockPos best = null;
+        int bd = Integer.MAX_VALUE;
+        for (BlockPos q : BlockPos.betweenClosed(post.offset(-2, -1, -2), post.offset(2, 1, 2))) {
+            if (!level.isLoaded(q) || !standable(level, q) || !counterBeside(level, q)) continue;
+            int d = q.distManhattan(post) * 2 + (q.getY() != post.getY() ? 1 : 0);
+            if (d < bd) {
+                bd = d;
+                best = q.immutable();
+            }
+        }
+        return best;
+    }
+
+    /** Room for a man: nothing solid at his feet or head, and a floor under him. */
+    private static boolean standable(ServerLevel level, BlockPos p) {
+        if (!level.getBlockState(p).getCollisionShape(level, p).isEmpty()) return false;
+        if (!level.getBlockState(p.above()).getCollisionShape(level, p.above()).isEmpty()) return false;
+        if (!level.getFluidState(p).isEmpty()) return false;
+        return !level.getBlockState(p.below()).getCollisionShape(level, p.below()).isEmpty();
+    }
+
+    /** A counter beside this spot: a trapdoor, a fence or a slab at waist or chest height. */
+    private static boolean counterBeside(ServerLevel level, BlockPos p) {
+        for (Direction d : Direction.Plane.HORIZONTAL) {
+            for (int dy = 0; dy <= 1; dy++) {
+                var b = level.getBlockState(p.relative(d).above(dy)).getBlock();
+                if (b instanceof TrapDoorBlock || b instanceof FenceBlock || b instanceof SlabBlock) return true;
+            }
+        }
+        return false;
+    }
+
+    /** Whether a home for sale has its door where the plans say: a place an older plan built can differ. */
+    private static boolean doorNear(ServerLevel level, BlockPos plot) {
+        for (BlockPos q : BlockPos.betweenClosed(plot.offset(-2, 0, -2), plot.offset(2, 1, 2))) {
+            if (q.distManhattan(plot) - Math.abs(q.getY() - plot.getY()) > 2) continue;
+            if (level.getBlockState(q).getBlock() instanceof DoorBlock) return true;
+        }
+        return false;
     }
 
     /** Put a keeper of this trade at this post. Null if the post isn't clear to stand in. */
