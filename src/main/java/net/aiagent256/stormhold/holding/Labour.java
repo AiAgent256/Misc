@@ -136,8 +136,8 @@ public final class Labour {
     private static void hire(ServerLevel level, Holding h, Villager v, String job) {
         // what he was, to be given back when he's let go
         CompoundTag was = new CompoundTag();
-        ResourceLocation prof = ForgeRegistries.VILLAGER_PROFESSIONS.getKey(v.getVillagerData().getProfession());
-        was.putString("Profession", prof == null ? "minecraft:none" : prof.toString());
+        ResourceLocation wasProf = ForgeRegistries.VILLAGER_PROFESSIONS.getKey(v.getVillagerData().getProfession());
+        was.putString("Profession", wasProf == null ? "minecraft:none" : wasProf.toString());
         was.putInt("Level", v.getVillagerData().getLevel());
         was.putInt("Xp", v.getVillagerXp());
         if (!v.getOffers().isEmpty()) was.put("Offers", v.getOffers().createTag());
