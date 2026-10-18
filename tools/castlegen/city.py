@@ -728,7 +728,7 @@ def great_city(seed=77):
     g.set(213, GL, 120, "minecraft:blast_furnace[facing=south,lit=false]"); g.set(210, GL, 120, "minecraft:lava_cauldron")
     g.chest(214, GL, 124, "west", LOOT + "castle_smithy")
     g.mark("smithy", 208, GL, 128)
-    doors += terrace(g, 219, 237, 118, 9, GL, rng, "south", trades=["smith", "smith", "tanner"])
+    doors += terrace(g, 219, 237, 118, 9, GL, rng, "south", trades=["armoury", "weapons", "tanner"])
     # the four blocks between the cross street and the market street, each split by a back lane
     doors += dense_block(g, 18, 133, 58, 158, GL, rng, trades=["general", "none", "none", "baker", "none"], alley=("z", 36))
     doors += dense_block(g, 65, 133, 122, 158, GL, rng, trades=["none", "cloth", "none", "none", "chandler"], alley=("z", 93))
@@ -736,7 +736,7 @@ def great_city(seed=77):
     doors += dense_block(g, 197, 133, 237, 158, GL, rng, trades=["smith", "none", "tanner", "none", "none"], alley=("z", 220))
     # flanks: the north-west quarter is a warren of lanes, the north-east holds the Dragonpit
     doors += dense_block(g, 18, 18, 58, 60, GL, rng, sides=("south", "west", "east"), trades=["none", "none", "apothecary", "none"], alley=("x", 39))
-    doors += dense_block(g, 18, 67, 58, 112, GL, rng, trades=["none", "general", "none", "none"], alley=("x", 90))
+    doors += dense_block(g, 18, 67, 58, 112, GL, rng, trades=["none", "fletcher", "none", "none"], alley=("x", 90))
     dragonpit(g, 218, 42, 19, GL)
     doors += dense_block(g, 197, 67, 237, 112, GL, rng, trades=["none", "none", "butcher", "none"], alley=("x", 90))
     # south of the cross street: the sept in its plaza, the market, the barracks
@@ -745,8 +745,8 @@ def great_city(seed=77):
     market_square(g, 68, 168, 186, 194, GL, rng)
     arcade(g, 68, 168, 186, 170, GL, rng, "south", trades=["cloth", "general", "potter", "chandler"])
     arcade(g, 68, 192, 186, 194, GL, rng, "north", trades=["baker", "butcher", "general", "fish"])
-    stall_cluster(g, 72, 173, 110, 190, GL, rng, trades=["general", "cloth", "potter", "baker", "general"])
-    stall_cluster(g, 146, 173, 182, 190, GL, rng, trades=["fish", "general", "butcher", "chandler", "general"])
+    stall_cluster(g, 72, 173, 110, 190, GL, rng, trades=["general", "fletcher", "farmer", "baker", "armoury"])
+    stall_cluster(g, 146, 173, 182, 190, GL, rng, trades=["fish", "weapons", "butcher", "apothecary", "general"])
     bell_tower(g, 70, 170, GL)
     barracks(g, 200, 170, 240, 192, GL, rng)
     # the harbour quarter: fishmongers and taverns stacked over the quay street

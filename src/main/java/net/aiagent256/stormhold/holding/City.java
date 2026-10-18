@@ -36,7 +36,17 @@ public final class City {
 
     /** Put the muster post and the notice board down once the city's chunks are loaded. */
     public static void placeBlocks(ServerLevel level, Holding h) {
-        if (h.cityBlocksPlaced || !h.isCity()) return;
+        if (h.cityBlocksPlaced || !(h.isCity() || h.isTown())) return;
+        if (h.isTown()) {
+            // a town's board is the signboard in the market: give its blank signs their label
+            List<BlockPos> nb = h.extras.get("notice_board");
+            if (nb != null && !nb.isEmpty()) {
+                if (!level.isLoaded(nb.get(0))) return;
+                Shops.labelBoard(level, nb.get(0));
+            }
+            h.cityBlocksPlaced = true;
+            return;
+        }
         List<BlockPos> b = h.extras.get("barracks"), n = h.extras.get("notice_board");
         if (b == null || n == null || b.isEmpty() || n.isEmpty()) {
             h.cityBlocksPlaced = true;
@@ -57,6 +67,18 @@ public final class City {
     public static Holding cityAt(HoldingManager mgr, BlockPos p) {
         Holding h = mgr.at(p, 2);
         return h != null && h.isCity() ? h : null;
+    }
+
+    /** A city or a market town: somewhere with shops, a notice board and homes for sale. */
+    @Nullable
+    public static Holding marketAt(HoldingManager mgr, BlockPos p) {
+        Holding h = mgr.at(p, 2);
+        return h != null && (h.isCity() || h.isTown()) ? h : null;
+    }
+
+    /** What a home costs: less in a market town than in the capital. */
+    public static int housePrice(Holding h) {
+        return h.isTown() ? 24 : HOUSE_PRICE;
     }
 
     /** Can this player deal with the city: it's theirs, or its house likes them. */
@@ -127,9 +149,10 @@ public final class City {
     /** Right-clicking a door that's for sale. Returns true if this door is one of the city's plots. */
     public static boolean useDoor(ServerLevel level, ServerPlayer p, BlockPos door) {
         HoldingManager mgr = HoldingManager.get(level);
-        Holding h = cityAt(mgr, door);
+        Holding h = marketAt(mgr, door);
         if (h == null) return false;
         List<BlockPos> plots = h.extras.get("house");
+        int price = housePrice(h);
         if (plots == null) return false;
         BlockPos plot = null;
         for (BlockPos q : plots) if (q.distManhattan(door) <= 2) plot = q;
@@ -147,20 +170,20 @@ public final class City {
             return true;
         }
         if (!p.getMainHandItem().is(Items.EMERALD)) {
-            p.displayClientMessage(Component.literal("For sale: a house in " + h.name + ", " + HOUSE_PRICE
+            p.displayClientMessage(Component.literal("For sale: a house in " + h.name + ", " + price
                     + " emeralds. Use the door holding emeralds to buy it.").withStyle(ChatFormatting.GOLD), true);
             return true;
         }
-        int short_ = take(p, HOUSE_PRICE);
+        int short_ = take(p, price);
         if (short_ >= 0) {
-            p.displayClientMessage(Component.literal("The house costs " + HOUSE_PRICE + " emeralds; you have " + short_ + ".")
+            p.displayClientMessage(Component.literal("The house costs " + price + " emeralds; you have " + short_ + ".")
                     .withStyle(ChatFormatting.RED), true);
             return true;
         }
         h.ownedHouses.put(plot, p.getUUID());
         mgr.setDirty();
         level.playSound(null, door, SoundEvents.VILLAGER_CELEBRATE, SoundSource.PLAYERS, 1.0F, 1.0F);
-        p.sendSystemMessage(Component.literal("The house is yours. Its chests are yours to use, you may build inside it, and a bed here is a bed in the capital.")
+        p.sendSystemMessage(Component.literal("The house is yours. Its chests are yours to use, you may build inside it, and a bed here is your bed in " + h.name + ".")
                 .withStyle(ChatFormatting.GREEN));
         return true;
     }
@@ -174,9 +197,9 @@ public final class City {
     // ------------------------------------------------------------ the notice board
 
     public static void tickPostings(ServerLevel level, HoldingManager mgr, Holding h, long now) {
-        if (!h.isCity() || !h.isHouseOwned()) return;
+        if (!(h.isCity() || h.isTown()) || !h.isHouseOwned()) return;
         boolean dirty = h.postings.removeIf(p -> p.takenBy == null && p.expires > 0 && now > p.expires);
-        if (h.postings.size() < MAX_POSTINGS && now >= h.nextPosting) {
+        if (h.postings.size() < (h.isTown() ? 2 : MAX_POSTINGS) && now >= h.nextPosting) {
             h.nextPosting = now + 12000;
             h.postings.add(makePosting(level, h));
             dirty = true;
@@ -203,17 +226,51 @@ public final class City {
 
     public static void showBoard(ServerLevel level, ServerPlayer p, BlockPos board) {
         HoldingManager mgr = HoldingManager.get(level);
-        Holding h = cityAt(mgr, board);
+        Holding h = marketAt(mgr, board);
         if (h == null) return;
+        BlockPos from = p.blockPosition();
         p.sendSystemMessage(Component.literal("Notice board of " + h.name).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+        // the shops, nearest first, each with the way to its nearest counter
+        var posts = Shops.posts(h);
+        if (!posts.isEmpty()) {
+            p.sendSystemMessage(Component.literal("Shops").withStyle(ChatFormatting.GOLD));
+            List<Object[]> rows = new java.util.ArrayList<>();
+            for (var e : posts.entrySet()) {
+                BlockPos best = null;
+                for (BlockPos q : e.getValue()) if (best == null || q.distSqr(from) < best.distSqr(from)) best = q;
+                if (best != null) rows.add(new Object[]{Shops.type(e.getKey()).title(), best});
+            }
+            rows.sort(java.util.Comparator.comparingDouble(r -> ((BlockPos) r[1]).distSqr(from)));
+            for (Object[] r : rows) {
+                BlockPos q = (BlockPos) r[1];
+                p.sendSystemMessage(Component.literal("  " + r[0] + ": ").withStyle(ChatFormatting.YELLOW)
+                        .append(Component.literal(Guide.way(from, q) + " (" + q.getX() + ", " + q.getZ() + ")").withStyle(ChatFormatting.WHITE)));
+            }
+        }
+        // homes for sale
+        List<BlockPos> plots = h.extras.get("house");
+        if (plots != null && !plots.isEmpty()) {
+            BlockPos best = null;
+            int free = 0;
+            for (BlockPos q : plots) {
+                if (h.ownedHouses.containsKey(q)) continue;
+                free++;
+                if (best == null || q.distSqr(from) < best.distSqr(from)) best = q;
+            }
+            p.sendSystemMessage(Component.literal("Houses for sale: " + free + (best == null ? "" : ", " + housePrice(h)
+                    + " emeralds. Nearest door " + Guide.way(from, best) + " (" + best.getX() + ", " + best.getZ() + ")"
+                    + ". Use the door holding emeralds.")).withStyle(ChatFormatting.GOLD));
+        }
+        // work
+        p.sendSystemMessage(Component.literal("Work").withStyle(ChatFormatting.GOLD));
         if (h.postings.isEmpty()) {
-            p.sendSystemMessage(Component.literal("Nothing posted today.").withStyle(ChatFormatting.GRAY));
+            p.sendSystemMessage(Component.literal("  Nothing posted today.").withStyle(ChatFormatting.GRAY));
             return;
         }
         int i = 0;
         for (Posting post : h.postings) {
             String state = post.takenBy == null ? "" : post.takenBy.equals(p.getUUID()) ? " (yours)" : " (taken)";
-            Component line = Component.literal(" " + (i + 1) + ". " + post.title + ". Reward " + post.reward + " emeralds" + state);
+            Component line = Component.literal("  " + (i + 1) + ". " + post.title + ". Reward " + post.reward + " emeralds" + state);
             if (post.takenBy == null) {
                 line = line.copy().withStyle(Style.EMPTY.withColor(ChatFormatting.YELLOW)
                         .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/stormhold accept " + h.id + " " + post.id))
@@ -224,6 +281,21 @@ public final class City {
             p.sendSystemMessage(line);
             i++;
         }
+    }
+
+    /** A sign on a town's or a city's notice board, right-clicked: read the board. True if it was one. */
+    public static boolean readBoardSign(ServerLevel level, ServerPlayer p, BlockPos sign) {
+        Holding h = marketAt(HoldingManager.get(level), sign);
+        if (h == null) return false;
+        List<BlockPos> nb = h.extras.get("notice_board");
+        if (nb == null) return false;
+        for (BlockPos m : nb) {
+            if (Math.abs(m.getX() - sign.getX()) <= 3 && Math.abs(m.getZ() - sign.getZ()) <= 3 && Math.abs(m.getY() - sign.getY()) <= 3) {
+                showBoard(level, p, m);
+                return true;
+            }
+        }
+        return false;
     }
 
     public static boolean accept(ServerLevel level, ServerPlayer p, UUID holdingId, UUID postingId) {

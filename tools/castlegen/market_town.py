@@ -16,8 +16,8 @@ LOOT = "stormhold:chests/"
 AIR = "minecraft:air"
 GREEN = Mix(("minecraft:grass_block", 70), ("minecraft:coarse_dirt", 10), ("minecraft:dirt_path", 10), ("minecraft:podzol", 10))
 WHITE = Mix(("minecraft:stone_bricks", 40), ("minecraft:polished_andesite", 25), ("minecraft:andesite", 20), ("minecraft:cobblestone", 15))
-TRADES_A = ["baker", "general", "cloth", "none", "chandler", "none"]
-TRADES_B = ["smith", "none", "potter", "general", "none", "butcher"]
+TRADES_A = ["armoury", "general", "cloth", "none", "chandler", "none"]
+TRADES_B = ["weapons", "none", "potter", "general", "none", "butcher"]
 TRADES_C = ["none", "none", "apothecary", "none", "fish", "none"]
 
 
@@ -216,6 +216,7 @@ def smithy(g, x0, z0, x1, z1, GL, rng, door="south"):
     g.chest(x1 - 1, GL, z1 - 1, "west", LOOT + "castle_smithy")
     g.set(x0 + 1, GL, z1 - 1, "minecraft:smithing_table")
     g.mark("smithy", dcell[0], GL, dcell[1])
+    g.mark("shop_smith", cx, GL, cz)                 # the smith at his anvil
 
 
 def tithe_barn(g, x0, z0, x1, z1, GL, rng, door="south"):
@@ -233,11 +234,16 @@ def tithe_barn(g, x0, z0, x1, z1, GL, rng, door="south"):
     g.chest(x1 - 1, GL, cz + 1, "west", LOOT + "castle_store")
 
 
+BOARD_SIGNS = (("Shops",), ("Houses", "for sale"), ("NOTICE", "BOARD", "", "Right-click"), ("Work", "for hire"), ("Ask the", "reeve"))
+
+
 def notice_board(g, x, z, GL, facing="south"):
+    from town import sign_nbt
     g.fill(x - 2, GL, z, x + 2, GL + 2, z, "minecraft:dark_oak_planks")
-    for xx in range(x - 2, x + 3):
+    for i, xx in enumerate(range(x - 2, x + 3)):
         g.set(xx, GL + 3, z, "minecraft:dark_oak_slab[type=bottom]")
-        g.set(xx, GL + 1, z + (1 if facing == "south" else -1), f"minecraft:oak_wall_sign[facing={facing}]")
+        g.set(xx, GL + 1, z + (1 if facing == "south" else -1), f"minecraft:oak_wall_sign[facing={facing}]",
+              nbt=sign_nbt(BOARD_SIGNS[i], "minecraft:sign"))
     g.mark("notice_board", x, GL, z + (2 if facing == "south" else -2))
 
 
@@ -301,6 +307,14 @@ def town_wall(g, x0, z0, x1, z1, GL, gate_x0, gate_x1):
     return walk
 
 
+def sell_homes(g, rng, n=10):
+    """Up to `n` of the town's homes are for sale: their doors become 'house' plots the game sells."""
+    homes = list(g.markers.pop("dwelling", []))
+    rng.shuffle(homes)
+    for (x, y, z) in homes[:n]:
+        g.mark("house", x, y, z)
+
+
 # ---------------------------------------------------------------- the three towns
 
 
@@ -325,13 +339,13 @@ def town_walled(seed=301):
     smithy(g, 76, 80, 84, 86, GL, rng, door="west")
     tithe_barn(g, 74, 12, 86, 24, GL, rng, door="south")
     town_well(g, 40, 44, GL)
-    stall_cluster(g, 32, 28, 52, 42, GL, rng, trades=["baker", "cloth", "general", "potter", "chandler"])
+    stall_cluster(g, 32, 28, 52, 42, GL, rng, trades=["baker", "fletcher", "general", "farmer", "butcher"])
     notice_board(g, 50, 48, GL, facing="south")
     # terraces: north of the cross street (west of the square), south of it, and down the main street
     terrace(g, 12, 28, 55, 8, GL, rng, "south", trades=TRADES_A)
     terrace(g, 12, 34, 61, 8, GL, rng, "north", trades=TRADES_B)
     terrace(g, 64, 86, 61, 8, GL, rng, "north", trades=TRADES_C)
-    terrace(g, 72, 86, 53, 8, GL, rng, "west", trades=["none", "general", "none"])
+    terrace(g, 72, 86, 53, 8, GL, rng, "west", trades=["none", "farmer", "none"])
     terrace(g, 72, 86, 44, 8, GL, rng, "east", trades=["none", "none", "apothecary"])
     for z in range(66, 86, 10):
         lamp_post(g, gx0 - 1, z, GL); lamp_post(g, gx1 + 1, z, GL)
@@ -340,6 +354,7 @@ def town_walled(seed=301):
     for (x, z) in ((48, 70), (48, 84), (20, 58), (80, 58), (48, 50), (64, 22)):
         g.mark("knight", x, GL, z)
     g.mark("gate", 48, GL, 96)
+    sell_homes(g, rng)
     return g, {"name": "town_walled", "tier": 1, "GL": GL, "kind": "town", "character": "rustic"}
 
 
@@ -361,8 +376,8 @@ def town_cross(seed=302):
     smithy(g, 72, 64, 80, 70, GL, rng, door="west")
     tithe_barn(g, 84, 64, 98, 74, GL, rng, door="west")
     town_well(g, 42, 52, GL)
-    stall_cluster(g, 56, 30, 68, 39, GL, rng, trades=["fish", "general", "baker"])
-    stall_cluster(g, 56, 49, 68, 58, GL, rng, trades=["cloth", "potter", "general"])
+    stall_cluster(g, 56, 30, 68, 39, GL, rng, trades=["fletcher", "general", "baker"])
+    stall_cluster(g, 56, 49, 68, 58, GL, rng, trades=["farmer", "butcher", "general"])
     notice_board(g, 42, 30, GL, facing="south")
     terrace(g, 4, 30, 39, 8, GL, rng, "south", trades=TRADES_A)
     terrace(g, 74, 100, 39, 8, GL, rng, "south", trades=TRADES_B)
@@ -377,6 +392,7 @@ def town_cross(seed=302):
     for (x, z) in ((51, 10), (51, 76), (12, 43), (90, 43), (40, 44), (62, 44)):
         g.mark("knight", x, GL, z)
     g.mark("gate", 51, GL, 0)
+    sell_homes(g, rng)
     return g, {"name": "town_cross", "tier": 1, "GL": GL, "kind": "town", "character": "martial"}
 
 
@@ -401,16 +417,17 @@ def town_green(seed=303):
     smithy(g, 78, 30, 86, 36, GL, rng, door="west")
     tithe_barn(g, 4, 78, 18, 90, GL, rng, door="north")
     town_well(g, 60, 56, GL)
-    stall_cluster(g, 28, 58, 44, 68, GL, rng, trades=["baker", "general", "cloth"])
+    stall_cluster(g, 28, 58, 44, 68, GL, rng, trades=["baker", "general", "fletcher"])
     notice_board(g, 48, 30, GL, facing="south")
-    terrace(g, 56, 70, 19, 8, GL, rng, "south", trades=["baker", "none"])
+    terrace(g, 56, 70, 19, 8, GL, rng, "south", trades=["butcher", "none"])
     terrace(g, 26, 70, 19, 8, GL, rng, "east", trades=TRADES_A)
-    terrace(g, 54, 70, 76, 8, GL, rng, "north", trades=["none", "potter"])
-    terrace(g, 42, 68, 76, 8, GL, rng, "west", trades=["none", "fish", "none"])
+    terrace(g, 54, 70, 76, 8, GL, rng, "north", trades=["none", "farmer"])
+    terrace(g, 42, 68, 76, 8, GL, rng, "west", trades=["none", "weapons", "none"])
     for (x, z) in ((22, 30), (22, 60), (73, 30), (73, 60), (48, 22), (48, 73)):
         lamp_post(g, x, z, GL)
     toll_gate(g, 46, 51, 93, GL)
     for (x, z) in ((48, 80), (48, 60), (30, 22), (66, 22), (22, 46), (73, 46)):
         g.mark("knight", x, GL, z)
     g.mark("gate", 48, GL, 95)
+    sell_homes(g, rng)
     return g, {"name": "town_green", "tier": 1, "GL": GL, "kind": "town", "character": "pious"}

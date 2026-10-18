@@ -79,6 +79,7 @@ public final class HoldingTicker {
         if (now % 200 == 0) Builder.ensureBuilder(level, h);
         greet(level, mgr, h);
         if (!h.villagersSpawned) Garrisons.spawnVillagers(level, h);
+        if (now % 100 == 40) Shops.tick(level, mgr, h);
         HoldingEvents.contest(level, mgr, h);
     }
 

@@ -43,25 +43,43 @@ GOODS = [b for b in GOODS if b not in ("minecraft:bread", "minecraft:cake")] + [
 TRADES = {
     "smith": dict(items=["minecraft:anvil[facing=east]", "minecraft:blast_furnace[facing=south,lit=true]",
                          "minecraft:smithing_table", "minecraft:grindstone[face=floor,facing=north]"], awning="gray",
-                  sign="smithy", chimney=True),
+                  sign=("Smithy", "Tools"), chimney=True),
+    "armoury": dict(items=["minecraft:anvil[facing=east]", "minecraft:smithing_table", "minecraft:chest[facing=north]",
+                           "minecraft:barrel[facing=up]"], awning="light_gray", sign=("Armoury",)),
+    "weapons": dict(items=["minecraft:grindstone[face=floor,facing=north]", "minecraft:anvil[facing=east]",
+                           "minecraft:barrel[facing=up]", "minecraft:chest[facing=north]"], awning="black", sign=("Weapon", "smith")),
+    "fletcher": dict(items=["minecraft:fletching_table", "minecraft:target", "minecraft:barrel[facing=up]",
+                            "minecraft:hay_block[axis=y]"], awning="lime", sign=("Fletcher", "Bows")),
+    "farmer": dict(items=["minecraft:composter", "minecraft:hay_block[axis=y]", "minecraft:pumpkin",
+                          "minecraft:barrel[facing=up]"], awning="green", sign=("Farm", "Supply")),
     "baker": dict(items=["minecraft:smoker[facing=south,lit=true]", "minecraft:cake", "minecraft:hay_block[axis=y]",
-                         "minecraft:barrel[facing=up]"], awning="yellow", sign="bakery", chimney=True),
+                         "minecraft:barrel[facing=up]"], awning="yellow", sign=("Bakery",), chimney=True),
     "fish": dict(items=["minecraft:barrel[facing=up]", "minecraft:campfire[lit=true,signal_fire=false]",
-                        "minecraft:cauldron", "minecraft:chest[facing=north]"], awning="blue", sign="fishmonger"),
+                        "minecraft:cauldron", "minecraft:chest[facing=north]"], awning="blue", sign=("Fish",)),
     "cloth": dict(items=["minecraft:loom[facing=north]", "minecraft:red_wool", "minecraft:purple_wool",
-                         "minecraft:lime_wool", "minecraft:white_wool"], awning="purple", sign="draper"),
+                         "minecraft:lime_wool", "minecraft:white_wool"], awning="purple", sign=("Draper", "Tailor")),
     "tanner": dict(items=["minecraft:cauldron", "minecraft:barrel[facing=up]", "minecraft:brown_wool",
-                          "minecraft:fletching_table"], awning="brown", sign="tannery"),
+                          "minecraft:fletching_table"], awning="brown", sign=("Saddler",)),
     "butcher": dict(items=["minecraft:barrel[facing=up]", "minecraft:chest[facing=north]", "minecraft:smoker[facing=south,lit=false]",
-                           "minecraft:cauldron"], awning="red", sign="butcher"),
+                           "minecraft:cauldron"], awning="red", sign=("Butcher",)),
     "potter": dict(items=["minecraft:decorated_pot", "minecraft:flower_pot", "minecraft:decorated_pot", "minecraft:clay"],
-                   awning="orange", sign="potter"),
+                   awning="orange", sign=("Mason &", "Potter")),
     "apothecary": dict(items=["minecraft:brewing_stand", "minecraft:bookshelf", "minecraft:cauldron", "minecraft:lectern[facing=north]"],
-                       awning="green", sign="apothecary"),
+                       awning="cyan", sign=("Apothe-", "cary")),
     "chandler": dict(items=["minecraft:lantern[hanging=false]", "minecraft:candle[candles=3,lit=true]",
-                            "minecraft:barrel[facing=up]", "minecraft:white_candle[candles=4,lit=true]"], awning="white", sign="chandler"),
-    "general": dict(items=GOODS, awning=None, sign="merchant"),
+                            "minecraft:barrel[facing=up]", "minecraft:white_candle[candles=4,lit=true]"], awning="white", sign=("Chandler",)),
+    "general": dict(items=GOODS, awning=None, sign=("General", "Store")),
 }
+
+
+def sign_nbt(lines, sign_id="minecraft:hanging_sign"):
+    """Waxed sign text, centred on the lines a sign has."""
+    msgs = list(lines) + [""] * (4 - len(lines))
+    if len(lines) <= 2:
+        msgs = [""] + list(lines) + [""] * (3 - len(lines))
+    return {"id": sign_id, "is_waxed": 1,
+            "front_text": {"messages": [f'{{"text":"{m}"}}' for m in msgs[:4]], "color": "black", "has_glowing_text": 0},
+            "back_text": {"messages": [f'{{"text":"{m}"}}' for m in msgs[:4]], "color": "black", "has_glowing_text": 0}}
 
 
 def _dir(street):
@@ -239,8 +257,16 @@ def townhouse(g, x0, z0, x1, z1, GL, rng, street, storeys=None, wall=None, trade
                 g.set(x, GL, z, rng.choice(["minecraft:barrel[facing=up]", "minecraft:hay_block[axis=y]", "minecraft:decorated_pot"]))
         # hanging sign beside the door
         sgx, sgz = door[0] + (2 if along_x else 0) + ddx, door[1] + (0 if along_x else 2) + ddz
-        g.set(sgx, GL + 2, sgz, f"minecraft:dark_oak_wall_hanging_sign[facing={street}]",
-              nbt={"id": "minecraft:hanging_sign", "front_text": {"messages": [f'{{"text":"{t["sign"]}"}}', '{"text":""}', '{"text":""}', '{"text":""}'], "color": "black", "has_glow": 0}})
+        g.set(sgx, GL + 2, sgz, f"minecraft:dark_oak_wall_hanging_sign[facing={street}]", nbt=sign_nbt(t["sign"]))
+        # the shopkeeper stands behind the counter, in the middle of the shop and clear of the door
+        if along_x:
+            cells = [x for x in range(x0 + 1, x1) if abs(x - door[0]) > 1] or [x for x in range(x0 + 1, x1) if x != door[0]]
+            kx = cells[len(cells) // 2]
+            g.mark("shop_" + trade, kx, GL, fz - dz)
+        else:
+            cells = [z for z in range(z0 + 1, z1) if abs(z - door[1]) > 1] or [z for z in range(z0 + 1, z1) if z != door[1]]
+            kz = cells[len(cells) // 2]
+            g.mark("shop_" + trade, fx - dx, GL, kz)
         if t.get("chimney"):
             chim = (x0 + 1, z0 + 1) if dz > 0 else (x1 - 1, z1 - 1)
         else:
@@ -248,6 +274,8 @@ def townhouse(g, x0, z0, x1, z1, GL, rng, street, storeys=None, wall=None, trade
     else:
         chim = (x0 + 1, z0 + 1) if rng.random() < 0.5 else None
         if not passage:
+            # a home: towns sell some of these to travellers
+            g.mark("dwelling", door[0], GL, door[-1])
             # a bed and a chest on the ground floor
             bx, bz = (x0 + 1, z1 - 1) if dz > 0 else (x1 - 1, z0 + 1)
             g.bed(bx, GL, bz, "east" if bx == x0 + 1 else "west", rng.choice(BED_COLORS))
@@ -472,6 +500,10 @@ def stall(g, x, z, GL, rng, facing="south", trade=None):
         g.set(x, GL, z - 1, items[int(rng.integers(len(items)))]); g.set(x, GL, z + 1, items[int(rng.integers(len(items)))])
         g.set(x - dx, GL, z, "minecraft:barrel[facing=up]")
     g.set(x, GL + 2, z, "minecraft:lantern[hanging=true]")
+    if trade:
+        g.mark("shop_" + trade, x, GL, z)
+        rot = {"south": 0, "west": 4, "north": 8, "east": 12}[facing]
+        g.set(x + dx, GL + 2, z + dz, f"minecraft:spruce_hanging_sign[rotation={rot},attached=false]", nbt=sign_nbt(t["sign"]))
 
 
 def arcade(g, x0, z0, x1, z1, GL, rng, inward, trades=()):

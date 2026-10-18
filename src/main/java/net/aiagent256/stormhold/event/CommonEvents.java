@@ -202,9 +202,29 @@ public final class CommonEvents {
         });
     }
 
+    /** A shopkeeper of a house that holds you hostile won't open his stall to you. */
+    @SubscribeEvent
+    public static void shop(PlayerInteractEvent.EntityInteract e) {
+        if (!(e.getLevel() instanceof ServerLevel level) || !(e.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp)) return;
+        if (!(e.getTarget() instanceof net.minecraft.world.entity.npc.Villager v)) return;
+        if (net.aiagent256.stormhold.holding.Shops.refuses(level, sp, v)) {
+            e.setCanceled(true);
+            e.setCancellationResult(InteractionResult.SUCCESS);
+        }
+    }
+
     @SubscribeEvent
     public static void interact(PlayerInteractEvent.RightClickBlock e) {
-        if (!(e.getLevel() instanceof ServerLevel level) || e.getEntity().isCreative()) return;
+        if (!(e.getLevel() instanceof ServerLevel level)) return;
+        // a sign on a town's or a city's notice board reads the board
+        if (e.getHand() == net.minecraft.world.InteractionHand.MAIN_HAND && e.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp0
+                && level.getBlockState(e.getPos()).getBlock() instanceof net.minecraft.world.level.block.SignBlock
+                && net.aiagent256.stormhold.holding.City.readBoardSign(level, sp0, e.getPos())) {
+            e.setCanceled(true);
+            e.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+        if (e.getEntity().isCreative()) return;
         if (e.getHand() == net.minecraft.world.InteractionHand.MAIN_HAND && e.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp
                 && level.getBlockState(e.getPos()).getBlock() instanceof net.minecraft.world.level.block.DoorBlock
                 && net.aiagent256.stormhold.holding.City.useDoor(level, sp, e.getPos())) {

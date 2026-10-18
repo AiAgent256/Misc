@@ -51,6 +51,23 @@ public class StormholdGameTests {
         for (String t : new String[]{"riverlands", "reach", "dorne", "stormlands", "nether"}) {
             if (DataRegistries.theme(t).isEmpty()) throw new IllegalStateException("missing theme " + t);
         }
+        // every town and city has its shops, its notice board and homes for sale
+        for (String n : new String[]{"town_walled", "town_cross", "town_green", "great_city", "canal_city"}) {
+            var lay = DataRegistries.layout(n);
+            int shops = 0;
+            java.util.Set<String> kinds = new java.util.HashSet<>();
+            for (var e : lay.extras.entrySet()) {
+                if (!e.getKey().startsWith("shop_")) continue;
+                shops += e.getValue().size();
+                kinds.add(e.getKey());
+                if (net.aiagent256.stormhold.holding.Shops.type(e.getKey().substring(5)) == null)
+                    throw new IllegalStateException(n + " has a shop of an unknown kind: " + e.getKey());
+            }
+            if (kinds.size() < 6) throw new IllegalStateException(n + " has only " + kinds.size() + " kinds of shop: " + kinds);
+            var houses = lay.extras.get("house");
+            if (houses == null || houses.size() < 3) throw new IllegalStateException(n + " sells " + (houses == null ? 0 : houses.size()) + " houses");
+            if (lay.extras.get("notice_board") == null) throw new IllegalStateException(n + " has no notice board");
+        }
         // every keep has its crypt: the marker the generator leaves at the founder's tomb
         for (String n : new String[]{"holdfast_a", "holdfast_b", "holdfast_c", "great_castle_a", "great_castle_b", "great_castle_c", "great_city", "canal_city"}) {
             var crypt = DataRegistries.layout(n).extras.get("crypt");
@@ -63,6 +80,48 @@ public class StormholdGameTests {
             throw new IllegalStateException("the Nether holdfast is not registered for the Nether");
         if (reg.get(Stormhold.id("holdfast_north")) instanceof net.aiagent256.stormhold.worldgen.CastleStructure o && o.nether())
             throw new IllegalStateException("a surface holdfast is flagged for the Nether");
+        g.succeed();
+    }
+
+    /** Every kind of shop puts a keeper behind his counter who sells real goods, stays put, and restocks. */
+    @GameTest(template = "arena")
+    public static void shopsTradeAndRestock(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        Holding h = sample(g);
+        List<Entity> spawned = new ArrayList<>();
+        try {
+            int i = 0;
+            for (String kind : net.aiagent256.stormhold.holding.Shops.types().keySet()) {
+                BlockPos post = g.absolutePos(new BlockPos(2 + (i % 6) * 2, 2, 2 + (i / 6) * 3));
+                level.setBlock(post, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+                level.setBlock(post.above(), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+                var v = net.aiagent256.stormhold.holding.Shops.spawnKeeper(level, h, kind, post);
+                if (v == null) throw new IllegalStateException("no keeper for " + kind);
+                spawned.add(v);
+                if (!v.isNoAi()) throw new IllegalStateException(kind + " keeper wanders");
+                var offers = v.getOffers();
+                if (offers.size() < 5) throw new IllegalStateException(kind + " sells only " + offers.size() + " things");
+                int sells = 0, buys = 0;
+                for (var o : offers) {
+                    if (o.getResult().isEmpty() || o.getBaseCostA().isEmpty()) throw new IllegalStateException(kind + " has an empty offer");
+                    if (o.getBaseCostA().is(net.minecraft.world.item.Items.EMERALD)) sells++;
+                    if (o.getResult().is(net.minecraft.world.item.Items.EMERALD)) buys++;
+                }
+                if (sells == 0 || buys == 0) throw new IllegalStateException(kind + " sells " + sells + " and buys " + buys);
+                if (v.getVillagerData().getLevel() != 5) throw new IllegalStateException(kind + " keeper is not a master");
+                // sell him out of his first line, then a new morning
+                var first = offers.get(0);
+                while (!first.isOutOfStock()) first.increaseUses();
+                net.aiagent256.stormhold.holding.Shops.restock(v);
+                if (first.isOutOfStock()) throw new IllegalStateException(kind + " did not restock");
+                if (!v.hasCustomName() || !v.getCustomName().getString().contains(net.aiagent256.stormhold.holding.Shops.type(kind).keeper()))
+                    throw new IllegalStateException(kind + " keeper is called " + v.getCustomName());
+                i++;
+            }
+            if (i < 12) throw new IllegalStateException("only " + i + " kinds of shop");
+        } finally {
+            for (Entity e : spawned) e.discard();
+        }
         g.succeed();
     }
 

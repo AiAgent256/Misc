@@ -100,6 +100,7 @@ def main():
             if cr is None:
                 raise SystemExit(f"{name}: no room for a crypt under the keep")
             kinds.update(cr)
+        g.markers.pop("dwelling", None)              # homes not put up for sale are just homes
         kinds["lit"] = fixup.light_rooms(g, meta["GL"])
         opened = fixup.clear_blocked_doorways(g, meta["GL"], tuple(meta.get("levels", ())))
         dropped = fixup.drop_buried_markers(g)

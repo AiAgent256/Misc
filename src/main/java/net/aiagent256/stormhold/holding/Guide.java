@@ -67,10 +67,18 @@ public final class Guide {
         if (h.isCity() && barracks != null && !barracks.isEmpty())
             out.add(line("Muster Post, at the barracks", from, barracks.get(0), "Right-click with emeralds: 6 a knight, sneak 5 an archer, sneak + empty off-hand 5 a crossbowman"));
         var board = h.extras.get("notice_board");
-        if (h.isCity() && board != null && !board.isEmpty())
-            out.add(line("Notice Board, in the market", from, board.get(0), "Jobs: bandit camps and warbands to clear for emeralds and standing"));
+        if ((h.isCity() || h.isTown()) && board != null && !board.isEmpty())
+            out.add(line("Notice Board, in the market", from, board.get(0), "Right-click it: every shop and house for sale with the way there, and work"));
+        var shops = Shops.posts(h);
+        if (!shops.isEmpty()) {
+            List<String> names = new ArrayList<>();
+            for (String k : shops.keySet()) names.add(Shops.type(k).title());
+            out.add(Component.literal("  Shops: ").withStyle(ChatFormatting.GOLD)
+                    .append(Component.literal(String.join(", ", names)).withStyle(ChatFormatting.WHITE))
+                    .append(Component.literal(". Keepers stand behind their counters, named over their heads").withStyle(ChatFormatting.GRAY)));
+        }
         var houses = h.extras.get("house");
-        if (h.isCity() && houses != null && !houses.isEmpty()) {
+        if ((h.isCity() || h.isTown()) && houses != null && !houses.isEmpty()) {
             BlockPos nearest = null;
             int sold = 0;
             for (BlockPos d : houses) {
@@ -81,7 +89,7 @@ public final class Guide {
                 if (nearest == null || d.distSqr(from) < nearest.distSqr(from)) nearest = d;
             }
             if (nearest != null) out.add(line("Houses for sale (" + (houses.size() - sold) + ")", from, nearest,
-                    "Nearest door. Right-click a marked door for the price (" + City.HOUSE_PRICE + " emeralds); yours to live and build in"));
+                    "Nearest door. Use it holding emeralds (" + City.housePrice(h) + "); yours to live and build in"));
         }
         var inn = h.extras.get("inn");
         if (inn != null && !inn.isEmpty()) out.add(line("Inn", from, inn.get(0), ""));

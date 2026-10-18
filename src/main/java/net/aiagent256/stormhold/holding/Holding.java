@@ -108,6 +108,11 @@ public class Holding {
     public final Map<String, List<BlockPos>> extras = new HashMap<>();
     /** House doors bought by players. */
     public final Map<BlockPos, UUID> ownedHouses = new HashMap<>();
+    /** The keeper standing at each shop post, and the day the shops last restocked. */
+    public final Map<BlockPos, UUID> shopkeepers = new HashMap<>();
+    public long shopsDay = -1;
+    /** 1 once the plans' shop posts and homes for sale have been read into a place built before it had them. */
+    public int shopsVersion;
     public final List<Posting> postings = new ArrayList<>();
     public long nextPosting;
     public boolean cityBlocksPlaced;
@@ -332,6 +337,15 @@ public class Holding {
             oh.add(e);
         });
         t.put("OwnedHouses", oh);
+        ListTag sk = new ListTag();
+        shopkeepers.forEach((p2, u) -> {
+            CompoundTag e = NbtUtils.writeBlockPos(p2);
+            e.putUUID("Keeper", u);
+            sk.add(e);
+        });
+        t.put("Shopkeepers", sk);
+        t.putLong("ShopsDay", shopsDay);
+        t.putInt("ShopsVersion", shopsVersion);
         ListTag pl = new ListTag();
         for (Posting p2 : postings) pl.add(p2.save());
         t.put("Postings", pl);
@@ -428,6 +442,13 @@ public class Holding {
             CompoundTag e = oh.getCompound(i);
             if (e.hasUUID("Owner")) h.ownedHouses.put(NbtUtils.readBlockPos(e), e.getUUID("Owner"));
         }
+        ListTag sk = t.getList("Shopkeepers", Tag.TAG_COMPOUND);
+        for (int i = 0; i < sk.size(); i++) {
+            CompoundTag e = sk.getCompound(i);
+            if (e.hasUUID("Keeper")) h.shopkeepers.put(NbtUtils.readBlockPos(e), e.getUUID("Keeper"));
+        }
+        h.shopsDay = t.contains("ShopsDay") ? t.getLong("ShopsDay") : -1;
+        h.shopsVersion = t.getInt("ShopsVersion");
         ListTag pl = t.getList("Postings", Tag.TAG_COMPOUND);
         for (int i = 0; i < pl.size(); i++) h.postings.add(Posting.load(pl.getCompound(i)));
         h.nextPosting = t.getLong("NextPosting");
