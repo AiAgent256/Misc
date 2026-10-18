@@ -48,6 +48,8 @@ public final class Market {
     /** The market's stalls all stand within this of its first, so they read as one market. */
     static final int SPREAD = 14;
     private static final int NONE = Integer.MIN_VALUE;
+    /** What the last search found, step by step: for the log and the tests. */
+    public static String lastReport = "";
 
     record Look(Block wool, Block carpet, BlockState left, BlockState right, String line1, String line2) {
     }
@@ -67,7 +69,7 @@ public final class Market {
         h.marketVersion = 1;
         mgr.setDirty();
         int n = raise(level, h);
-        Stormhold.LOGGER.info("Stormhold: {} put up {} market stalls", h.name, n);
+        Stormhold.LOGGER.info("Stormhold: {} put up {} market stalls ({})", h.name, n, lastReport);
     }
 
     /** Find the stalls' places, build them and record their keepers' posts. How many stalls went up. */
@@ -101,7 +103,10 @@ public final class Market {
 
         // the yard: every spot a man can walk to from the rally point on the ground floor
         BlockPos start = startNear(level, h.rallyPos, x0, z0, x1, z1);
-        if (start == null) return List.of();
+        if (start == null) {
+            lastReport = "no ground to stand on at the rally point " + h.rallyPos.toShortString();
+            return List.of();
+        }
         ArrayDeque<BlockPos> q = new ArrayDeque<>();
         int si = (start.getZ() - z0) * w + (start.getX() - x0);
         fy[si] = start.getY();
@@ -147,26 +152,37 @@ public final class Market {
         keepOff.add(h.warTablePos);
         keepOff.add(h.bannerPos);
         List<BlockPos> cands = new ArrayList<>();
+        int yard = 0, far = 0, level7 = 0, roofed = 0, posted = 0, road = 0, buried = 0;
+        for (int v : fy) if (v != NONE) yard++;
         for (int cz = z0 + 3; cz <= z1 - 3; cz++) {
             for (int cx = x0 + 3; cx <= x1 - 3; cx++) {
                 int y = fy[(cz - z0) * w + (cx - x0)];
                 if (y == NONE) continue;
                 if (cheb(cx, cz, h.rallyPos) < FROM_RALLY) continue;
+                far++;
                 boolean ok = true;
                 for (int dz = -3; dz <= 3 && ok; dz++)
                     for (int dx = -3; dx <= 3 && ok; dx++)
                         if (fy[(cz + dz - z0) * w + (cx + dx - x0)] != y || door[(cz + dz - z0) * w + (cx + dx - x0)]) ok = false;
+                if (!ok) continue;
+                level7++;
                 for (int dz = -1; dz <= 1 && ok; dz++)
                     for (int dx = -1; dx <= 1 && ok; dx++)
                         if (!tall[(cz + dz - z0) * w + (cx + dx - x0)]) ok = false;
-                if (!ok || nearAny(keepOff, cx, cz, 3)) continue;
+                if (!ok) continue;
+                roofed++;
+                if (nearAny(keepOff, cx, cz, 3)) continue;
+                posted++;
                 boolean onRoad = false;                            // the way in from each gate stays clear
                 for (BlockPos gt : gates) if (segDist(cx, cz, gt, h.rallyPos) <= 4) onRoad = true;
                 if (onRoad) continue;
+                road++;
                 BlockPos c = new BlockPos(cx, y, cz);
                 for (int dz = -1; dz <= 1 && ok; dz++)
                     for (int dx = -1; dx <= 1 && ok; dx++)
                         if (!free(level, c.offset(dx, 0, dz)) || !free(level, c.offset(dx, 1, dz))) ok = false;
+                if (!ok) continue;
+                buried++;
                 // open to the sky: nothing over the stall (the heightmap, not sky light, which lags behind blocks)
                 for (int dz = -1; dz <= 1 && ok; dz++)
                     for (int dx = -1; dx <= 1 && ok; dx++)
@@ -174,6 +190,9 @@ public final class Market {
                 if (ok) cands.add(c);
             }
         }
+        lastReport = "yard " + yard + " spots from " + start.toShortString() + "; stall centres off the muster ground " + far
+                + ", on 7x7 level ground " + level7 + ", room overhead " + roofed + ", off the posts " + posted
+                + ", off the road " + road + ", nothing buried " + buried + ", open sky " + cands.size();
 
         // the market: of every spot the first stall could take, the one with room for the most stalls round
         // it, and of those the nearest the rally point

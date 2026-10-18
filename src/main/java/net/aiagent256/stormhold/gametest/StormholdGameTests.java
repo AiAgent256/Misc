@@ -173,7 +173,8 @@ public class StormholdGameTests {
         List<Entity> spawned = new ArrayList<>();
         try {
             int n = net.aiagent256.stormhold.holding.Market.raise(level, h);
-            if (n < 2) throw new IllegalStateException("only " + n + " stalls went up in an open yard");
+            if (n < 2) throw new IllegalStateException("only " + n + " stalls went up in an open yard: "
+                    + net.aiagent256.stormhold.holding.Market.lastReport);
             for (int i = 0; i < n; i++) {
                 String kind = net.aiagent256.stormhold.holding.Market.KINDS.get(i);
                 List<BlockPos> ps = h.extras.get("shop_" + kind);
