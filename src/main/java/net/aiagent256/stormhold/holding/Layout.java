@@ -23,6 +23,8 @@ public class Layout {
     public final BlockPos lord, bannerStand, warTable, gate, rally;
     public final EnumMap<Role, List<BlockPos>> posts = new EnumMap<>(Role.class);
     public final List<BlockPos> banners = new ArrayList<>();
+    /** Posts beside a machicolation, with the side the man leans out over the hole from: {dx, dz}. */
+    public final java.util.Map<BlockPos, int[]> lips = new java.util.HashMap<>();
     /** Non-garrison markers: barracks, notice_board, house, inn, smithy. */
     public final java.util.Map<String, List<BlockPos>> extras = new java.util.HashMap<>();
     /** Each portcullis plane as {x0, y0, z0, x1, y1, z1}, so a lost gate can be put back. */
@@ -61,6 +63,13 @@ public class Layout {
             posts.put(role, list);
         }
         for (JsonElement el : o.getAsJsonArray("banners")) banners.add(pos(el));
+        if (o.has("lips")) {
+            for (JsonElement el : o.getAsJsonArray("lips")) {
+                JsonArray a = el.getAsJsonArray();
+                lips.put(new BlockPos(a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt()),
+                        new int[]{a.get(3).getAsInt(), a.get(4).getAsInt()});
+            }
+        }
         if (o.has("gate_planes")) {
             for (JsonElement el : o.getAsJsonArray("gate_planes")) {
                 JsonArray a = el.getAsJsonArray();

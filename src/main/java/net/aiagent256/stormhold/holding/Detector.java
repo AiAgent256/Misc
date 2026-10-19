@@ -185,6 +185,8 @@ public final class Detector {
         }
         h.banners.clear();
         for (BlockPos b : l.banners) h.banners.add(o.offset(b));
+        h.lips.clear();
+        l.lips.forEach((p, d) -> h.lips.put(o.offset(p), d.clone()));
         h.extras.clear();
         for (var e : l.extras.entrySet()) {
             List<BlockPos> list = new ArrayList<>();

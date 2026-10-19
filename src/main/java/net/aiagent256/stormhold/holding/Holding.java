@@ -111,6 +111,8 @@ public class Holding {
     public final List<BlockPos> banners = new ArrayList<>();
     /** City features by name: barracks, notice_board, house (door positions), inn, smithy. */
     public final Map<String, List<BlockPos>> extras = new HashMap<>();
+    /** Posts beside a machicolation and the side the man there leans out over the hole from, {dx, dz}. */
+    public final Map<BlockPos, int[]> lips = new HashMap<>();
     /** House doors bought by players. */
     public final Map<BlockPos, UUID> ownedHouses = new HashMap<>();
     /** The keeper standing at each shop post, and the day the shops last restocked. */
@@ -371,6 +373,9 @@ public class Holding {
         CompoundTag ex = new CompoundTag();
         extras.forEach((k, v) -> ex.put(k, posList(v)));
         t.put("Extras", ex);
+        ListTag lp = new ListTag();
+        lips.forEach((q, d) -> lp.add(new net.minecraft.nbt.IntArrayTag(new int[]{q.getX(), q.getY(), q.getZ(), d[0], d[1]})));
+        t.put("Lips", lp);
         ListTag oh = new ListTag();
         ownedHouses.forEach((p2, u) -> {
             CompoundTag e = NbtUtils.writeBlockPos(p2);
@@ -512,6 +517,11 @@ public class Holding {
         h.banners.addAll(readPosList(t.getList("Banners", Tag.TAG_COMPOUND)));
         CompoundTag ex = t.getCompound("Extras");
         for (String k : ex.getAllKeys()) h.extras.put(k, readPosList(ex.getList(k, Tag.TAG_COMPOUND)));
+        ListTag lp = t.getList("Lips", Tag.TAG_INT_ARRAY);
+        for (int i = 0; i < lp.size(); i++) {
+            int[] a = lp.getIntArray(i);
+            if (a.length == 5) h.lips.put(new BlockPos(a[0], a[1], a[2]), new int[]{a[3], a[4]});
+        }
         ListTag oh = t.getList("OwnedHouses", Tag.TAG_COMPOUND);
         for (int i = 0; i < oh.size(); i++) {
             CompoundTag e = oh.getCompound(i);

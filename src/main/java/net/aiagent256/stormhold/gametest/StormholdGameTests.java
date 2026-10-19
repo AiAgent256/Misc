@@ -2668,6 +2668,61 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /**
+     * A wall six high with a corbelled ledge and a machicolation cut in it. From the middle of his block an archer
+     * can't see a man at the wall's foot (the wall's own top is in the way); at the hole's lip he can, and shoots.
+     */
+    @GameTest(template = "arena", timeoutTicks = 300)
+    public static void lipArchersShootDownTheWall(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        int fy = 1;
+        while (!level.getBlockState(g.absolutePos(new BlockPos(5, fy, 5))).isAir() && fy < 6) fy++;
+        int top = fy + 6;                                // the walk: men stand at y = top
+        for (int z = 3; z <= 11; z++) {
+            for (int y = fy; y < top; y++) for (int x = 8; x <= 9; x++)
+                g.setBlock(new BlockPos(x, y, z), net.minecraft.world.level.block.Blocks.STONE_BRICKS);
+            if (z == 7) continue;                         // the hole
+            g.setBlock(new BlockPos(7, top - 2, z), net.minecraft.world.level.block.Blocks.STONE_BRICKS);   // the ledge
+            g.setBlock(new BlockPos(7, top - 1, z), net.minecraft.world.level.block.Blocks.STONE_BRICKS);
+            if (z % 4 < 2) {                              // merlons
+                g.setBlock(new BlockPos(7, top, z), net.minecraft.world.level.block.Blocks.STONE_BRICKS);
+                g.setBlock(new BlockPos(7, top + 1, z), net.minecraft.world.level.block.Blocks.STONE_BRICKS);
+            }
+        }
+        BlockPos post = g.absolutePos(new BlockPos(8, top, 7));
+        BlockPos foot = g.absolutePos(new BlockPos(6, fy, 7));
+        Holding h = sample(g);
+        h.lips.put(post, new int[]{-1, 0});
+        GarrisonEntity archer = Garrisons.spawn(level, mgr, h, Role.ARCHER, post, h.owner, true);
+        if (archer == null) throw new IllegalStateException("no archer");
+        var foe = net.minecraft.world.entity.EntityType.VINDICATOR.create(level);
+        if (foe == null) throw new IllegalStateException("no vindicator");
+        foe.moveTo(foot.getX() + 0.5, foot.getY(), foot.getZ() + 0.5, 0, 0);
+        foe.setNoAi(true);
+        foe.setPersistenceRequired();
+        level.addFreshEntity(foe);
+        // the dead ground: from the middle of his block the wall's top hides the man below
+        net.minecraft.world.phys.Vec3 mid = new net.minecraft.world.phys.Vec3(post.getX() + 0.5, post.getY() + archer.getEyeHeight(), post.getZ() + 0.5);
+        var hit = level.clip(new net.minecraft.world.level.ClipContext(mid, foe.getEyePosition(),
+                net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, archer));
+        if (hit.getType() == net.minecraft.world.phys.HitResult.Type.MISS) {
+            archer.discard(); foe.discard();
+            throw new IllegalStateException("the wall's foot was in sight from the middle of the walk: the test wall is wrong");
+        }
+        float full = foe.getHealth();
+        g.succeedWhen(() -> {
+            if (!archer.isAlive()) throw new IllegalStateException("archer died");
+            if (archer.getY() < post.getY() - 0.01) throw new IllegalStateException("archer fell off the lip: y " + archer.getY());
+            net.minecraft.world.phys.Vec3 at = archer.lipSpot();
+            if (at == null || Math.abs(archer.getX() - at.x) > 0.06 || Math.abs(archer.getZ() - at.z) > 0.06)
+                throw new IllegalStateException("not at the lip: " + archer.position() + " want " + at);
+            if (foe.isAlive() && foe.getHealth() >= full) throw new IllegalStateException("no hit on the man at the foot yet");
+            archer.discard();
+            foe.discard();
+        });
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

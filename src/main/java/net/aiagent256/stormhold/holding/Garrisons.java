@@ -214,6 +214,8 @@ public final class Garrisons {
         int tier = h != null ? h.tier : 2;
         int renown = Frontier.level(level, h);              // renown, or the frontier zone if higher
         e.setup(side, h != null ? h.id : null, tier, renown, color, p, hold);
+        int[] lip = h != null && r.ranged && hold ? h.lips.get(p) : null;
+        if (lip != null) e.setLip(lip[0], lip[1]);
         e.moveTo(p.getX() + 0.5, p.getY(), p.getZ() + 0.5, level.random.nextFloat() * 360F, 0);
         e.finalizeSpawn(level, level.getCurrentDifficultyAt(p), MobSpawnType.EVENT, null, null);
         Loadouts.equip(e, r, tier, renown, color, house);

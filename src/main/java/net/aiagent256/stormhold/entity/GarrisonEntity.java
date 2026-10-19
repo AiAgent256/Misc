@@ -82,6 +82,11 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     private int lastDamagedTick = -1000;
     /** A wall archer that has come down to fight; counts down back to holding the wall. */
     public int sortieTicks;
+    /** The side of his post a bowman leans out over a machicolation from; both 0 for a post with no hole beside it. */
+    private int lipX, lipZ;
+    /** How far off his block's centre a man at a lip stands: his body a quarter of a block out over the hole,
+     * his eye over its edge. The generator's audit stands him at the same spot. */
+    public static final double LIP = 0.45;
     private boolean holdPosition;
     private int tier = 1;
     private int renown = 2;
@@ -169,6 +174,8 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         this.renown = Math.max(1, Math.min(9, renown));
         this.color = color;
         this.post = post;
+        this.lipX = 0;
+        this.lipZ = 0;
         this.holdPosition = hold;
     }
 
@@ -179,7 +186,35 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     @Nullable public UUID shipmentId() { return shipmentId; }
     public void setShipmentId(@Nullable UUID id) { this.shipmentId = id; }
     @Nullable public BlockPos post() { return post; }
-    public void setPost(@Nullable BlockPos p) { this.post = p; }
+    public void setLip(int dx, int dz) { this.lipX = Integer.signum(dx); this.lipZ = Integer.signum(dz); }
+    public boolean hasLip() { return lipX != 0 || lipZ != 0; }
+
+    /** Where a man at a lip post stands: LIP off the post's centre toward the hole. Null when the post has none. */
+    @Nullable
+    public Vec3 lipSpot() {
+        if (post == null || !hasLip()) return null;
+        double len = Math.sqrt(lipX * lipX + lipZ * lipZ);
+        return new Vec3(post.getX() + 0.5 + LIP * lipX / len, post.getY(), post.getZ() + 0.5 + LIP * lipZ / len);
+    }
+
+    /**
+     * A bowman at a post beside a machicolation stands at the hole's lip, leaning over it, so he sees straight
+     * down the wall's face where a man at the middle of his block sees only the ledge. He's set there once he's
+     * on his post and still: walking there could carry him over the edge.
+     */
+    private void holdLip() {
+        if (!hasLip() || !role().ranged || !holdsPosition() || sortieTicks > 0) return;
+        if (!this.blockPosition().equals(post) || !this.onGround() || !this.getNavigation().isDone()) return;
+        Vec3 at = lipSpot();
+        double dx = at.x - this.getX(), dz = at.z - this.getZ();
+        if (dx * dx + dz * dz < 0.0004) return;
+        this.setPos(at.x, this.getY(), at.z);
+        this.setDeltaMovement(0, this.getDeltaMovement().y, 0);
+    }
+    public void setPost(@Nullable BlockPos p) {
+        if (!java.util.Objects.equals(p, this.post)) { lipX = 0; lipZ = 0; }      // a lip belongs to its post
+        this.post = p;
+    }
     @Nullable public BlockPos marchTarget() { return marchTarget; }
     public void setMarchTarget(@Nullable BlockPos p) { this.marchTarget = p; }
     @Nullable public BlockPos marchVia() { return marchVia; }
@@ -734,6 +769,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         if (alarmTicks > 0) alarmTicks--;
         if (backOffTicks > 0) backOffTicks--;
         if (sortieTicks > 0) sortieTicks--;
+        holdLip();
         if (owner() != null) {
             tickCare();
             // a marked target overrides whatever he picked for himself
@@ -848,6 +884,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         tag.putString("Side", side);
         if (holdingId != null) tag.putUUID("Holding", holdingId);
         if (post != null) tag.put("Post", NbtUtils.writeBlockPos(post));
+        if (hasLip()) { tag.putInt("LipX", lipX); tag.putInt("LipZ", lipZ); }
         tag.putInt("Tier", tier);
         tag.putInt("Renown", renown);
         tag.putInt("Color", color.getId());
@@ -866,6 +903,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         side = tag.getString("Side");
         if (tag.hasUUID("Holding")) holdingId = tag.getUUID("Holding");
         if (tag.contains("Post")) post = NbtUtils.readBlockPos(tag.getCompound("Post"));
+        setLip(tag.getInt("LipX"), tag.getInt("LipZ"));
         tier = Math.max(1, tag.getInt("Tier"));
         if (tag.contains("Renown")) renown = Math.max(1, Math.min(9, tag.getInt("Renown")));
         color = DyeColor.byId(tag.getInt("Color"));
