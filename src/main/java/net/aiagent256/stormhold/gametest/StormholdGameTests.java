@@ -2712,12 +2712,12 @@ public class StormholdGameTests {
         }
         float full = foe.getHealth();
         g.succeedWhen(() -> {
-            if (!archer.isAlive()) throw new IllegalStateException("archer died");
-            if (archer.getY() < post.getY() - 0.01) throw new IllegalStateException("archer fell off the lip: y " + archer.getY());
+            if (!archer.isAlive()) throw new net.minecraft.gametest.framework.GameTestAssertException("archer died");
+            if (archer.getY() < post.getY() - 0.01) throw new net.minecraft.gametest.framework.GameTestAssertException("archer fell off the lip: y " + archer.getY());
             net.minecraft.world.phys.Vec3 at = archer.lipSpot();
             if (at == null || Math.abs(archer.getX() - at.x) > 0.06 || Math.abs(archer.getZ() - at.z) > 0.06)
-                throw new IllegalStateException("not at the lip: " + archer.position() + " want " + at);
-            if (foe.isAlive() && foe.getHealth() >= full) throw new IllegalStateException("no hit on the man at the foot yet");
+                throw new net.minecraft.gametest.framework.GameTestAssertException("not at the lip: " + archer.position() + " want " + at);
+            if (foe.isAlive() && foe.getHealth() >= full) throw new net.minecraft.gametest.framework.GameTestAssertException("no hit on the man at the foot yet");
             archer.discard();
             foe.discard();
         });
