@@ -16,6 +16,7 @@ import crypt
 import gatehouse
 import defense_audit
 import loops
+import machicolate
 import manor
 import market_town
 import export
@@ -86,27 +87,31 @@ SCALE_LIMITS = {"*": {"narrow_stairs": 0, "pinches": 3, "dark_rooms": 0},
 
 # What a plan's defences must reach before it's exported (see defense_audit): bowmen on walks a man can pass
 # another on, the walls' foot covered by flanking fire, the field before them in bowshot.
-DEFENSE_LIMITS = {"*": {"one_wide": 0, "two_wide": 0.10, "foot": 0.35, "field": 0.85},
+DEFENSE_LIMITS = {"*": {"one_wide": 0, "two_wide": 0.10, "foot": 0.55, "field": 0.85},
+                  # (feet raised with the machicolations: a corbelled parapet's foot is now seen down its holes,
+                  # so a plan that loses them, or the men at their lips, fails)
                   # an open market town has no wall to man: a man or two up its church tower
                   "town": {"one_wide": 0, "two_wide": 1.0, "foot": 0.0, "field": 0.0},
-                  # the manor's walls are low: its men see their foot, and the bar is set higher to match
-                  "fortified_manor": {"one_wide": 0, "two_wide": 0.10, "foot": 0.50, "field": 0.85},
+                  # the manor's walls are low and flush (a ledge would push their dead ground out): its men see
+                  # their foot from the crenels
+                  "fortified_manor": {"one_wide": 0, "two_wide": 0.10, "foot": 0.60, "field": 0.85},
                   # the walled town's curtain is held to a castle's walks
-                  "town_walled": {"one_wide": 0, "two_wide": 0.10, "foot": 0.35, "field": 0.80},
+                  "town_walled": {"one_wide": 0, "two_wide": 0.10, "foot": 0.65, "field": 0.80},
                   # the backlog the audit found on its first run: tower tops crowded by their stair heads and
                   # turret roofs, the keep wall's walk in great castle C. A new narrow walk still fails the build.
-                  "great_castle_a": {"one_wide": 0, "two_wide": 0.20, "foot": 0.35, "field": 0.85},
-                  "great_castle_a2": {"one_wide": 0, "two_wide": 0.20, "foot": 0.35, "field": 0.85},
-                  "great_castle_c": {"one_wide": 0, "two_wide": 0.15, "foot": 0.35, "field": 0.85},
-                  "great_castle_c2": {"one_wide": 0, "two_wide": 0.15, "foot": 0.35, "field": 0.85},
-                  # the cities' walls run for half a mile: their foot is watched from the towers, not all of it
-                  "great_city": {"one_wide": 3, "two_wide": 0.12, "foot": 0.10, "field": 0.80},
-                  "canal_city": {"one_wide": 3, "two_wide": 0.12, "foot": 0.10, "field": 0.80},
+                  "great_castle_a": {"one_wide": 0, "two_wide": 0.20, "foot": 0.60, "field": 0.85},
+                  "great_castle_a2": {"one_wide": 0, "two_wide": 0.20, "foot": 0.60, "field": 0.85},
+                  "great_castle_c": {"one_wide": 0, "two_wide": 0.15, "foot": 0.65, "field": 0.85},
+                  "great_castle_c2": {"one_wide": 0, "two_wide": 0.15, "foot": 0.65, "field": 0.85},
+                  # the cities' walls run for half a mile, twenty-eight high: the holes in their ledges see most
+                  # of the foot, the towers the rest
+                  "great_city": {"one_wide": 3, "two_wide": 0.12, "foot": 0.55, "field": 0.80},
+                  "canal_city": {"one_wide": 3, "two_wide": 0.12, "foot": 0.55, "field": 0.80},
                   # the gatehouse castle was built to the audit: its towers and bastions flank every wall
-                  "gatehouse_castle": {"one_wide": 0, "two_wide": 0.10, "foot": 0.60, "field": 0.85},
+                  "gatehouse_castle": {"one_wide": 0, "two_wide": 0.10, "foot": 0.90, "field": 0.85},
                   # the hill town's curtain is short-sided and towered every few rods: its foot is held to
                   # better than a castle's
-                  "hill_town": {"one_wide": 0, "two_wide": 0.10, "foot": 0.50, "field": 0.85}}
+                  "hill_town": {"one_wide": 0, "two_wide": 0.10, "foot": 0.70, "field": 0.85}}
 
 
 # Plans rebuilt since they first went out into worlds. A rebuilt plan is exported under a new name
@@ -159,7 +164,10 @@ def main():
         parts.CAP_STYLE = style
         g, meta = fn() if seed_shift is None else fn(seed=fn.__defaults__[0] + seed_shift)
         parts.CAP_STYLE = "cone"
+        # machicolations in the corbelled parapets, then the men onto their sills and to the holes' lips
+        holes = [] if meta.get("kind") == "landmark" else machicolate.open_crenels(g, meta["GL"])
         at_embrasures = fixup.embrasures(g)
+        lips = machicolate.assign_lips(g) if holes else 0
         meta["name"] = name
         character = meta.get("character") or rooms.character_for(name, seed_shift or 0)
         meta["character"] = character
@@ -168,6 +176,8 @@ def main():
         widened = 0 if landmark else scale.widen_doorways(g, meta["GL"])
         kinds = {"beds": 0, "men": 0} if landmark else rooms.furnish(g, meta["GL"], character, tier=meta.get("tier", 2))
         kinds["doorways_widened"] = widened
+        kinds["machicolations"] = len(holes)
+        kinds["lips"] = lips
         meta["beds"] = kinds["beds"]
         if meta.get("tier", 2) >= 2 and meta.get("kind") != "town":
             # a crypt under the keep: the city's keep stands on its top terrace

@@ -13,6 +13,7 @@ blind     Archer posts that can't see a single spot outside the walls (inner war
 import numpy as np
 
 from walk import passable, supports
+from machicolate import LIP
 
 RANGES = {"archer": 28, "crossbowman": 24}      # the roles' ranges in the mod (Role.java)
 EYE = 1.6
@@ -208,11 +209,14 @@ def flanking(g, GL, roles=("archer", "crossbowman"), stride=2):
         foot = foot[(foot[:, 0] + foot[:, 1]) % stride == 0]
         field = field[(field[:, 0] + field[:, 1]) % (stride * 2) == 0]
     eyes, ranges = [], []
+    lips = getattr(g, "lips", {})
     for r in roles:
         for (x, y, z) in g.markers.get(r, []):
             if not _stand(g, x, y, z):
                 continue
-            eyes.append((x + PAD + 0.5, y + (0.5 if _sill(g, x, y, z) else 0.0) + EYE, z + PAD + 0.5))
+            # a man beside a machicolation stands at its lip, as the mod puts him
+            lx, lz = lips.get((x, y, z), (0, 0))
+            eyes.append((x + PAD + 0.5 + LIP * lx, y + (0.5 if _sill(g, x, y, z) else 0.0) + EYE, z + PAD + 0.5 + LIP * lz))
             ranges.append(RANGES.get(r, 24))
     posts = np.array(eyes, dtype=float)
     ranges = np.array(ranges, dtype=float)

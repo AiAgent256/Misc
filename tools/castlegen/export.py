@@ -143,6 +143,11 @@ def write_layout(g, meta, tiles, path):
         "banners": [list(b) for b in g.banners if g.get(*b).endswith("wall_banner" ) or "wall_banner" in g.get(*b)],
         "footprint": footprint(g, meta["GL"]),
     }
+    # the posts beside a machicolation, with the side the man leans out over the hole from
+    kept = {tuple(p) for r in ("archer", "crossbowman") for p in posts.get(r, [])}
+    lips = [[x, y, z, dx, dz] for (x, y, z), (dx, dz) in sorted(getattr(g, "lips", {}).items()) if (x, y, z) in kept]
+    if lips:
+        layout["lips"] = lips
     if meta.get("kind") == "landmark":
         layout["kind"] = "landmark"            # a place, not a holding: the game makes no garrison for it
     os.makedirs(os.path.dirname(path), exist_ok=True)

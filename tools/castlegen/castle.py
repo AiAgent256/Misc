@@ -5,7 +5,7 @@ from grid import Grid, Mix, disk, ring, rect, rect_ring, spiral_stair, dogleg_st
 from parts import (SILL, STONE, DARK, FOUND, PAVE, ROAD, FLOOR_STONE, ROOF, ROOF_STAIR, STONE_STAIR,
                    DARK_STAIR, SLAB_CAP, RAIL, PLANK, DARK_PLANK, PORTCULLIS, GLASS,
                    curtain, posts_on_walk, round_tower, square_tower, straight_wall,
-                   pointed_arch, building, lamp_post, tree_weirwood, side_grids, wall_stair)
+                   pointed_arch, building, lamp_post, tree_weirwood, side_grids, wall_stair, roof_ladder, tower_room)
 
 LOOT = "stormhold:chests/"
 
@@ -28,14 +28,13 @@ def d_tower(g, side, pos, a, b, walk, GL, r=6):
         cx, cz, door = a + 1, pos, (0, 1)
     else:
         cx, cz, door = b - 1, pos, (0, 1)
-    top = walk + 6
+    top = walk + 7              # a block over the old six: room for a half floor between two short ladders
     dx, dz = door
     round_tower(g, cx, cz, r, top, GL, floors=(GL + 8, walk - 1), spiral=False,
                 doors=((dx, dz, walk), (-dx, -dz, walk), (dx, dz, GL + 9), (-dx, -dz, GL + 9)),
                 banner_dirs=(), lantern_floors=True)
-    # a ladder from the wall-walk floor up through a hatch to the roof; mark posts
-    for y in range(walk, top):
-        g.set(cx + 2, y, cz, "minecraft:ladder[facing=west]")
+    # from the wall-walk room up through a hatch to the roof, two short ladders; mark posts
+    roof_ladder(g, tower_room(g, cx, cz, r), walk, top, (cx + 2, cz, "west"), (cx - 2, cz, "east"))
     for k in range(6):
         ang = k * np.pi / 3
         g.mark("archer", int(round(cx + 3 * np.cos(ang))), top, int(round(cz + 3 * np.sin(ang))))
@@ -151,8 +150,14 @@ def great_castle_a(seed=7):
     # gate hall above with murder holes
     g.fill(58, GL + 12, b - 6, 70, gtop - 2, b + 6, "minecraft:air")
     g.fill(58, GL + 11, b - 6, 70, GL + 11, b + 6, PLANK)
-    for z in range(b - 4, b + 5, 2):
-        g.fill(64, GL + 10, z, 64, GL + 11, z, "minecraft:air")
+    # murder holes right through the passage's vault (the arch is open to GL + 8), a crossbowman at each,
+    # standing at its lip so he shoots straight down on whoever is caught between the portcullises
+    g.lips = getattr(g, "lips", {})
+    for i, z in enumerate(range(b - 4, b + 5, 2)):
+        g.fill(64, GL + 9, z, 64, GL + 11, z, "minecraft:air")
+        side = -1 if i % 2 == 0 else 1
+        g.mark("crossbowman", 64 + side, GL + 12, z)
+        g.lips[(64 + side, GL + 12, z)] = (-side, 0)
     g.lantern(61, gtop - 2, b); g.lantern(67, gtop - 2, b)
     g.fill(58, walk - 1, b - 6, 70, walk - 1, b + 6, PLANK)        # gallery at wall-walk level
     spiral_stair(g, 60, b - 3, GL + 12, gtop - 1, STONE_STAIR, STONE, landings=(walk,))
@@ -584,7 +589,7 @@ def holdfast_a(seed=11):
             g.set(x, GL - 2, z, "minecraft:pointed_dripstone[thickness=tip,vertical_direction=up]")
     d, along, out = curtain(g, a, b, thick, walk, GL, gallery=False, banners_every=12)
     posts_on_walk(g, d, along, walk, "archer", dsel=1, every=5, offset=2)
-    ttop = walk + 6
+    ttop = walk + 7             # room for a half floor between two short ladders
     for (cx, cz) in ((a + 2, a + 2), (b - 2, a + 2), (a + 2, b - 2), (b - 2, b - 2)):
         sx = 1 if cx < W / 2 else -1
         sz = 1 if cz < W / 2 else -1
@@ -596,9 +601,8 @@ def holdfast_a(seed=11):
         g.mark("archer", cx, ttop, cz) if cz < W / 2 else None
         # ladder from the wall-walk floor up through a hatch onto the tower roof
         lf = "east" if sx > 0 else "west"
-        for y in range(walk, ttop):
-            g.set(cx - sx, y, cz - sz, f"minecraft:ladder[facing={lf}]")
-        g.set(cx - sx, ttop, cz - sz, "minecraft:air")
+        roof_ladder(g, rect(g, cx - 1, cz - 1, cx + 1, cz + 1), walk, ttop, (cx - sx, cz - sz, lf),
+                    (cx + sx, cz + sz, "west" if sx > 0 else "east"))
     # stairs from the yard to the wall-walk: one against the west wall, one against the east
     wall_stair(g, a + thick, 42, GL, walk, "z", "west")
     wall_stair(g, b - thick, 42, GL, walk, "z", "east")

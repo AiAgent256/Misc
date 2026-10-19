@@ -3,6 +3,7 @@
 Coordinates: x east, y up, z south. Array is stored as a[x, z, y].
 Palette id 0 = structure void (not placed), 1 = explicit air.
 """
+import contextlib
 import math
 from collections import defaultdict
 
@@ -39,6 +40,17 @@ class Grid:
         self.block_nbt = {}  # (x,y,z) -> dict
         self.markers = defaultdict(list)  # role -> [(x,y,z)]
         self.banners = []  # (x,y,z)
+
+    @contextlib.contextmanager
+    def private_rng(self, seed):
+        """Draw the random stone of what's built inside from a stream of its own, so everything built after it
+        comes out as it did before that part changed (houses, furniture, weathering)."""
+        saved = self.rng
+        self.rng = np.random.default_rng(seed)
+        try:
+            yield
+        finally:
+            self.rng = saved
 
     # ---------- palette ----------
     def pid(self, state):

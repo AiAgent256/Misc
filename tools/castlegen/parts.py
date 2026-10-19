@@ -289,17 +289,30 @@ def round_tower(g, cx, cz, r, top, GL, floors=(), spiral=True, cone=False, t=3,
         if CAP_STYLE != "flat":
             g.fill_mask(full, top, top + 6, "minecraft:air")
         cap_roof(g, cx, cz, r, top)
-        if getattr(g, "last_cap", None) == "hoard" and r - t >= 2:
-            # a ladder up the inside of the shell to the hoarding, through a hatch in the roof slab
+        if getattr(g, "last_cap", None) == "hoard" and r - t >= 2 and sp is None:
+            # no stair to the roof: a ladder up from the top room to the hoarding, through a hatch in the roof slab.
+            # Never more than four rungs at a go: past that a half floor between, the next ladder on the far wall
             dx, dz = (0, 1)
             if doors:
                 ddx, ddz, _ = doors[0]
                 dx, dz = (-ddx, -ddz) if (ddx or ddz) else (0, 1)
             lx, lz = cx + dx * (r - t), cz + dz * (r - t)
             f = "east" if dx < 0 else "west" if dx > 0 else "south" if dz < 0 else "north"
-            for y in range(GL, top):
-                g.set(lx, y, lz, f"minecraft:ladder[facing={f}]")
-            g.protected_xz = getattr(g, "protected_xz", set()) | {(lx, lz)}
+            start = max([GL] + [fy + 1 for fy in floors if fy + 1 < top] + [y for (_, _, y) in doors if y < top])
+            if top - start <= 4:
+                for y in range(start, top):
+                    g.set(lx, y, lz, f"minecraft:ladder[facing={f}]")
+                cells_ = {(lx, lz)}
+            else:
+                F = start + (top - start) // 2 - 1          # the half floor: a man stands on it at F + 1
+                g.fill_mask(inner, F, F, PLANK)
+                for y in range(start, F + 1):
+                    g.set(lx, y, lz, f"minecraft:ladder[facing={f}]")
+                bx, bz = cx - dx * (r - t), cz - dz * (r - t)
+                for y in range(F + 1, top):
+                    g.set(bx, y, bz, f"minecraft:ladder[facing={OPPOSITE[f]}]")
+                cells_ = {(lx, lz), (bx, bz)}
+            g.protected_xz = getattr(g, "protected_xz", set()) | cells_
     for (dx, dz) in banner_dirs:
         x = cx + int(round(dx * (r + 1)))
         z = cz + int(round(dz * (r + 1)))
@@ -381,6 +394,36 @@ def square_tower(g, x0, z0, x1, z1, top, GL, floors=(), spiral_at=None, t=3, con
         else:
             g.wall_banner(x1 + 1, top - 6, cz, "east")
     return sp
+
+
+def roof_ladder(g, room, y0, top, a, b):
+    """The way from a tower room (standing level y0) up through a hatch in the roof slab (top - 1) onto the roof.
+    One ladder when it's five rungs or fewer; past that a half floor three over the room (`room`, a 2-D mask of
+    it), one ladder up to it and the next on the far wall (a, b: (x, z, facing)), so no man climbs more than four
+    at a go. Needs top - y0 >= 7 for that: two of headroom over the half floor."""
+    (ax, az, af), (bx, bz, bf) = a, b
+    if top - y0 <= 5:
+        for y in range(y0, top):
+            g.set(ax, y, az, f"minecraft:ladder[facing={af}]")
+        cells = {(ax, az)}
+    else:
+        F = y0 + 3
+        open_ = room & np.isin(g.a[:, :, F], [i for i, st in enumerate(g.palette) if st in ("minecraft:air", "<void>")])
+        g.fill_mask(open_, F, F, PLANK)
+        for y in range(y0, F + 1):
+            g.set(ax, y, az, f"minecraft:ladder[facing={af}]")
+        for y in range(F + 1, top):
+            g.set(bx, y, bz, f"minecraft:ladder[facing={bf}]")
+        cells = {(ax, az), (bx, bz)}
+    g.set(ax, top, az, "minecraft:air")
+    g.set(bx, top, bz, "minecraft:air") if top - y0 > 5 else None
+    g.protected_xz = getattr(g, "protected_xz", set()) | cells
+    return cells
+
+
+def tower_room(g, cx, cz, r, t=3):
+    """The inside of a round tower's shell, as round_tower hollows it."""
+    return disk(g, cx, cz, r) & ~ring(g, cx, cz, r, r - t)
 
 
 def straight_wall(g, x0, z0, x1, z1, walk_y, outward, GL):

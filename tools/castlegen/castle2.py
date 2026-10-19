@@ -5,7 +5,7 @@ from grid import Grid, Mix, disk, ring, rect, rect_ring, spiral_stair, dogleg_st
 from parts import (SILL, STONE, DARK, FOUND, PAVE, ROAD, FLOOR_STONE, ROOF, ROOF_STAIR, STONE_STAIR,
                    DARK_STAIR, SLAB_CAP, RAIL, PLANK, DARK_PLANK, PORTCULLIS, GLASS,
                    curtain, ring_grids, posts_on_walk, round_tower, square_tower, straight_wall,
-                   pointed_arch, building, lamp_post, tree_weirwood)
+                   pointed_arch, building, lamp_post, tree_weirwood, roof_ladder, tower_room, wall_stair)
 from castle import portcullis_plane, bartizan
 
 LOOT = "stormhold:chests/"
@@ -37,6 +37,53 @@ def parapet_rect(g, x0, z0, x1, z1, y):
             g.set(x, y, z, STONE if z % 4 < 2 else SILL)
             if z % 4 < 2:
                 g.set(x, y + 1, z, STONE); g.set(x, y + 2, z, SLAB_CAP)
+
+
+def corbel_parapet_rect(g, x0, z0, x1, z1, y):
+    """parapet_rect's parapet carried a block out from the wall's face on corbels, so the ledge can take
+    machicolations: the wall's top course becomes walk, the ledge stands on a corbel at every other block, and the
+    merlons and sills go on the ledge. Only where the outside is open air from two below the walk up; elsewhere
+    (a tower, a building against the wall) the flush parapet stands as parapet_rect builds it."""
+    from parts import OPPOSITE
+    p = getattr(g, "protected_xz", set())
+    # the flush parapet drew two random stones per merlon cell from the grid's stream: draw them still, and build
+    # the ledge from a stream of its own, so the rest of the plan comes out as it did
+    burn = sum(2 for x in range(x0, x1 + 1) for z in (z0, z1) if (x, z) not in p and x % 4 < 2) + \
+        sum(2 for z in range(z0, z1 + 1) for x in (x0, x1) if (x, z) not in p and z % 4 < 2)
+    for _ in range(burn):
+        g._ids_for(STONE, 1)
+    with g.private_rng(x0 * 7919 + z0 * 104729 + y):
+        _corbel_parapet(g, x0, z0, x1, z1, y, p, OPPOSITE)
+
+
+def _corbel_parapet(g, x0, z0, x1, z1, y, p, OPPOSITE):
+    def open_air(x, z):
+        return g.inb(x, y, z) and all(g.get(x, yy, z) in ("minecraft:air", "<void>") for yy in range(y - 2, y + 3))
+
+    def crenel(x, z, a):
+        g.set(x, y, z, STONE if a % 4 < 2 else SILL)
+        if a % 4 < 2:
+            g.set(x, y + 1, z, STONE); g.set(x, y + 2, z, SLAB_CAP)
+
+    cells = []
+    for x in range(x0, x1 + 1):
+        cells += [(x, z0, x, z0 - 1, "north", x), (x, z1, x, z1 + 1, "south", x)]
+    for z in range(z0 + 1, z1):
+        cells += [(x0, z, x0 - 1, z, "west", z), (x1, z, x1 + 1, z, "east", z)]
+    for (ix, iz, ox, oz, out, a) in cells:
+        if (ix, iz) in p:
+            continue
+        if not open_air(ox, oz):
+            crenel(ix, iz, a)                       # flush here
+            continue
+        if a % 2 == 0:
+            g.stair(ox, y - 2, oz, STONE_STAIR, OPPOSITE[out], half="top")
+        g.set(ox, y - 1, oz, STONE)
+        crenel(ox, oz, a)
+    # the ledge's corners: a solid merlon each, so the ledge doesn't stop short with a gap at the angle
+    for (cx, cz) in ((x0 - 1, z0 - 1), (x1 + 1, z0 - 1), (x0 - 1, z1 + 1), (x1 + 1, z1 + 1)):
+        if open_air(cx, cz) and sum(g.is_solid(cx + dx, y - 1, cz + dz) for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1))) >= 2:
+            g.set(cx, y - 1, cz, STONE); g.set(cx, y, cz, STONE); g.set(cx, y + 1, cz, STONE); g.set(cx, y + 2, cz, SLAB_CAP)
 
 
 def hall_furnish(g, x0, x1, z_throne, z_end, GL, throne_facing="south"):
@@ -142,11 +189,9 @@ def great_castle_b(seed=21):
     g.fill(62, GL - 1, 80, 66, GL - 1, 88, ROAD)
     portcullis_plane(g, 62, 66, GL, 7, 86)
     for tx in (57, 71):
-        round_tower(g, tx, 85, 5, swalk + 6, GL, floors=(swalk - 1,), spiral=False, cone=True, t=2,
+        # a newel stair from the ground floor to the shell walk and the roof (it was a twenty-two rung ladder)
+        round_tower(g, tx, 85, 5, swalk + 6, GL, floors=(swalk - 1,), spiral=True, cone=True, t=2,
                     doors=((1, 0, swalk), (-1, 0, swalk), (0, -1, GL)))
-        # ladder from the ground floor up to the shell walk and on through a hatch to the roof
-        for y in range(GL, swalk + 6):
-            g.set(tx + 1, y, 86, "minecraft:ladder[facing=north]")
         # a landing joining the tower's outer door to the ring walk, which curves away from it here
         lx0, lx1 = (tx - 8, tx - 4) if tx < 64 else (tx + 4, tx + 8)
         g.fill(lx0, swalk - 1, 81, lx1, swalk - 1, 86, STONE)
@@ -227,8 +272,13 @@ def great_castle_b(seed=21):
     portcullis_plane(g, 61, 67, GL, 10, 107)
     g.fill(59, GL + 12, 108, 69, gtop - 2, 120, AIR)
     g.fill(59, GL + 11, 108, 69, GL + 11, 120, PLANK)
-    for z in range(110, 120, 2):
-        g.fill(64, GL + 10, z, 64, GL + 11, z, AIR)
+    # murder holes right through the vault, a crossbowman at the lip of each (see great_castle_a)
+    g.lips = getattr(g, "lips", {})
+    for i, z in enumerate(range(110, 120, 2)):
+        g.fill(64, GL + 9, z, 64, GL + 11, z, AIR)
+        side = -1 if i % 2 == 0 else 1
+        g.mark("crossbowman", 64 + side, GL + 12, z)
+        g.lips[(64 + side, GL + 12, z)] = (-side, 0)
     g.fill(59, walk - 1, 108, 69, walk - 1, 120, PLANK)            # gallery at wall-walk level
     spiral_stair(g, 61, 111, GL + 12, gtop - 1, STONE_STAIR, STONE, landings=(walk,))
     g.fill(58, gtop - 1, 106, 70, gtop - 1, 122, STONE)
@@ -353,18 +403,21 @@ def great_castle_c(seed=33):
     straight_wall(g, 101, az + thick, 103, 46, kw, "east", GL)
     straight_wall(g, 56, 44, 103, 46, kw, "south", GL)
     for (x0, x1) in ((68, 76), (83, 91)):
-        square_tower(g, x0, 41, x1, 48, kw + 6, GL, floors=(kw - 1,), banner_sides=("south",))
-        g.mark("crossbowman", x0 + 2, kw + 6, 46); g.mark("crossbowman", x1 - 2, kw + 6, 46)
+        square_tower(g, x0, 41, x1, 48, kw + 7, GL, floors=(kw - 1,), banner_sides=("south",))
+        g.mark("crossbowman", x0 + 2, kw + 7, 46); g.mark("crossbowman", x1 - 2, kw + 7, 46)
         # door from the yard, a ladder up the inside to the walk floor and on to the roof, doors onto the walk
         mx = (x0 + x1) // 2
         if x0 < 80:
             g.fill(mx + 1, GL, 44, x1 + 1, GL + 1, 45, AIR)       # from the gate passage
         else:
             g.fill(x0 - 1, GL, 44, mx - 1, GL + 1, 45, AIR)
-        for y in range(GL, kw + 6):
-            g.set(mx, y, 45, "minecraft:ladder[facing=north]")
+        # from the walk room to the roof in two short ladders (the old one ran eighteen up from the ground)
+        roof_ladder(g, rect(g, x0 + 3, 44, x1 - 3, 45), kw, kw + 7, (mx, 45, "north"), (mx, 44, "south"))
         g.fill(x0, kw, 45, x0 + 2, kw + 1, 45, AIR)
         g.fill(x1 - 2, kw, 45, x1, kw + 1, 45, AIR)
+    # the keep's walls are climbed by two three-wide flights from its yard, against the west and east walls
+    wall_stair(g, 59, 22, GL, kw, "z", "west")
+    wall_stair(g, 100, 22, GL, kw, "z", "east")
     g.fill(77, 0, 43, 82, kw + 2, 47, STONE)
     pointed_arch(g, 77, 82, GL, 7, 43, 47)
     g.fill(77, GL - 1, 43, 82, GL - 1, 51, ROAD)
@@ -486,13 +539,12 @@ def great_castle_c(seed=33):
         g.mark("archer", x0 + 3, ctop, z0 + 3); g.mark("archer", x1 - 3, ctop, z1 - 3)
     for xpos in (44, 116):
         for (cz, sgn) in ((az + 1, 1), (bz - 1, -1)):
-            round_tower(g, xpos, cz, 7, walk + 6, GL, floors=(GL + 8, walk - 1), spiral=False,
+            round_tower(g, xpos, cz, 7, walk + 7, GL, floors=(GL + 8, walk - 1), spiral=False,
                         doors=((1, 0, walk), (-1, 0, walk), (1, 0, GL + 9), (-1, 0, GL + 9)))
-            for y in range(walk, walk + 6):
-                g.set(xpos + 2, y, cz, "minecraft:ladder[facing=west]")
+            roof_ladder(g, tower_room(g, xpos, cz, 7), walk, walk + 7, (xpos + 2, cz, "west"), (xpos - 2, cz, "east"))
             for k in range(6):
                 a2 = k * np.pi / 3
-                g.mark("archer", int(round(xpos + 3 * np.cos(a2))), walk + 6, int(round(cz + 3 * np.sin(a2))))
+                g.mark("archer", int(round(xpos + 3 * np.cos(a2))), walk + 7, int(round(cz + 3 * np.sin(a2))))
     # gatehouses west and east
     gtop = walk + 5
     for (gx, sgn, label) in ((ax, -1, "gate"), (bx, 1, "gate2")):
@@ -556,7 +608,7 @@ def holdfast_b(seed=13):
     g.fill_mask(body, 0, wtop - 1, STONE)
     g.fill_mask(rect_ring(g, 3, 3, o + 1, o + 1, 1), 0, GL + 1, DARK)
     g.fill_mask(rect_ring(g, 4, 4, o, o, 1), GL + 3, GL + 3, DARK)
-    parapet_rect(g, 4, 4, o, o, wtop)
+    corbel_parapet_rect(g, 4, 4, o, o, wtop)
     g.fill_mask(rect(g, 5, 5, o - 1, o - 1) & ~rect(g, 8, 8, o - 4, o - 4), wtop, wtop + 3, AIR)
     for x in range(8, o - 2, 5):
         g.mark("archer", x, wtop, 5); g.mark("archer", x, wtop, o - 1)
@@ -794,9 +846,7 @@ def holdfast_c(seed=17):
         tx, tz = -np.sin(ang), np.cos(ang)
         round_tower(g, cx, cz, 6, ttop, GL, floors=(walk - 1,), spiral=False, cone=(k % 2 == 0),
                     doors=((tx, tz, walk), (-tx, -tz, walk)), banner_dirs=((round(np.cos(ang), 2), round(np.sin(ang), 2)),))
-        for y in range(walk, ttop):
-            g.set(cx + 2, y, cz, "minecraft:ladder[facing=west]")
-        g.set(cx + 2, ttop, cz, AIR)
+        roof_ladder(g, tower_room(g, cx, cz, 6), walk, ttop, (cx + 2, cz, "west"), (cx - 2, cz, "east"))
         for j in range(4):
             a2 = j * np.pi / 2
             g.mark("archer", int(round(cx + 3 * np.cos(a2))), ttop, int(round(cz + 3 * np.sin(a2))))

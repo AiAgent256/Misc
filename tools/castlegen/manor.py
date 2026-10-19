@@ -132,7 +132,7 @@ def fortified_manor(seed=41):
     g.fill_mask(rect_ring(g, x0 - 1, z0 - 1, x1 + 1, z1 + 1, 1), 0, GL + 1, DARK)
     g.fill_mask(rect_ring(g, x0, z0, x1, z1, 1), GL + 3, GL + 3, DARK)
     g.fill_mask(rect(g, x0 + 1, z0 + 1, x1 - 1, z1 - 1) & ~rect(g, x0 + 5, z0 + 5, x1 - 5, z1 - 5), WT, WT + 4, AIR)
-    parapet_rect(g, x0, z0, x1, z1, WT)
+    parapet_rect(g, x0, z0, x1, z1, WT)     # flush: six high, a ledge would push the dead ground out (see machicolate)
     g.fill_mask(rect_ring(g, x0 + 5, z0 + 5, x1 - 5, z1 - 5, 1), WT, WT, RAIL)
     # flower boxes on the rail every few blocks, as on the house's own terrace
     rail = rect_ring(g, x0 + 5, z0 + 5, x1 - 5, z1 - 5, 1)
@@ -161,6 +161,10 @@ def fortified_manor(seed=41):
                     doors=((1, 0, WT), (-1, 0, WT)))
         g.mark("crossbowman", cx, top_r, z1 + 1)
     parts.CAP_STYLE = plan_cap
+    # the gate towers' plinths ran into the passage, leaving it two wide: clear it to the arch's four, either side
+    # of the portcullis
+    g.fill(gx0, GL, z1 - 5, gx1, GL + 1, z1 - 1, AIR)
+    g.fill(gx0, GL, z1 + 1, gx1, GL + 1, W - 1, AIR)
     # the great tower, seventeen up from the walk, its roof standing on posts over an open platform
     tx0, tz0, tx1, tz1 = 47, 0, 59, 12
     ttop = WT + 18

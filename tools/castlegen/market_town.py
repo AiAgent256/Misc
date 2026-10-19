@@ -4,11 +4,11 @@ the reeve sits, an inn, a smithy, a tithe barn, a well. Three plans: a walled hi
 a crossroads town, and a village round a green. Tier 1: a town watch of a dozen men, a reeve, no lord.
 The fields outside are painted in play (see Roads.paintFields)."""
 import numpy as np
-from grid import Grid, Mix, disk, ring, rect, rect_ring, gable_roof, cone_roof
+from grid import Grid, Mix, disk, ring, rect, rect_ring, gable_roof, cone_roof, spiral_stair
 from parts import (STONE, DARK, FOUND, PAVE, ROAD, FLOOR_STONE, ROOF, ROOF_STAIR, STONE_STAIR, DARK_STAIR, SLAB_CAP,
                    RAIL, PLANK, PORTCULLIS, GLASS, building, lamp_post, pointed_arch)
 from castle import portcullis_plane
-from castle2 import parapet_rect
+from castle2 import parapet_rect, corbel_parapet_rect
 from city import inn, SQUARE, ALLEY, PLASTER
 from town import terrace, lane, stall_cluster, well as town_well, townhouse
 
@@ -115,25 +115,33 @@ def church(g, x0, z0, GL, rng, along="z"):
     g.set(cx, top - 3, cz, "minecraft:bell[attachment=ceiling,facing=north]")
     g.set(cx, top - 2, cz, "minecraft:chain[axis=y]")
     # a door from the nave, a ladder up, a hatch onto the roof
+    # three wide: the stair's treads pass high over the cells inside it, and a one-wide door into a newel stair
+    # is a squeeze
     if along == "z":
-        g.fill(tx1, GL, cz, tx1, GL + 2, cz, AIR); g.fill(tx1 + 1, GL, cz - 1, tx1 + 1, GL + 2, cz + 1, AIR)
+        g.fill(tx1, GL, cz - 1, tx1, GL + 2, cz + 1, AIR); g.fill(tx1 + 1, GL, cz - 1, tx1 + 1, GL + 2, cz + 1, AIR)
     else:
-        g.fill(cx, GL, tz1, cx, GL + 2, tz1, AIR); g.fill(cx - 1, GL, tz1 + 1, cx + 1, GL + 2, tz1 + 1, AIR)
-    lx, lz = tx0 + 1, tz0 + 1
-    for y in range(GL, top):
-        g.set(lx, y, lz, "minecraft:ladder[facing=east]")
-    g.fill(tx0 + 1, top - 4, tz0 + 1, tx1 - 1, top - 4, tz1 - 1, PLANK)          # bell-ringers' floor
-    g.set(lx, top - 4, lz, "minecraft:ladder[facing=east]")
-    g.set(lx, top - 1, lz, "minecraft:ladder[facing=east]")
+        g.fill(cx - 1, GL, tz1, cx + 1, GL + 2, tz1, AIR); g.fill(cx - 1, GL, tz1 + 1, cx + 1, GL + 2, tz1 + 1, AIR)
+    # a newel stair up the inside to the bell-ringers' floor (its head is that floor), then a short ladder through
+    # a hatch onto the roof: no eighteen-block ladder for whoever climbs up to raise his banner
+    with g.private_rng(tx0 * 31 + tz0):                         # the ladder it replaces drew no random stone
+        ring_ = spiral_stair(g, cx, cz, GL, top - 4, STONE_STAIR, STONE, wide=False)
+    tail = {ring_[(g.spiral_last - k) % len(ring_)][:2] for k in range(4)}
+    g.fill(cx - 1, top - 3, cz - 1, cx + 1, top - 2, cz + 1, AIR)                # the newel stops at the floor
+    g.set(cx, top - 3, cz, "minecraft:bell[attachment=ceiling,facing=north]")
+    g.set(cx, top - 2, cz, "minecraft:chain[axis=y]")
+    roof_posts = {(tx0 + 1, tz1 - 1), (tx1 - 1, tz0 + 1)}
+    for (lx, lz, lf) in ((tx0 + 1, tz0 + 1, "east"), (tx1 - 1, tz1 - 1, "west"), (tx1 - 1, tz0 + 1, "west"), (tx0 + 1, tz1 - 1, "east")):
+        if (lx, lz) not in tail and (lx, lz) not in roof_posts:
+            break
+    for y in (top - 3, top - 2):
+        g.set(lx, y, lz, f"minecraft:ladder[facing={lf}]")
     g.set(lx, top, lz, AIR)
     g.__dict__.setdefault("protected_xz", set()).add((lx, lz))
     # roof platform with a parapet, then the spire set back on it
     g.fill(tx0, top, tz0, tx1, top + 1, tz1, AIR)
     parapet_rect(g, tx0, tz0, tx1, tz1, top)
     g.fill(tx0, top - 1, tz0, tx1, top - 1, tz1, STONE)
-    g.set(lx, top - 1, lz, AIR)
-    g.set(lx, top - 1, lz, "minecraft:ladder[facing=east]")
-    g.set(lx, top - 2, lz, "minecraft:ladder[facing=east]")
+    g.set(lx, top - 1, lz, f"minecraft:ladder[facing={lf}]")              # the hatch
     g.fill(cx - 1, top, cz - 1, cx + 1, top + 2, cz + 1, WHITE)               # the spire's foot; a ring to stand on round it
     spire = cone_roof(g, cx, cz, 1, top + 3, ROOF, height_factor=4.0)
     g.set(cx, spire, cz, "minecraft:gold_block"); g.set(cx, spire + 1, cz, "minecraft:lightning_rod")
@@ -271,7 +279,7 @@ def town_curtain(g, x0, z0, x1, z1, GL, gate_x0, gate_x1, rng):
     g.fill_mask(rect_ring(g, x0 - 1, z0 - 1, x1 + 1, z1 + 1, 1), 0, GL + 1, DARK)            # plinth
     g.fill_mask(rect_ring(g, x0, z0, x1, z1, 1), GL + 3, GL + 3, DARK)                    # string course
     g.fill_mask(rect(g, x0 + 1, z0 + 1, x1 - 1, z1 - 1) & ~rect(g, x0 + 4, z0 + 4, x1 - 4, z1 - 4), walk, walk + 4, AIR)
-    parapet_rect(g, x0, z0, x1, z1, walk)
+    corbel_parapet_rect(g, x0, z0, x1, z1, walk)
     g.fill_mask(rect_ring(g, x0 + 4, z0 + 4, x1 - 4, z1 - 4, 1), walk, walk, RAIL)
     # towers: the corners, halfway along each side, either side of the gate. Their centres stand on the
     # wall's outer line, so half of each stands out beyond the face
