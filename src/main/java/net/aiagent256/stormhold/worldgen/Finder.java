@@ -33,6 +33,7 @@ public final class Finder {
             "town", "stormhold:towns",
             "nether", "stormhold:nether_holdfasts",
             "ruin", "stormhold:ruins",
+            "cliff", "stormhold:cliff_castles",
             "temple", "stormhold:temple_ruins");
 
     public record Found(String what, int x, int z, boolean known) {
@@ -64,6 +65,7 @@ public final class Finder {
             case "town" -> h.isTown();
             case "nether" -> h.isNether();
             case "ruin" -> h.ruined;
+            case "cliff" -> h.structure != null && h.structure.getPath().startsWith("cliff_castle");
             default -> false;
         };
     }

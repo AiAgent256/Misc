@@ -39,7 +39,9 @@ public class StormholdGameTests {
             // second revisions: new castles use these, the old ones keep their plans for repairs and half-built chunks
             "town_walled_r2", "town_cross_r2", "town_green_r2", "great_city_r2", "canal_city_r2",
             // moated castles and the chateau
-            "holdfast_b_moat", "holdfast_c_moat", "great_castle_a_moat", "great_castle_c_moat", "great_castle_d", "great_castle_d2"};
+            "holdfast_b_moat", "holdfast_c_moat", "great_castle_a_moat", "great_castle_c_moat", "great_castle_d", "great_castle_d2",
+            // the lake castles and the timber-framed towns
+            "lake_castle", "lake_castle2", "town_walled_r3", "town_cross_r3", "town_green_r3"};
 
     @GameTest(template = "arena")
     public static void castleDataLoads(GameTestHelper g) {
@@ -57,7 +59,8 @@ public class StormholdGameTests {
         }
         // every town and city has its shops, its notice board and homes for sale
         for (String n : new String[]{"town_walled", "town_cross", "town_green", "great_city", "canal_city",
-                "town_walled_r2", "town_cross_r2", "town_green_r2", "great_city_r2", "canal_city_r2"}) {
+                "town_walled_r2", "town_cross_r2", "town_green_r2", "great_city_r2", "canal_city_r2",
+                "town_walled_r3", "town_cross_r3", "town_green_r3"}) {
             var lay = DataRegistries.layout(n);
             int shops = 0;
             java.util.Set<String> kinds = new java.util.HashSet<>();
@@ -75,7 +78,7 @@ public class StormholdGameTests {
         }
         // every keep has its crypt: the marker the generator leaves at the founder's tomb
         for (String n : new String[]{"holdfast_a", "holdfast_b", "holdfast_c", "great_castle_a", "great_castle_b", "great_castle_c", "great_city", "canal_city",
-                "great_city_r2", "canal_city_r2", "holdfast_b_moat", "great_castle_a_moat", "great_castle_d", "great_castle_d2"}) {
+                "great_city_r2", "canal_city_r2", "holdfast_b_moat", "great_castle_a_moat", "great_castle_d", "great_castle_d2", "lake_castle"}) {
             var crypt = DataRegistries.layout(n).extras.get("crypt");
             if (crypt == null || crypt.isEmpty()) throw new IllegalStateException("no crypt under " + n);
         }
@@ -96,6 +99,8 @@ public class StormholdGameTests {
             throw new IllegalStateException("the temple ruin is missing or not a landmark");
         if (!(reg.get(Stormhold.id("temple_ruin_north")) instanceof net.aiagent256.stormhold.worldgen.CastleStructure))
             throw new IllegalStateException("the temple ruin structure is not registered");
+        if (!(reg.get(Stormhold.id("cliff_castle_north")) instanceof net.aiagent256.stormhold.worldgen.CastleStructure cl) || !cl.cliff())
+            throw new IllegalStateException("the cliff castles are not registered for cliffs");
         g.succeed();
     }
 
