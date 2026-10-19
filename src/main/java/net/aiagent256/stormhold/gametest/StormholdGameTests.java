@@ -1335,7 +1335,6 @@ public class StormholdGameTests {
             for (BlockPos p : BlockPos.betweenClosed(g.absolutePos(new BlockPos(3, 3, 3)), g.absolutePos(new BlockPos(13, 4, 13))))
                 level.setBlock(p, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
             dropped.forEach(Entity::discard);
-            net.aiagent256.stormhold.holding.Steward.SPOILS_AT.remove(h.id);
             mgr.holdings.remove(h.id);
             mgr.byKey.remove(h.key);
         }
