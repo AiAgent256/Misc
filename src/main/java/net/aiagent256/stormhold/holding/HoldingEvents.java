@@ -81,7 +81,7 @@ public final class HoldingEvents {
         if (!(lord.level() instanceof ServerLevel level) || lord.holdingId() == null) return;
         HoldingManager mgr = HoldingManager.get(level);
         Holding h = mgr.holdings.get(lord.holdingId());
-        if (h == null) return;
+        if (h == null || !h.live.containsKey(lord.getUUID())) return;
         Garrisons.reinforce(level, mgr, h, Role.KNIGHT, 2 + h.tier, lord.blockPosition(), lord.getTarget());
         announceNear(level, lord.blockPosition(), 64, gold(h.lordName + " calls his household guard!"));
         level.playSound(null, lord.blockPosition(), SoundEvents.RAID_HORN.value(), SoundSource.HOSTILE, 4.0F, 1.0F);

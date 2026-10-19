@@ -76,6 +76,7 @@ public final class Garrisons {
         if (city) {
             // soldiers that wandered out of every player's district fade back into the count
             for (UUID id : new java.util.ArrayList<>(h.live.keySet())) {
+                if (h.live.get(id) == Role.LORD) continue;      // the lord keeps his hall: spawned again each time, he'd lose his wounds
                 Entity e = level.getEntity(id);
                 if (e instanceof GarrisonEntity ge && ge.getTarget() == null && !nearPlayer(level, e.blockPosition(), DISTRICT_RADIUS + 40)) {
                     if (ge.post() != null) h.usedPosts.remove(ge.post());
@@ -85,7 +86,7 @@ public final class Garrisons {
             }
         }
         int budget = 6;
-        if ((h.isHouseOwned() || Vassals.is(h)) && h.lordAlive && liveCount(h.live, Role.LORD) == 0 && level.isLoaded(h.lordPos)) {
+        if ((h.isHouseOwned() || Vassals.is(h)) && h.lordAlive && liveCount(h.live, Role.LORD) == 0 && ready(level, h.lordPos)) {
             spawn(level, mgr, h, Role.LORD, h.lordPos, h.owner, true);
             budget--;
         }
@@ -118,7 +119,7 @@ public final class Garrisons {
         for (int i = 0; i < (city ? 40 : 16); i++) {
             BlockPos p = list.get(level.random.nextInt(list.size()));
             if (city && !nearPlayer(level, p, DISTRICT_RADIUS)) continue;
-            if (!h.usedPosts.contains(p) && level.isLoaded(p)) {
+            if (!h.usedPosts.contains(p) && ready(level, p)) {
                 h.usedPosts.add(p);
                 BlockPos free = standable(level, p);
                 if (free != null) return free;
@@ -126,7 +127,40 @@ public final class Garrisons {
         }
         if (city) return null;
         BlockPos p = list.get(level.random.nextInt(list.size()));
-        return level.isLoaded(p) ? standable(level, p) : null;
+        return ready(level, p) ? standable(level, p) : null;
+    }
+
+    /**
+     * The chunk is loaded and so are the men saved in it. A chunk comes in before its entities do; a
+     * soldier spawned in that gap stands beside the one who was already there, and every visit made the
+     * castle's lord one more.
+     */
+    public static boolean ready(ServerLevel level, BlockPos p) {
+        return level.isLoaded(p) && level.areEntitiesLoaded(net.minecraft.world.level.ChunkPos.asLong(p));
+    }
+
+    /**
+     * A castle's soldier coming back from disk. He takes his place again if the castle still has one for
+     * him; if not (a second lord, a man over the count, a man of the house that lost the place) he's
+     * dropped. False means drop him.
+     */
+    public static boolean belongs(ServerLevel level, GarrisonEntity g) {
+        UUID hid = g.holdingId();
+        if (hid == null || g.campaignId() != null || g.shipmentId() != null || g.owner() != null) return true;
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = mgr.holdings.get(hid);
+        if (h == null || h.live.containsKey(g.getUUID())) return true;
+        if (!h.owner.equals(g.side())) return false;
+        pruneLive(level, h.live);
+        Role r = g.role();
+        if (r == Role.LORD) {
+            if (!h.lordAlive || !(h.isHouseOwned() || Vassals.is(h)) || liveCount(h.live, Role.LORD) > 0) return false;
+        } else if (r == Role.COURIER || liveCount(h.live, r) >= h.count(r)) {
+            return false;
+        }
+        h.live.put(g.getUUID(), r);
+        if (g.post() != null) h.usedPosts.add(g.post());
+        return true;
     }
 
     /**

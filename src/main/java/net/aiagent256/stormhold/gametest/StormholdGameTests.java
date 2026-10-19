@@ -1243,6 +1243,52 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** A man coming back from disk takes his place only if it's free: one lord, never more than the count. */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void savedSoldiersAreNotDoubled(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = sample(g);
+        mgr.add(h);
+        List<GarrisonEntity> made = new ArrayList<>();
+        try {
+            for (int k = 0; k < 6; k++) Garrisons.materialize(level, mgr, h);
+            if (Garrisons.liveCount(h.live, Role.LORD) != 1) throw new IllegalStateException("lord did not appear once");
+            java.util.function.Function<Role, GarrisonEntity> saved = r -> {
+                GarrisonEntity e = net.aiagent256.stormhold.registry.ModEntities.typeFor(r, true).create(level);
+                if (e == null) throw new IllegalStateException("no entity for " + r);
+                e.setup(h.owner, h.id, h.tier, net.minecraft.world.item.DyeColor.RED, h.lordPos, true);
+                made.add(e);
+                return e;
+            };
+            GarrisonEntity second = saved.apply(Role.LORD);
+            if (Garrisons.belongs(level, second)) throw new IllegalStateException("a second lord was let in");
+            // the lord's chunk unloaded, the castle forgot him: the saved one takes his place
+            for (var e : new ArrayList<>(h.live.entrySet()))
+                if (e.getValue() == Role.LORD) {
+                    Entity lord = level.getEntity(e.getKey());
+                    if (lord != null) lord.discard();
+                }
+            if (!Garrisons.belongs(level, second) || !h.live.containsKey(second.getUUID()))
+                throw new IllegalStateException("the saved lord was not taken back");
+            int knights = Garrisons.liveCount(h.live, Role.KNIGHT);
+            h.add(Role.KNIGHT, knights - h.count(Role.KNIGHT));
+            if (Garrisons.belongs(level, saved.apply(Role.KNIGHT))) throw new IllegalStateException("a knight over the count was let in");
+            h.add(Role.KNIGHT, 1);
+            if (!Garrisons.belongs(level, saved.apply(Role.KNIGHT))) throw new IllegalStateException("a knight under the count was dropped");
+            GarrisonEntity theirs = saved.apply(Role.KNIGHT);
+            h.add(Role.KNIGHT, 5);
+            h.owner = Sides.player(UUID.randomUUID());
+            if (Garrisons.belongs(level, theirs)) throw new IllegalStateException("a man of the house that lost the castle was let in");
+        } finally {
+            made.forEach(Entity::discard);
+            Garrisons.discardLive(level, h.live, false);
+            mgr.holdings.remove(h.id);
+            mgr.byKey.remove(h.key);
+        }
+        g.succeed();
+    }
+
     /** Runs the same path as /place structure, then turns the result into a holding. */
     @GameTest(template = "arena", timeoutTicks = 400)
     public static void castlesGenerateAndAttach(GameTestHelper g) {

@@ -85,6 +85,10 @@ public final class CommonEvents {
             e.setCanceled(true);                        // a warband man saved with the world: his warband brings him up itself
             return;
         }
+        if (e.loadedFromDisk() && mob instanceof GarrisonEntity g && !net.aiagent256.stormhold.holding.Garrisons.belongs(level, g)) {
+            e.setCanceled(true);                        // a double, or a man with no place left in his castle
+            return;
+        }
         net.aiagent256.stormhold.holding.Frontier.onJoin(level, mob);
     }
 
