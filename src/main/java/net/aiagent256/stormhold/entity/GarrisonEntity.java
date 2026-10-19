@@ -157,7 +157,14 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         this.goalSelector.addGoal(9, new RandomLookAroundGoal(this));
         if (r != Role.COURIER) {
             this.targetSelector.addGoal(1, new HurtByTargetGoal(this));
-            this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, LivingEntity.class, 10, true, false, this::isHostileTo));
+            // the game looks for targets only four blocks up or down: a bowman on a wall never spotted the man at
+            // its foot until somebody was hit. A bowman looks as far down as his bow carries
+            this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, LivingEntity.class, 10, true, false, this::isHostileTo) {
+                @Override
+                protected net.minecraft.world.phys.AABB getTargetSearchArea(double d) {
+                    return this.mob.getBoundingBox().inflate(d, r.ranged ? Math.min(d, 32.0) : 4.0, d);
+                }
+            });
         }
     }
 
