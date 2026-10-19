@@ -7,44 +7,58 @@
  "theme": "north",
  "layouts": [
   {
-   "name": "watchtower_a",
+   "name": "watchtower_a_r2",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 1
   },
   {
-   "name": "watchtower_b",
+   "name": "watchtower_b_r2",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 1
   },
   {
-   "name": "watchtower_c",
+   "name": "watchtower_c_r2",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 1
   },
   {
-   "name": "watchtower_a2",
+   "name": "watchtower_a2_r2",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 1
   },
   {
-   "name": "watchtower_b2",
+   "name": "watchtower_b2_r2",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 1
   },
   {
-   "name": "watchtower_c2",
+   "name": "watchtower_c2_r2",
    "size_x": 48,
    "size_z": 48,
+   "ground": 4,
+   "weight": 1
+  },
+  {
+   "name": "fortified_manor",
+   "size_x": 60,
+   "size_z": 60,
+   "ground": 4,
+   "weight": 1
+  },
+  {
+   "name": "fortified_manor2",
+   "size_x": 60,
+   "size_z": 60,
    "ground": 4,
    "weight": 1
   }

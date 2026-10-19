@@ -7,58 +7,72 @@
  "theme": "stormlands",
  "layouts": [
   {
-   "name": "holdfast_a",
+   "name": "holdfast_a_r2",
    "size_x": 80,
    "size_z": 80,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "holdfast_b",
+   "name": "holdfast_b_r2",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "holdfast_c",
+   "name": "holdfast_c_r2",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "holdfast_a2",
+   "name": "holdfast_a2_r2",
    "size_x": 80,
    "size_z": 80,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "holdfast_b2",
+   "name": "holdfast_b2_r2",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "holdfast_c2",
+   "name": "holdfast_c2_r2",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "holdfast_b_moat",
+   "name": "holdfast_b_moat_r2",
    "size_x": 92,
    "size_z": 92,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "holdfast_c_moat",
+   "name": "holdfast_c_moat_r2",
    "size_x": 92,
    "size_z": 92,
+   "ground": 5,
+   "weight": 1
+  },
+  {
+   "name": "gatehouse_castle",
+   "size_x": 96,
+   "size_z": 96,
+   "ground": 5,
+   "weight": 1
+  },
+  {
+   "name": "gatehouse_castle2",
+   "size_x": 96,
+   "size_z": 96,
    "ground": 5,
    "weight": 1
   }

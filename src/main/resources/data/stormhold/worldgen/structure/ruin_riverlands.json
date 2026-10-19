@@ -7,105 +7,105 @@
  "theme": "riverlands",
  "layouts": [
   {
-   "name": "watchtower_a",
+   "name": "watchtower_a_r2",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 3
   },
   {
-   "name": "watchtower_b",
+   "name": "watchtower_b_r2",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 3
   },
   {
-   "name": "watchtower_c",
+   "name": "watchtower_c_r2",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 3
   },
   {
-   "name": "watchtower_a2",
+   "name": "watchtower_a2_r2",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 3
   },
   {
-   "name": "watchtower_b2",
+   "name": "watchtower_b2_r2",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 3
   },
   {
-   "name": "watchtower_c2",
+   "name": "watchtower_c2_r2",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 3
   },
   {
-   "name": "holdfast_a",
+   "name": "holdfast_a_r2",
    "size_x": 80,
    "size_z": 80,
    "ground": 5,
    "weight": 3
   },
   {
-   "name": "holdfast_b",
+   "name": "holdfast_b_r2",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 3
   },
   {
-   "name": "holdfast_c",
+   "name": "holdfast_c_r2",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 3
   },
   {
-   "name": "holdfast_a2",
+   "name": "holdfast_a2_r2",
    "size_x": 80,
    "size_z": 80,
    "ground": 5,
    "weight": 3
   },
   {
-   "name": "holdfast_b2",
+   "name": "holdfast_b2_r2",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 3
   },
   {
-   "name": "holdfast_c2",
+   "name": "holdfast_c2_r2",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 3
   },
   {
-   "name": "great_castle_a",
+   "name": "great_castle_a_r2",
    "size_x": 128,
    "size_z": 128,
    "ground": 6,
    "weight": 1
   },
   {
-   "name": "great_castle_b",
+   "name": "great_castle_b_r2",
    "size_x": 128,
    "size_z": 128,
    "ground": 6,
    "weight": 1
   },
   {
-   "name": "great_castle_c",
+   "name": "great_castle_c_r2",
    "size_x": 160,
    "size_z": 112,
    "ground": 6,

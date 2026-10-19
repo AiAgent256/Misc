@@ -7,23 +7,30 @@
  "theme": "riverlands",
  "layouts": [
   {
-   "name": "town_walled_r3",
+   "name": "town_walled_r4",
    "size_x": 100,
    "size_z": 100,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "town_cross_r3",
+   "name": "town_cross_r4",
    "size_x": 104,
    "size_z": 88,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "town_green_r3",
+   "name": "town_green_r4",
    "size_x": 96,
    "size_z": 96,
+   "ground": 5,
+   "weight": 1
+  },
+  {
+   "name": "hill_town",
+   "size_x": 144,
+   "size_z": 144,
    "ground": 5,
    "weight": 1
   }

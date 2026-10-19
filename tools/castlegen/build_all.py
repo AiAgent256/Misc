@@ -177,7 +177,8 @@ def main():
                 raise SystemExit(f"{name}: no room for a crypt under the keep")
             kinds.update(cr)
         g.markers.pop("dwelling", None)              # homes not put up for sale are just homes
-        kinds["lit"] = 0 if landmark else fixup.light_rooms(g, meta["GL"], rev=REVISIONS.get(name, 1))
+        # a plan new since the second lighting rule is lit by it from the first
+        kinds["lit"] = 0 if landmark else fixup.light_rooms(g, meta["GL"], rev=max(REVISIONS.get(name, 1), 2 if name in NEW_PLANS else 1))
         opened = 0 if landmark else fixup.clear_blocked_doorways(g, meta["GL"], tuple(meta.get("levels", ())))
         # loops low in the towers where the walk can't see the walls' foot: after the furniture, so no slit
         # opens behind a bed, and after the doorways, so a slit's sill isn't taken for a blocked door
