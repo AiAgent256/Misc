@@ -63,6 +63,7 @@ public final class Rewards {
         if (h.mode == Holding.Mode.PRODUCE) n += n / 4;
         if (Vassals.is(h)) n = (int) Math.round(n * Vassals.share(h));
         if (h.ruined) n = Math.max(1, (int) Math.round(n * Ruins.RENT));
+        if (Council.has(h.ownerPlayer(), Council.Seat.TREASURER)) n = (int) Math.round(n * 1.2);
         return n;
     }
 

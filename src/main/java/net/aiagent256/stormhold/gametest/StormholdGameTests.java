@@ -414,6 +414,121 @@ public class StormholdGameTests {
     }
 
     @GameTest(template = "arena")
+    public static void veteransEarnTheirRanks(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        UUID me = UUID.randomUUID();
+        GarrisonEntity man = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(4, 3, 4)), Sides.player(me), false);
+        if (man == null) throw new IllegalStateException("no man");
+        try {
+            man.setOwner(me);
+            man.setBaseName("Wat Tester");
+            double hp = man.getMaxHealth();
+            double dmg = man.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE);
+            for (int i = 0; i < 4; i++) man.scored();
+            if (!man.baseName().equals("Wat Tester")) throw new IllegalStateException("ranked after 4: " + man.baseName());
+            man.scored();
+            if (!man.baseName().equals("Veteran Wat Tester") || man.getMaxHealth() != hp + 4
+                    || man.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE) != dmg + 1)
+                throw new IllegalStateException("veteran: " + man.baseName() + " hp " + man.getMaxHealth() + " from " + hp);
+            for (int i = 0; i < 10; i++) man.scored();
+            if (!man.baseName().startsWith("Champion Wat Tester ") || man.getMaxHealth() != hp + 8 || man.kills() != 15)
+                throw new IllegalStateException("champion: " + man.baseName() + " hp " + man.getMaxHealth());
+            // the rank survives the save
+            var tag = new net.minecraft.nbt.CompoundTag();
+            man.saveWithoutId(tag);
+            if (tag.getInt("Kills") != 15 || !tag.getString("PlainName").equals("Wat Tester")) throw new IllegalStateException("not saved: " + tag);
+        } finally {
+            man.discard();
+        }
+        g.succeed();
+    }
+
+    @GameTest(template = "arena")
+    public static void roadTollsAndBrigands(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        UUID me = UUID.randomUUID();
+        Holding h = sample(g);
+        h.owner = Sides.player(me);
+        Holding o = new Holding();
+        o.name = "Tollhold";
+        o.owner = h.owner;
+        BlockPos c = h.center();
+        o.box = new BoundingBox(c.getX() + 595, c.getY() - 5, c.getZ() - 5, c.getX() + 605, c.getY() + 5, c.getZ() + 5);
+        h.gatePos = c;
+        h.roadsTo.add(o.id);
+        mgr.holdings.put(h.id, h);
+        mgr.holdings.put(o.id, o);
+        var em = net.aiagent256.stormhold.holding.Rewards.EMERALD;
+        try {
+            int toll = net.aiagent256.stormhold.holding.Tolls.toll(c, o.center());
+            if (toll != 4) throw new IllegalStateException("a 600-block road tolls " + toll);
+            int was = h.stock(em);
+            var line = net.aiagent256.stormhold.holding.Tolls.collect(level, mgr, me, List.of(h, o));
+            if (line == null || h.stock(em) != was + toll) throw new IllegalStateException("tolls: " + (line == null ? "none" : line.getString()));
+            // brigands on the road: no tolls while they sit there, a bonus when they're gone
+            var camp = new net.aiagent256.stormhold.holding.Campaign();
+            camp.kind = net.aiagent256.stormhold.holding.Campaign.Kind.CAMP;
+            camp.origin = h.id;
+            mgr.campaigns.add(camp);
+            h.roadCamps.put(o.id, camp.id);
+            was = h.stock(em);
+            net.aiagent256.stormhold.holding.Tolls.collect(level, mgr, me, List.of(h, o));
+            if (h.stock(em) != was) throw new IllegalStateException("tolls paid past a brigand camp");
+            camp.stage = net.aiagent256.stormhold.holding.Campaign.Stage.DONE;
+            was = h.stock(em);
+            net.aiagent256.stormhold.holding.Tolls.collect(level, mgr, me, List.of(h, o));
+            if (h.stock(em) != was + toll + net.aiagent256.stormhold.holding.Tolls.CLEARED_BONUS)
+                throw new IllegalStateException("the road cleared: " + (h.stock(em) - was));
+        } finally {
+            mgr.holdings.remove(h.id);
+            mgr.holdings.remove(o.id);
+            mgr.campaigns.removeIf(x -> h.id.equals(x.origin));
+        }
+        g.succeed();
+    }
+
+    @GameTest(template = "arena")
+    public static void councilSeatsPayAndHelp(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var mock = g.makeMockPlayer();
+        UUID me = mock.getUUID();
+        Holding h = sample(g);
+        h.owner = Sides.player(me);
+        h.mode = Holding.Mode.DEFEND;
+        mgr.holdings.put(h.id, h);
+        try {
+            int cap = h.capacity(Role.KNIGHT), rent = net.aiagent256.stormhold.holding.Rewards.rent(level, h);
+            var council = mgr.councils.computeIfAbsent(me, k -> new java.util.EnumMap<>(net.aiagent256.stormhold.holding.Council.Seat.class));
+            council.put(net.aiagent256.stormhold.holding.Council.Seat.MARSHAL, "Ser Test");
+            council.put(net.aiagent256.stormhold.holding.Council.Seat.TREASURER, "Master Coin");
+            // the record and the live view agree once the record is read back
+            net.aiagent256.stormhold.holding.Council.load(net.aiagent256.stormhold.holding.Council.save(mgr.councils), mgr.councils);
+            if (!net.aiagent256.stormhold.holding.Council.has(me, net.aiagent256.stormhold.holding.Council.Seat.MARSHAL))
+                throw new IllegalStateException("the marshal isn't seated");
+            if (h.capacity(Role.KNIGHT) != (int) Math.round(cap * 1.15) && h.capacity(Role.KNIGHT) <= cap)
+                throw new IllegalStateException("marshal: knights " + cap + " then " + h.capacity(Role.KNIGHT));
+            if (net.aiagent256.stormhold.holding.Rewards.rent(level, h) != (int) Math.round(rent * 1.2))
+                throw new IllegalStateException("treasurer: rent " + rent + " then " + net.aiagent256.stormhold.holding.Rewards.rent(level, h));
+            // wages: 6 + 4 from the stores; short of them, the officers go home
+            var em = net.aiagent256.stormhold.holding.Rewards.EMERALD;
+            h.addStock(em, 12 - h.stock(em));
+            var line = net.aiagent256.stormhold.holding.Council.wages(level, me, List.of(h));
+            if (line == null || h.stock(em) != 2 || mgr.councils.get(me).size() != 2) throw new IllegalStateException("wages: " + h.stock(em) + " left");
+            net.aiagent256.stormhold.holding.Council.wages(level, me, List.of(h));
+            if (!mgr.councils.get(me).isEmpty() || net.aiagent256.stormhold.holding.Council.has(me, net.aiagent256.stormhold.holding.Council.Seat.MARSHAL))
+                throw new IllegalStateException("unpaid officers stayed: " + mgr.councils.get(me));
+        } finally {
+            mgr.holdings.remove(h.id);
+            mgr.councils.remove(me);
+            net.aiagent256.stormhold.holding.Council.forget(me);
+        }
+        g.succeed();
+    }
+
+    @GameTest(template = "arena")
     public static void vassalsHoldPayHelpAndRevolt(GameTestHelper g) {
         ServerLevel level = g.getLevel();
         HoldingManager mgr = HoldingManager.get(level);

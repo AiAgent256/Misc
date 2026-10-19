@@ -37,7 +37,7 @@ public final class Net {
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
             MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19,
-            SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23, TREASURY = 24, VASSAL = 25, REVOKE = 26;
+            SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23, TREASURY = 24, VASSAL = 25, REVOKE = 26, COUNCIL = 27;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -248,6 +248,10 @@ public final class Net {
                     else net.aiagent256.stormhold.holding.Vassals.grant(level, mgr, h, player);
                 }
                 case REVOKE -> net.aiagent256.stormhold.holding.Vassals.revoke(level, mgr, h, player);
+                case COUNCIL -> {
+                    net.aiagent256.stormhold.holding.Council.show(level, player);
+                    return;
+                }
                 case TREASURY -> {
                     var em = new net.minecraft.resources.ResourceLocation("minecraft", "emerald");
                     int have = net.aiagent256.stormhold.holding.Stores.realmStock(mgr, h, player.getUUID(), em);

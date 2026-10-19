@@ -38,7 +38,8 @@ public class CastleStructure extends Structure {
             Codec.STRING.optionalFieldOf("theme", "north").forGetter(s -> s.theme),
             Codec.INT.optionalFieldOf("max_slope", 14).forGetter(s -> s.maxSlope),
             Codec.BOOL.optionalFieldOf("nether", false).forGetter(s -> s.nether),
-            Codec.BOOL.optionalFieldOf("ruined", false).forGetter(s -> s.ruined)
+            Codec.BOOL.optionalFieldOf("ruined", false).forGetter(s -> s.ruined),
+            Codec.BOOL.optionalFieldOf("cliff", false).forGetter(s -> s.cliff)
     ).apply(i, CastleStructure::new));
 
     /** Game tests run in a flat world where terrain scoring is meaningless. */
@@ -52,22 +53,34 @@ public class CastleStructure extends Structure {
     private final boolean nether;
     /** Left to the weather: placed through the ruin processor, and held by brigands until someone restores it. */
     private final boolean ruined;
+    /** Sited on a cliff over the sea: high ground, with the side away from the gate dropping to water. */
+    private final boolean cliff;
 
     public CastleStructure(StructureSettings settings, List<Variant> variants, String theme, int maxSlope) {
-        this(settings, variants, theme, maxSlope, false, false);
+        this(settings, variants, theme, maxSlope, false, false, false);
     }
 
     public CastleStructure(StructureSettings settings, List<Variant> variants, String theme, int maxSlope, boolean nether) {
-        this(settings, variants, theme, maxSlope, nether, false);
+        this(settings, variants, theme, maxSlope, nether, false, false);
     }
 
     public CastleStructure(StructureSettings settings, List<Variant> variants, String theme, int maxSlope, boolean nether, boolean ruined) {
+        this(settings, variants, theme, maxSlope, nether, ruined, false);
+    }
+
+    public CastleStructure(StructureSettings settings, List<Variant> variants, String theme, int maxSlope, boolean nether, boolean ruined,
+                           boolean cliff) {
         super(settings);
         this.variants = variants;
         this.theme = theme;
         this.maxSlope = maxSlope;
         this.nether = nether;
         this.ruined = ruined;
+        this.cliff = cliff;
+    }
+
+    public boolean cliff() {
+        return cliff;
     }
 
     public boolean nether() {
@@ -118,8 +131,9 @@ public class CastleStructure extends Structure {
         // Every site costs a dozen noise columns, so the chunk's own centre is tried first and the eight shifts only
         // when it won't do: a good site there is taken as it is.
         boolean huge = Math.max(chosen.sizeX(), chosen.sizeZ()) > 200;
-        int shift = huge ? 0 : 32;
-        int[][] order = {{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
+        int shift = huge ? 0 : cliff ? 16 : 32;
+        int[][] order = cliff ? CLIFF_ORDER : new int[][]{{0, 0}, {-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {1, -1}, {-1, 1}, {1, 1}};
+        int[] back = cliff ? backOf(chosen) : null;
         for (int[] o : order) {
             int i = o[0], j = o[1];
             if (huge && (i != 0 || j != 0)) continue;
@@ -129,7 +143,7 @@ public class CastleStructure extends Structure {
                 lastRejection = "too close to " + t.name() + " at " + t.x() + ", " + t.z();
                 continue;
             }
-            Site s = evaluate(ctx, sx, sz, chosen);
+            Site s = cliff ? evaluateCliff(ctx, sx, sz, chosen, back) : evaluate(ctx, sx, sz, chosen);
             if (s != null && (best == null || s.score > best.score)) best = s;
             if (best != null && best.score >= GOOD_ENOUGH) break;
         }
@@ -139,6 +153,93 @@ public class CastleStructure extends Structure {
         final BlockPos origin = new BlockPos(best.cx - v.sizeX() / 2, best.y + 1 - v.ground(), best.cz - v.sizeZ() / 2);
         BlockPos center = new BlockPos(best.cx, best.y, best.cz);
         return Optional.of(new GenerationStub(center, b -> addPieces(b, ctx.structureTemplateManager(), v, origin)));
+    }
+
+    /** A cliff site is rarer than a flat one: a five by five grid of shifts, nearest first. */
+    private static final int[][] CLIFF_ORDER;
+
+    static {
+        List<int[]> l = new java.util.ArrayList<>();
+        for (int i = -2; i <= 2; i++) for (int j = -2; j <= 2; j++) l.add(new int[]{i, j});
+        l.sort(java.util.Comparator.comparingInt(a -> a[0] * a[0] + a[1] * a[1]));
+        CLIFF_ORDER = l.toArray(new int[0][]);
+    }
+
+    /** The way out of the back of the castle, away from its gate: a unit step along x or z. */
+    private static int[] backOf(Variant v) {
+        net.aiagent256.stormhold.holding.Layout l = net.aiagent256.stormhold.holding.DataRegistries.layout(v.name());
+        if (l == null) return new int[]{0, -1};
+        int dx = l.gate.getX() - v.sizeX() / 2, dz = l.gate.getZ() - v.sizeZ() / 2;
+        if (Math.abs(dx) >= Math.abs(dz)) return new int[]{dx > 0 ? -1 : 1, 0};
+        return new int[]{0, dz > 0 ? -1 : 1};
+    }
+
+    /**
+     * A castle on a cliff over the sea: the footprint on high, reasonably level ground, and past the back wall
+     * the land falls away to water. Two noise columns turn most candidates down (the centre isn't high ground,
+     * or there's no sea behind); the rest get the footprint check and a line of samples along the drop.
+     */
+    @org.jetbrains.annotations.Nullable
+    private Site evaluateCliff(GenerationContext ctx, int cx, int cz, Variant v, int[] back) {
+        if (ignoreTerrain) return new Site(cx, cz, height(ctx, cx, cz, Heightmap.Types.WORLD_SURFACE_WG), 0);
+        int sea = ctx.chunkGenerator().getSeaLevel();
+        int[] mid = surfaceAndFloor(ctx, cx, cz);
+        if (mid[0] - mid[1] > 1 || mid[0] < sea + 12) {
+            lastRejection = "cliff: centre " + mid[0] + " not high ground";
+            return null;
+        }
+        int depth = back[0] != 0 ? v.sizeX() / 2 : v.sizeZ() / 2, width = back[0] != 0 ? v.sizeZ() : v.sizeX();
+        int[] far = surfaceAndFloor(ctx, cx + back[0] * (depth + 14), cz + back[1] * (depth + 14));
+        if (far[0] - far[1] <= 1 || far[0] > sea + 1) {
+            lastRejection = "cliff: no sea behind";
+            return null;
+        }
+        // the footprint: level enough, dry, high
+        int hx = v.sizeX() / 2 - 4, hz = v.sizeZ() / 2 - 4;
+        int[] hs = new int[9];
+        int k = 0, wet = 0;
+        for (int a = -1; a <= 1; a++) {
+            for (int b = -1; b <= 1; b++) {
+                int[] sf = a == 0 && b == 0 ? mid : surfaceAndFloor(ctx, cx + a * hx, cz + b * hz);
+                if (sf[0] - sf[1] > 1) wet++;
+                hs[k++] = sf[0];
+            }
+        }
+        if (wet > 0) {
+            lastRejection = "cliff: water in the footprint";
+            return null;
+        }
+        int[] sorted = hs.clone();
+        Arrays.sort(sorted);
+        int slope = sorted[8] - sorted[0], median = sorted[4];
+        if (slope > maxSlope || median < sea + 10) {
+            lastRejection = "cliff: footprint slope " + slope + ", median " + median;
+            return null;
+        }
+        // along the drop: water below for most of the back wall's length
+        int lateral = Math.max(4, width / 3), water = 0, low = Integer.MAX_VALUE;
+        for (int d : new int[]{8, 18}) {
+            for (int t = -1; t <= 1; t++) {
+                int x = cx + back[0] * (depth + d) + (back[0] == 0 ? t * lateral : 0);
+                int z = cz + back[1] * (depth + d) + (back[1] == 0 ? t * lateral : 0);
+                int[] sf = surfaceAndFloor(ctx, x, z);
+                if (sf[0] - sf[1] > 1 && sf[0] <= sea + 1) water++;
+                low = Math.min(low, sf[0]);
+            }
+        }
+        if (water < 3) {
+            lastRejection = "cliff: only " + water + " of 6 samples behind are sea";
+            return null;
+        }
+        int drop = median - low;
+        if (drop < 12) {
+            lastRejection = "cliff: drop of " + drop;
+            return null;
+        }
+        // the lip just behind the wall should still be high: the castle stands at the edge, not over a slope
+        int[] lip = surfaceAndFloor(ctx, cx + back[0] * (depth + 2), cz + back[1] * (depth + 2));
+        double score = Math.min(drop, 40) + (lip[0] >= median - 6 ? 10 : 0) - slope * 1.5 + water * 2;
+        return new Site(cx, cz, median, score);
     }
 
     private Site evaluate(GenerationContext ctx, int cx, int cz, Variant v) {

@@ -125,6 +125,8 @@ public final class CommonEvents {
 
     @SubscribeEvent
     public static void death(LivingDeathEvent e) {
+        if (e.getSource().getEntity() instanceof GarrisonEntity killer && killer.owner() != null && !killer.level().isClientSide
+                && !(e.getEntity() instanceof net.minecraft.world.entity.player.Player)) killer.scored();
         if (e.getEntity() instanceof GarrisonEntity g && !g.level().isClientSide) HoldingEvents.onDeath(g);
         if (e.getEntity().level() instanceof ServerLevel wl && e.getEntity().getPersistentData().hasUUID(net.aiagent256.stormhold.holding.Warbands.TAG))
             net.aiagent256.stormhold.holding.Warbands.onDeath(wl, e.getEntity());

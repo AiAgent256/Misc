@@ -184,6 +184,8 @@ public class Holding {
     public int loyalty;
     /** The places the builder has laid a road to from here. */
     public final java.util.Set<UUID> roadsTo = new java.util.LinkedHashSet<>();
+    /** Brigand camps sitting on those roads, by the place at the far end: no tolls while they stand. */
+    public final Map<UUID, UUID> roadCamps = new HashMap<>();
 
     public int fiefLevel() {
         int cottages = 0;
@@ -241,6 +243,7 @@ public class Holding {
             for (Role r : Role.TROOPS) total += capacity(tier, r);
             if (l.beds < total) base = Math.max(role == Role.KNIGHT ? 2 : 0, (int) Math.round(base * (double) l.beds / total));
         }
+        if (Council.has(ownerPlayer(), Council.Seat.MARSHAL)) base = (int) Math.round(base * 1.15);
         if (fortify <= 0) return base;
         return (int) Math.round(base * (1 + 0.15 * fortify));
     }
@@ -438,6 +441,9 @@ public class Holding {
         ListTag roadTags = new ListTag();
         for (UUID r : roadsTo) roadTags.add(NbtUtils.createUUID(r));
         t.put("RoadsTo", roadTags);
+        CompoundTag campTags = new CompoundTag();
+        roadCamps.forEach((k, v) -> campTags.putUUID(k.toString(), v));
+        t.put("RoadCamps", campTags);
         t.putString("Steward", stewardName);
         if (vassal != null) t.putString("Vassal", vassal);
         if (ruined) t.putBoolean("Ruined", true);
@@ -574,6 +580,8 @@ public class Holding {
         h.fortify = t.getInt("Fortify");
         h.workDone = t.getInt("WorkDone");
         for (var r : t.getList("RoadsTo", 11)) h.roadsTo.add(NbtUtils.loadUUID(r));
+        CompoundTag campTags = t.getCompound("RoadCamps");
+        for (String k : campTags.getAllKeys()) h.roadCamps.put(UUID.fromString(k), campTags.getUUID(k));
         h.stewardName = t.getString("Steward");
         h.vassal = t.contains("Vassal") ? t.getString("Vassal") : null;
         h.ruined = t.getBoolean("Ruined");

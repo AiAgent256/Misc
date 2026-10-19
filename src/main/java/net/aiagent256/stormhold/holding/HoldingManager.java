@@ -44,6 +44,8 @@ public class HoldingManager extends SavedData {
     public final List<Events.Matter> matters = new ArrayList<>();
     public final List<Dragons.Sighting> dragons = new ArrayList<>();
     public long lastDawn = -1, lastPolitics, lastMend;
+    /** Each lord's council (kept in the overworld's record). */
+    public final Map<UUID, java.util.EnumMap<Council.Seat, String>> councils = new HashMap<>();
     /** The frontier's centre, kept in the overworld's record: zones count out from here (see Frontier). */
     public boolean frontierSet;
     public int frontierX, frontierZ;
@@ -132,6 +134,7 @@ public class HoldingManager extends SavedData {
         CompoundTag colors = new CompoundTag();
         playerColors.forEach((k, v) -> colors.putInt(k.toString(), v.getId()));
         tag.put("PlayerColors", colors);
+        if (!councils.isEmpty()) tag.put("Councils", Council.save(councils));
         ListTag cl = new ListTag();
         for (Campaign c : campaigns) cl.add(c.save());
         tag.put("Campaigns", cl);
@@ -170,6 +173,7 @@ public class HoldingManager extends SavedData {
 
     public static HoldingManager load(CompoundTag tag) {
         HoldingManager m = new HoldingManager();
+        if (tag.contains("Councils")) Council.load(tag.getCompound("Councils"), m.councils);
         if (tag.contains("FrontierX")) {
             m.frontierSet = true;
             m.frontierX = tag.getInt("FrontierX");

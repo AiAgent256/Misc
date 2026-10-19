@@ -111,6 +111,7 @@ public final class Builder {
                 return;
             }
             int[] cost = fortifyCost(h.fortify + 1);
+            if (Council.has(h.ownerPlayer(), Council.Seat.WORKS)) cost = new int[]{cost[0] * 3 / 4, cost[1] * 3 / 4};
             java.util.UUID owner = h.ownerPlayer();
             int haveStone = stone(mgr, h), haveIron = owner == null ? h.stock(IRON) : Stores.realmStock(mgr, h, owner, IRON);
             if (haveStone < cost[0] || haveIron < cost[1]) {
@@ -277,6 +278,7 @@ public final class Builder {
             else rate = SLOW_RATE;
         }
         if (h.work.equals(CLEAR)) rate = CLEAR_RATE;
+        if (Council.has(h.ownerPlayer(), Council.Seat.WORKS)) rate *= 2;
         int placed = 0;
         while (placed < rate && !h.workQueue.isEmpty()) {
             Job j = h.workQueue.poll();
@@ -757,6 +759,7 @@ public final class Builder {
             return;
         }
         int stone = Math.max(16, (int) Math.ceil(bestD / ROAD_PER_STONE));
+        if (Council.has(owner, Council.Seat.WORKS)) stone = Math.max(8, stone / 2);
         int have = stone(mgr, h);
         if (have < stone) {
             player.sendSystemMessage(Component.literal("A road to " + best.name + " (" + (int) bestD + " blocks) takes " + stone

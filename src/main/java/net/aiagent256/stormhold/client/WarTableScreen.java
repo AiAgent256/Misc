@@ -79,6 +79,14 @@ public class WarTableScreen extends Screen {
                 .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Take up to 64 emeralds from the realm's stores into your pack. "
                         + "Spoils, the steward's sales and rents paid while you're away collect there.")))
                 .bounds(x0 + 6, y0 + H - 50, 112, 20).build());
+        if (h != null) this.addRenderableWidget(Button.builder(Component.literal("Council"), b -> {
+                    Net.sendAction(h.id(), Net.COUNCIL, BlockPos.ZERO, 0);
+                    this.onClose();
+                })
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Your council: a Marshal (bigger, harder garrisons), "
+                        + "a Spymaster (earlier warnings, faster and safer scouts), a Treasurer (more rent, cheaper shops) and a Master of Works "
+                        + "(builders twice as fast, cheaper works). Each is paid daily from the stores. Opens in chat.")))
+                .bounds(x0 + 6, y0 + H - 122, 112, 20).build());
         if (h != null) {
             boolean vassal = h.status().contains("Vassal: ");
             int gift = net.aiagent256.stormhold.holding.Vassals.GIFT;

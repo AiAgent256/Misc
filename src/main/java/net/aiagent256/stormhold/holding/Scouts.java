@@ -100,7 +100,7 @@ public final class Scouts {
             c.stage = Campaign.Stage.DONE;
             return;
         }
-        c.progress += SPEED / c.length();
+        c.progress += SPEED * (Council.has(c.player, Council.Seat.SPYMASTER) ? 1.5 : 1.0) / c.length();
         if (c.progress < 1) return;
         if (c.stage == Campaign.Stage.MARCH) {
             danger(level, mgr, h, c);
@@ -169,6 +169,7 @@ public final class Scouts {
             if (o.isHouseOwned() && c.player != null && Standing.hostile(mgr, o.houseId, c.player)) risk += 0.12;
             else if (net.aiagent256.stormhold.Sides.OUTLAWS.equals(o.owner)) risk += 0.08;
         }
+        if (Council.has(c.player, Council.Seat.SPYMASTER)) risk /= 2;
         return Math.min(0.6, risk);
     }
 

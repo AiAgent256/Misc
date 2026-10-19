@@ -85,7 +85,7 @@ public final class Warbands {
             return;
         }
         if (active(mgr, h.id)) return;
-        if (!h.warbandWarned && now >= h.nextWarband - 24000) {
+        if (!h.warbandWarned && now >= h.nextWarband - (Council.has(h.ownerPlayer(), Council.Seat.SPYMASTER) ? 72000 : 24000)) {
             h.warbandWarned = true;
             HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("Scouts sight an illager warband gathering in the hills near "
                     + h.name + ". They'll come within a day.").withStyle(ChatFormatting.RED));
@@ -504,7 +504,8 @@ public final class Warbands {
 
     /** Fought out by numbers while nobody watches. */
     static void resolve(ServerLevel level, HoldingManager mgr, Holding h, Campaign c) {
-        double def = h.strength() * (h.mode == Holding.Mode.DEFEND ? 1.6 : 1.2) * (0.8 + level.random.nextDouble() * 0.4);
+        double def = h.strength() * (h.mode == Holding.Mode.DEFEND ? 1.6 : 1.2) * (0.8 + level.random.nextDouble() * 0.4)
+                * (Council.has(h.ownerPlayer(), Council.Seat.MARSHAL) ? 1.2 : 1.0);
         double att = c.strength() * (1.0 + 0.15 * (Frontier.zone(level, h.center()) - 1)) * (0.8 + level.random.nextDouble() * 0.4);
         if (att > def) {
             sack(level, mgr, h, c);

@@ -28,6 +28,19 @@ public final class StormholdCommand {
                     return 1;
                 }))
                 .then(Commands.literal("list").executes(StormholdCommand::list))
+                .then(Commands.literal("council").executes(c -> {
+                            var p = c.getSource().getPlayerOrException();
+                            net.aiagent256.stormhold.holding.Council.show(p.serverLevel(), p);
+                            return 1;
+                        })
+                        .then(Commands.literal("appoint").then(Commands.argument("seat", com.mojang.brigadier.arguments.StringArgumentType.word())
+                                .suggests((c, b) -> net.minecraft.commands.SharedSuggestionProvider.suggest(java.util.Arrays.stream(
+                                        net.aiagent256.stormhold.holding.Council.Seat.values()).map(s -> s.name().toLowerCase(java.util.Locale.ROOT)), b))
+                                .executes(c -> council(c, true))))
+                        .then(Commands.literal("dismiss").then(Commands.argument("seat", com.mojang.brigadier.arguments.StringArgumentType.word())
+                                .suggests((c, b) -> net.minecraft.commands.SharedSuggestionProvider.suggest(java.util.Arrays.stream(
+                                        net.aiagent256.stormhold.holding.Council.Seat.values()).map(s -> s.name().toLowerCase(java.util.Locale.ROOT)), b))
+                                .executes(c -> council(c, false)))))
                 .then(Commands.literal("nearest").executes(StormholdCommand::nearest))
                 .then(Commands.literal("info").executes(StormholdCommand::info))
                 .then(Commands.literal("houses").executes(StormholdCommand::houses))
@@ -294,4 +307,19 @@ public final class StormholdCommand {
                 + 8 * net.aiagent256.stormhold.Config.FRONTIER_BAND.get() + ".").withStyle(net.minecraft.ChatFormatting.GOLD), false);
         return 1;
     }
+
+    private static int council(com.mojang.brigadier.context.CommandContext<net.minecraft.commands.CommandSourceStack> c, boolean appoint)
+            throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        var p = c.getSource().getPlayerOrException();
+        var seat = net.aiagent256.stormhold.holding.Council.Seat.byName(com.mojang.brigadier.arguments.StringArgumentType.getString(c, "seat"));
+        if (seat == null) {
+            c.getSource().sendFailure(Component.literal("Seats: marshal, spymaster, treasurer, works."));
+            return 0;
+        }
+        boolean ok = appoint ? net.aiagent256.stormhold.holding.Council.appoint(p.serverLevel(), p, seat)
+                : net.aiagent256.stormhold.holding.Council.dismiss(p.serverLevel(), p, seat);
+        if (ok) net.aiagent256.stormhold.holding.Council.show(p.serverLevel(), p);
+        return ok ? 1 : 0;
+    }
+
 }

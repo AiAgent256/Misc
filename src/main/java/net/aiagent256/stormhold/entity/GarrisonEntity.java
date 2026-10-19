@@ -197,6 +197,77 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     }
     public String baseName() { return baseName.isEmpty() ? this.getName().getString() : baseName; }
 
+    // ------------------------------------------------------------ veterans: a company man's kills, and the rank they earn him
+
+    private int kills;
+    /** His name before any rank was put in front of it. */
+    private String plainName = "";
+    private static final java.util.UUID VET_HEALTH = java.util.UUID.fromString("6f6e1c1a-5b3e-4a27-9d1e-0a4f6b7c8d01"),
+            VET_DAMAGE = java.util.UUID.fromString("6f6e1c1a-5b3e-4a27-9d1e-0a4f6b7c8d02"),
+            VET_KNOCKBACK = java.util.UUID.fromString("6f6e1c1a-5b3e-4a27-9d1e-0a4f6b7c8d03");
+    private static final String[] EPITHETS = {"the Bold", "the Grim", "Ironhand", "the Red", "Oakheart", "the Steady", "Wolfsbane",
+            "the Lion", "Stoneface", "the Unbroken", "Longarm", "the Black"};
+
+    public int kills() { return kills; }
+
+    /** 0 none, 1 Veteran (5 kills), 2 Champion (15), 3 Hero (40). */
+    public static int rankFor(int kills) {
+        return kills >= 40 ? 3 : kills >= 15 ? 2 : kills >= 5 ? 1 : 0;
+    }
+
+    public static String rankName(int rank) {
+        return switch (rank) {
+            case 1 -> "Veteran";
+            case 2 -> "Champion";
+            case 3 -> "Hero";
+            default -> "";
+        };
+    }
+
+    /** A kill for one of a lord's company: count it, and raise him a rank when he's earned one. */
+    public void scored() {
+        if (owner() == null) return;
+        int before = rankFor(kills);
+        kills++;
+        int rank = rankFor(kills);
+        if (rank == before) return;
+        if (plainName.isEmpty()) plainName = baseName();
+        String epithet = rank >= 2 ? " " + EPITHETS[Math.floorMod(this.getUUID().hashCode(), EPITHETS.length)] : "";
+        setBaseName(rankName(rank) + " " + plainName + epithet);
+        applyRank(rank);
+        if (this.level() instanceof net.minecraft.server.level.ServerLevel sl) {
+            net.aiagent256.stormhold.holding.HoldingEvents.tell(sl, owner(), net.minecraft.network.chat.Component.literal(plainName
+                    + " has proven himself: " + baseName() + ", " + kills + " kills. " + switch (rank) {
+                        case 1 -> "Tougher and harder-hitting than a fresh man.";
+                        case 2 -> "Men steady when he's beside them.";
+                        default -> "They'll sing of him.";
+                    }).withStyle(net.minecraft.ChatFormatting.GOLD));
+        }
+    }
+
+    private void applyRank(int rank) {
+        double hp = rank == 1 ? 4 : rank == 2 ? 8 : rank >= 3 ? 14 : 0, dmg = rank == 1 ? 1 : rank == 2 ? 2.5 : rank >= 3 ? 4 : 0;
+        var health = this.getAttribute(Attributes.MAX_HEALTH);
+        if (health != null) {
+            health.removeModifier(VET_HEALTH);
+            if (hp > 0) health.addPermanentModifier(new net.minecraft.world.entity.ai.attributes.AttributeModifier(VET_HEALTH, "Stormhold veteran", hp,
+                    net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADDITION));
+            this.heal((float) hp);
+        }
+        var attack = this.getAttribute(Attributes.ATTACK_DAMAGE);
+        if (attack != null) {
+            attack.removeModifier(VET_DAMAGE);
+            if (dmg > 0) attack.addPermanentModifier(new net.minecraft.world.entity.ai.attributes.AttributeModifier(VET_DAMAGE, "Stormhold veteran", dmg,
+                    net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADDITION));
+        }
+        var knock = this.getAttribute(Attributes.KNOCKBACK_RESISTANCE);
+        if (knock != null) {
+            knock.removeModifier(VET_KNOCKBACK);
+            if (rank >= 2) knock.addPermanentModifier(new net.minecraft.world.entity.ai.attributes.AttributeModifier(VET_KNOCKBACK, "Stormhold veteran",
+                    0.1 * rank, net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADDITION));
+        }
+    }
+
     @Override
     protected void defineSynchedData() {
         super.defineSynchedData();
@@ -747,6 +818,8 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         tag.putInt("Color", color.getId());
         if (owner() != null) tag.putUUID("Owner", owner());
         if (!baseName.isEmpty()) tag.putString("BaseName", baseName);
+        if (kills > 0) tag.putInt("Kills", kills);
+        if (!plainName.isEmpty()) tag.putString("PlainName", plainName);
         net.minecraft.nbt.ListTag pt = new net.minecraft.nbt.ListTag();
         for (ItemStack st : pouch) pt.add(st.save(new CompoundTag()));
         tag.put("Pouch", pt);
@@ -763,6 +836,8 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         color = DyeColor.byId(tag.getInt("Color"));
         if (tag.hasUUID("Owner")) setOwner(tag.getUUID("Owner"));
         baseName = tag.getString("BaseName");
+        kills = tag.getInt("Kills");
+        plainName = tag.getString("PlainName");
         var pt = tag.getList("Pouch", 10);
         for (int i = 0; i < pouch.size() && i < pt.size(); i++) pouch.set(i, ItemStack.of(pt.getCompound(i)));
     }

@@ -36,10 +36,13 @@ public final class Campaigns {
             if (now >= h.nextRaid) h.nextRaid = now + 24000;
             return;
         }
-        if (!h.raidWarned && now >= h.nextRaid - 24000) {
+        boolean spy = Council.has(h.ownerPlayer(), Council.Seat.SPYMASTER);
+        if (!h.raidWarned && now >= h.nextRaid - (spy ? 72000 : 24000)) {
             h.raidWarned = true;
-            HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("Scouts report " + mgr.house(h.houseId).title()
-                    + " gathering to retake " + h.name + ". They march within a day.").withStyle(ChatFormatting.RED));
+            long days = Math.max(1, (h.nextRaid - now + 23999) / 24000);
+            HoldingEvents.tell(level, h.ownerPlayer(), Component.literal((spy ? "Your Spymaster's people report " : "Scouts report ")
+                    + mgr.house(h.houseId).title() + " gathering to retake " + h.name + ". They march within "
+                    + (days <= 1 ? "a day." : days + " days.")).withStyle(ChatFormatting.RED));
             mgr.setDirty();
         }
         if (now >= h.nextRaid) {
@@ -340,7 +343,8 @@ public final class Campaigns {
         }
         if (!Config.ABSTRACT_RAIDS.get()) return;
         // fought out while the lord is away
-        double def = h.strength() * (h.mode == Holding.Mode.DEFEND ? 1.6 : 1.2) * (0.8 + level.random.nextDouble() * 0.4);
+        double def = h.strength() * (h.mode == Holding.Mode.DEFEND ? 1.6 : 1.2) * (0.8 + level.random.nextDouble() * 0.4)
+                * (Council.has(h.ownerPlayer(), Council.Seat.MARSHAL) ? 1.2 : 1.0);
         double att = c.strength() * (0.8 + level.random.nextDouble() * 0.4);
         if (att > def) {
             HoldingEvents.transfer(level, mgr, h, c.side);

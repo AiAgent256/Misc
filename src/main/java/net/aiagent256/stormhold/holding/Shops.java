@@ -711,7 +711,8 @@ public final class Shops {
 
     /** The percent a place's shops take off for a regular. */
     public static int discount(Holding h, UUID player) {
-        return Math.min(MAX_DISCOUNT, h.custom.getOrDefault(player, 0) / TRADES_PER_PERCENT);
+        return Math.min(MAX_DISCOUNT, h.custom.getOrDefault(player, 0) / TRADES_PER_PERCENT)
+                + (Council.has(player, Council.Seat.TREASURER) ? 10 : 0);
     }
 
     @Nullable

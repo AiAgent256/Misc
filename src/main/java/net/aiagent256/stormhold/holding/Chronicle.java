@@ -82,6 +82,10 @@ public final class Chronicle {
             for (Component c : account(level, mgr, p.getUUID(), mine, day)) p.sendSystemMessage(c);
             Component rents = Rewards.rents(level, mgr, p.getUUID(), mine);
             if (rents != null) p.sendSystemMessage(rents);
+            Component tolls = Tolls.collect(level, mgr, p.getUUID(), mine);
+            if (tolls != null) p.sendSystemMessage(tolls);
+            Component wages = Council.wages(level, p.getUUID(), mine);
+            if (wages != null) p.sendSystemMessage(wages);
             Events.dawn(level, mgr, p, mine);
         }
     }
