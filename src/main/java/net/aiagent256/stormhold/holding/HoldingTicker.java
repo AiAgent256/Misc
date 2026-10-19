@@ -13,6 +13,7 @@ public final class HoldingTicker {
         HoldingManager mgr = HoldingManager.get(level);
         if (t % 100 == 13) Detector.detect(level, mgr);
         Roads.tick(level, mgr);
+        Engines.tickStones(level);
         if (t % 10 == 5) {
             for (Holding h : mgr.holdings.values()) {
                 if (!level.isLoaded(h.center())) continue;
@@ -22,6 +23,7 @@ public final class HoldingTicker {
         }
         if (t % 20 != 0) return;
         Orders.tick(level);
+        Engines.tick(level, mgr);
         for (Holding h : mgr.holdings.values()) tickHolding(level, mgr, h, t);
         if (t - mgr.lastStandingDrift >= 24000) {
             mgr.lastStandingDrift = t;

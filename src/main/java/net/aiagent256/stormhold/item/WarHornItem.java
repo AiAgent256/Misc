@@ -30,7 +30,10 @@ public class WarHornItem extends Item {
         if (player instanceof ServerPlayer sp) {
             if (player.isShiftKeyDown()) {
                 var mgr = net.aiagent256.stormhold.holding.HoldingManager.get(sp.serverLevel());
-                net.aiagent256.stormhold.holding.Siege.raise(sp.serverLevel(), mgr, sp);
+                // looking at a castle's walls far off: a trebuchet; otherwise a siege tower where you stand
+                var target = net.aiagent256.stormhold.holding.Engines.aimedAt(sp.serverLevel(), mgr, sp);
+                if (target != null) net.aiagent256.stormhold.holding.Engines.raise(sp.serverLevel(), mgr, sp, target);
+                else net.aiagent256.stormhold.holding.Siege.raise(sp.serverLevel(), mgr, sp);
                 player.getCooldowns().addCooldown(this, 40);
                 return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
             }

@@ -414,6 +414,49 @@ public class StormholdGameTests {
     }
 
     @GameTest(template = "arena")
+    public static void trebuchetAimsAndStands(GameTestHelper g) {
+        // the throw: a falling block's own motion, tick by tick, should come down at the wall it was aimed at
+        for (double[] t : new double[][]{{40, 6}, {80, -4}, {120, 12}}) {
+            var from = new net.minecraft.world.phys.Vec3(0.5, 70.5, 0.5);
+            var to = new net.minecraft.world.phys.Vec3(0.5 + t[0], 70.5 + t[1], 0.5 + t[0] * 0.3);
+            var v = net.aiagent256.stormhold.holding.Engines.velocity(from, to);
+            double x = from.x, y = from.y, z = from.z, vx = v.x, vy = v.y, vz = v.z, best = Double.MAX_VALUE;
+            for (int k = 0; k < 200; k++) {
+                vy -= 0.04;
+                x += vx;
+                y += vy;
+                z += vz;
+                vx *= 0.98;
+                vy *= 0.98;
+                vz *= 0.98;
+                best = Math.min(best, Math.sqrt((x - to.x) * (x - to.x) + (y - to.y) * (y - to.y) + (z - to.z) * (z - to.z)));
+            }
+            if (best > 2.5) throw new IllegalStateException("a throw at " + t[0] + " blocks misses by " + best);
+        }
+        // the frame goes up where it's put
+        ServerLevel level = g.getLevel();
+        BlockPos a = g.absolutePos(BlockPos.ZERO);
+        BlockPos base = new BlockPos(a.getX() + 8, 301, a.getZ() + 8);
+        for (int x = 0; x < 16; x++)
+            for (int z = 0; z < 16; z++) {
+                level.setBlock(new BlockPos(a.getX() + x, 300, a.getZ() + z), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(), 3);
+                for (int y = 301; y < 312; y++)
+                    level.setBlock(new BlockPos(a.getX() + x, y, a.getZ() + z), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+            }
+        net.aiagent256.stormhold.holding.Engines.build(level, base, net.minecraft.core.Direction.EAST);
+        int logs = 0, weight = 0;
+        for (int x = -5; x <= 5; x++)
+            for (int z = -3; z <= 3; z++)
+                for (int y = 0; y <= 8; y++) {
+                    var st = level.getBlockState(base.offset(x, y, z));
+                    if (st.is(net.minecraft.tags.BlockTags.LOGS)) logs++;
+                    if (st.is(net.minecraft.world.level.block.Blocks.COBBLESTONE)) weight++;
+                }
+        if (logs < 25 || weight != 12) throw new IllegalStateException("the frame: " + logs + " logs, " + weight + " counterweight");
+        g.succeed();
+    }
+
+    @GameTest(template = "arena")
     public static void veteransEarnTheirRanks(GameTestHelper g) {
         ServerLevel level = g.getLevel();
         HoldingManager mgr = HoldingManager.get(level);

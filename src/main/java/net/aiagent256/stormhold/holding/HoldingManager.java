@@ -44,6 +44,8 @@ public class HoldingManager extends SavedData {
     public final List<Events.Matter> matters = new ArrayList<>();
     public final List<Dragons.Sighting> dragons = new ArrayList<>();
     public long lastDawn = -1, lastPolitics, lastMend;
+    /** Siege engines standing before castles. */
+    public final List<Engines.Engine> engines = new ArrayList<>();
     /** Each lord's council (kept in the overworld's record). */
     public final Map<UUID, java.util.EnumMap<Council.Seat, String>> councils = new HashMap<>();
     /** The frontier's centre, kept in the overworld's record: zones count out from here (see Frontier). */
@@ -135,6 +137,9 @@ public class HoldingManager extends SavedData {
         playerColors.forEach((k, v) -> colors.putInt(k.toString(), v.getId()));
         tag.put("PlayerColors", colors);
         if (!councils.isEmpty()) tag.put("Councils", Council.save(councils));
+        ListTag el = new ListTag();
+        for (Engines.Engine e : engines) el.add(e.save());
+        tag.put("Engines", el);
         ListTag cl = new ListTag();
         for (Campaign c : campaigns) cl.add(c.save());
         tag.put("Campaigns", cl);
@@ -174,6 +179,8 @@ public class HoldingManager extends SavedData {
     public static HoldingManager load(CompoundTag tag) {
         HoldingManager m = new HoldingManager();
         if (tag.contains("Councils")) Council.load(tag.getCompound("Councils"), m.councils);
+        ListTag el = tag.getList("Engines", Tag.TAG_COMPOUND);
+        for (int i = 0; i < el.size(); i++) m.engines.add(Engines.Engine.load(el.getCompound(i)));
         if (tag.contains("FrontierX")) {
             m.frontierSet = true;
             m.frontierX = tag.getInt("FrontierX");
