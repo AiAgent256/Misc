@@ -104,6 +104,9 @@ def clean_posts(g):
             here, above = g.get(x, y, z), g.get(x, y + 1, z)
             if here in ("minecraft:air",) and above in ("minecraft:air", "<void>") and g.is_solid(x, y - 1, z):
                 keep.append([x, y, z])
+            elif "slab" in here and "type=bottom" in here and above in ("minecraft:air", "<void>") \
+                    and g.get(x, y + 2, z) in ("minecraft:air", "<void>"):
+                keep.append([x, y, z])                 # a bowman up on a crenel's sill
             elif role == "house" and "door" in here:
                 keep.append([x, y, z])                 # a house is marked by its door
         out[role] = keep

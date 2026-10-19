@@ -30,6 +30,7 @@ import themes
 import walk
 import worldgen
 import variety
+import hilltown
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 STRUCT_DIR = os.path.join(ROOT, "src/main/resources/data/stormhold/structures")
@@ -42,7 +43,8 @@ LAYOUTS = (castle.great_castle_a, castle2.great_castle_b, castle2.great_castle_c
            variety.temple_ruin, variety.great_castle_d,
            variety.moated(castle2.holdfast_b, "spire"), variety.moated(castle2.holdfast_c, "cone"),
            variety.moated(castle.great_castle_a, "spire"), variety.moated(castle2.great_castle_c, "hoard"),
-           variety.lake(castle2.great_castle_b, "spire"), manor.fortified_manor, gatehouse.gatehouse_castle)
+           variety.lake(castle2.great_castle_b, "spire"), manor.fortified_manor, gatehouse.gatehouse_castle,
+           hilltown.hill_town)
 # A second build of each castle with a different seed, roof style and temper, so two castles of the same
 # plan don't read as copies. The city is one of a kind.
 VARIANTS = {"fortified_manor": ("pyramid", 3), "lake_castle": ("cone", 4), "great_castle_d": ("cone", 3), "great_castle_a": ("hoard", 2), "great_castle_b": ("spire", 3), "great_castle_c": ("low", 1),
@@ -77,7 +79,9 @@ SCALE_LIMITS = {"*": {"narrow_stairs": 0, "pinches": 3, "dark_rooms": 0},
                 "great_castle_d2": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
                 # the ring fortress on its island: the same castle as great_castle_b inside
                 "lake_castle": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
-                "lake_castle2": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0}}
+                "lake_castle2": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
+                # the walled hill town: house doors on narrow lanes, the drums' merlons on the walk
+                "hill_town": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0}}
 
 
 # What a plan's defences must reach before it's exported (see defense_audit): bowmen on walks a man can pass
@@ -99,7 +103,10 @@ DEFENSE_LIMITS = {"*": {"one_wide": 0, "two_wide": 0.10, "foot": 0.35, "field": 
                   "great_city": {"one_wide": 3, "two_wide": 0.12, "foot": 0.10, "field": 0.80},
                   "canal_city": {"one_wide": 3, "two_wide": 0.12, "foot": 0.10, "field": 0.80},
                   # the gatehouse castle was built to the audit: its towers and bastions flank every wall
-                  "gatehouse_castle": {"one_wide": 0, "two_wide": 0.10, "foot": 0.60, "field": 0.85}}
+                  "gatehouse_castle": {"one_wide": 0, "two_wide": 0.10, "foot": 0.60, "field": 0.85},
+                  # the hill town's curtain is short-sided and towered every few rods: its foot is held to
+                  # better than a castle's
+                  "hill_town": {"one_wide": 0, "two_wide": 0.10, "foot": 0.50, "field": 0.85}}
 
 
 # Plans rebuilt since they first went out into worlds. A rebuilt plan is exported under a new name
