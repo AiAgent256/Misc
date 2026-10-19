@@ -15,6 +15,7 @@ import city2
 import crypt
 import defense_audit
 import loops
+import manor
 import market_town
 import export
 import fixup
@@ -40,10 +41,10 @@ LAYOUTS = (castle.great_castle_a, castle2.great_castle_b, castle2.great_castle_c
            variety.temple_ruin, variety.great_castle_d,
            variety.moated(castle2.holdfast_b, "spire"), variety.moated(castle2.holdfast_c, "cone"),
            variety.moated(castle.great_castle_a, "spire"), variety.moated(castle2.great_castle_c, "hoard"),
-           variety.lake(castle2.great_castle_b, "spire"))
+           variety.lake(castle2.great_castle_b, "spire"), manor.fortified_manor)
 # A second build of each castle with a different seed, roof style and temper, so two castles of the same
 # plan don't read as copies. The city is one of a kind.
-VARIANTS = {"lake_castle": ("cone", 4), "great_castle_d": ("cone", 3), "great_castle_a": ("hoard", 2), "great_castle_b": ("spire", 3), "great_castle_c": ("low", 1),
+VARIANTS = {"fortified_manor": ("pyramid", 3), "lake_castle": ("cone", 4), "great_castle_d": ("cone", 3), "great_castle_a": ("hoard", 2), "great_castle_b": ("spire", 3), "great_castle_c": ("low", 1),
             "holdfast_a": ("pyramid", 4), "holdfast_b": ("hoard", 2), "holdfast_c": ("spire", 3),
             "watchtower_a": ("flat", 3), "watchtower_b": ("spire", 1), "watchtower_c": ("hoard", 2)}
 
@@ -83,6 +84,8 @@ SCALE_LIMITS = {"*": {"narrow_stairs": 0, "pinches": 3, "dark_rooms": 0},
 DEFENSE_LIMITS = {"*": {"one_wide": 0, "two_wide": 0.10, "foot": 0.35, "field": 0.85},
                   # an open market town has no wall to man: a man or two up its church tower
                   "town": {"one_wide": 0, "two_wide": 1.0, "foot": 0.0, "field": 0.0},
+                  # the manor's walls are low: its men see their foot, and the bar is set higher to match
+                  "fortified_manor": {"one_wide": 0, "two_wide": 0.10, "foot": 0.50, "field": 0.85},
                   # the walled town's curtain is held to a castle's walks
                   "town_walled": {"one_wide": 0, "two_wide": 0.10, "foot": 0.35, "field": 0.80},
                   # the backlog the audit found on its first run: tower tops crowded by their stair heads and
@@ -120,7 +123,7 @@ def builds():
 # on, tower roofs standing on the merlons so the men under them see out, loops cut low in the towers to cover
 # the walls' foot, walks a man can pass another on. A revision each, so castles already standing keep theirs.
 for _fn, _name, _style, _shift in builds():
-    if _name != "temple_ruin":
+    if _name not in ("temple_ruin", "fortified_manor", "fortified_manor2"):     # new plans start at their first revision
         REVISIONS[_name] = REVISIONS.get(_name, 1) + 1
 
 
