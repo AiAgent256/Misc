@@ -7,7 +7,8 @@ from themes import BIOMES, OVERWORLD
 TIERS = {
     "great_castle": {"layouts": ["great_castle_a", "great_castle_b", "great_castle_c",
                                  "great_castle_a2", "great_castle_b2", "great_castle_c2",
-                                 "great_castle_a_moat", "great_castle_c_moat", "great_castle_d", "great_castle_d2"],
+                                 "great_castle_a_moat", "great_castle_c_moat", "great_castle_d", "great_castle_d2",
+                                 "lake_castle", "lake_castle2"],
                      "spacing": 64, "separation": 28, "salt": 718213044},
     "holdfast": {"layouts": ["holdfast_a", "holdfast_b", "holdfast_c", "holdfast_a2", "holdfast_b2", "holdfast_c2",
                              "holdfast_b_moat", "holdfast_c_moat"], "spacing": 44, "separation": 18, "salt": 515870611},
@@ -27,6 +28,15 @@ TIERS = {
                          "great_castle_a", "great_castle_b", "great_castle_c"],
              "weights": {"great_castle_a": 1, "great_castle_b": 1, "great_castle_c": 1}, "default_weight": 3,
              "spacing": 40, "separation": 16, "salt": 271828183, "ruined": True, "max_slope": 20, "tag": True},
+    # castles on the sea cliffs: the same plans, sited by the game on high ground at a cliff edge with the drop to
+    # the water behind the back wall (cliff=true); where it finds no such edge, nothing is built
+    "cliff_castle": {"layouts": ["holdfast_a", "holdfast_b", "holdfast_c", "holdfast_a2", "holdfast_b2", "holdfast_c2",
+                                 "great_castle_a", "great_castle_b", "great_castle_c", "great_castle_a2", "great_castle_b2",
+                                 "great_castle_c2", "great_castle_d", "great_castle_d2"],
+                     "weights": {"great_castle_a": 1, "great_castle_b": 1, "great_castle_c": 1, "great_castle_a2": 1,
+                                 "great_castle_b2": 1, "great_castle_c2": 1, "great_castle_d": 1, "great_castle_d2": 1},
+                     "default_weight": 2, "spacing": 56, "separation": 24, "salt": 161803398, "max_slope": 14,
+                     "cliff": True, "tag": True},
     # the old world's temples: nobody's, overgrown, a pool before the steps and something under the altar
     "temple_ruin": {"layouts": ["temple_ruin"], "spacing": 48, "separation": 20, "salt": 314159265, "max_slope": 20, "tag": True},
 }
@@ -79,6 +89,8 @@ def write(root, layout_meta, export_name=lambda n: n):
                 st["nether"] = True
             if cfg.get("ruined"):
                 st["ruined"] = True
+            if cfg.get("cliff"):
+                st["cliff"] = True
             with open(os.path.join(sdir, f"{sid}.json"), "w") as f:
                 json.dump(st, f, indent=1)
             entries.append({"structure": f"stormhold:{sid}", "weight": THEME_WEIGHT[theme]})

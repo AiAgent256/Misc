@@ -1,0 +1,10 @@
+{
+ "replace": false,
+ "values": [
+  "stormhold:cliff_castle_north",
+  "stormhold:cliff_castle_riverlands",
+  "stormhold:cliff_castle_reach",
+  "stormhold:cliff_castle_dorne",
+  "stormhold:cliff_castle_stormlands"
+ ]
+}

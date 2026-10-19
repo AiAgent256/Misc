@@ -1,0 +1,30 @@
+{
+ "structures": [
+  {
+   "structure": "stormhold:cliff_castle_north",
+   "weight": 3
+  },
+  {
+   "structure": "stormhold:cliff_castle_riverlands",
+   "weight": 3
+  },
+  {
+   "structure": "stormhold:cliff_castle_reach",
+   "weight": 2
+  },
+  {
+   "structure": "stormhold:cliff_castle_dorne",
+   "weight": 2
+  },
+  {
+   "structure": "stormhold:cliff_castle_stormlands",
+   "weight": 2
+  }
+ ],
+ "placement": {
+  "type": "minecraft:random_spread",
+  "spacing": 56,
+  "separation": 24,
+  "salt": 161803398
+ }
+}

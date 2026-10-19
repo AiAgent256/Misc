@@ -75,6 +75,20 @@
    "size_z": 128,
    "ground": 6,
    "weight": 1
+  },
+  {
+   "name": "lake_castle",
+   "size_x": 168,
+   "size_z": 168,
+   "ground": 10,
+   "weight": 1
+  },
+  {
+   "name": "lake_castle2",
+   "size_x": 168,
+   "size_z": 168,
+   "ground": 10,
+   "weight": 1
   }
  ]
 }

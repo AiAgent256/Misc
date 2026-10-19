@@ -39,6 +39,12 @@ GOODS = ["minecraft:hay_block[axis=y]", "minecraft:barrel[facing=up]", "minecraf
          "minecraft:pumpkin", "minecraft:bookshelf", "minecraft:cauldron", "minecraft:red_wool", "minecraft:blue_wool",
          "minecraft:bread", "minecraft:chest[facing=north]", "minecraft:loom[facing=north]"]
 GOODS = [b for b in GOODS if b not in ("minecraft:bread", "minecraft:cake")] + ["minecraft:cake"]
+# Timber-framed ground storeys (the market towns from their third revision): log posts at the corners and every
+# three blocks, a beam at the storey line, the wall between them as infill, shutters on every window, some barred,
+# and a planter of flowers on the sill. Off for the cities, so their plans rebuild as they were.
+FACADES = False
+POTS = ("minecraft:potted_red_tulip", "minecraft:potted_poppy", "minecraft:potted_azure_bluet",
+        "minecraft:potted_flowering_azalea_bush", "minecraft:potted_oxeye_daisy", "minecraft:potted_cornflower")
 
 TRADES = {
     "smith": dict(items=["minecraft:anvil[facing=east]", "minecraft:blast_furnace[facing=south,lit=true]",
@@ -162,11 +168,18 @@ def townhouse(g, x0, z0, x1, z1, GL, rng, street, storeys=None, wall=None, trade
                 g.set(x, y, z, "minecraft:polished_andesite")
     # ---- windows: panes, sills, shutters, on street and open sides ----
     def window(x, y, z, face):
-        g.fill(x, y, z, x, y + 1, z, GLASS)
+        ground = FACADES and y == GL + 1
+        g.fill(x, y, z, x, y + 1, z, "minecraft:iron_bars" if ground and rng.random() < 0.3 else GLASS)
         ox, oz = x + FACING_VEC[face][0], z + FACING_VEC[face][1]
         if g.get(ox, y - 1, z if face in ("north", "south") else oz) == AIR and g.get(ox, y - 1, oz) == AIR:
-            g.stair(ox, y - 1, oz, "minecraft:stone_brick_stairs", OPPOSITE[face], half="top")
-        if rng.random() < 0.5:
+            if ground:
+                # a planter on the sill: a box of dark oak with a pot of flowers on it
+                g.set(ox, y - 1, oz, "minecraft:dark_oak_slab[type=top]")
+                if g.get(ox, y, oz) == AIR:
+                    g.set(ox, y, oz, POTS[int(rng.integers(0, len(POTS)))])
+            else:
+                g.stair(ox, y - 1, oz, "minecraft:stone_brick_stairs", OPPOSITE[face], half="top")
+        if ground or rng.random() < 0.5:
             for s_ in (-1, 1):
                 sx, sz = (x + s_, z) if face in ("north", "south") else (x, z + s_)
                 if g.get(sx + FACING_VEC[face][0], y, sz + FACING_VEC[face][1]) == AIR and g.get(sx, y, sz) != AIR:
@@ -287,6 +300,37 @@ def townhouse(g, x0, z0, x1, z1, GL, rng, street, storeys=None, wall=None, trade
         g.bed(bx, y, bz, "east" if bx == jx0 + 1 else "west", rng.choice(BED_COLORS))
         g.lantern(jx0 + 2, y + sh - 2, jz0 + 2)
     g.lantern(x0 + 2, GL + sh - 2, z0 + 2)
+    # ---- the timber frame of the ground storey ----
+    if FACADES:
+        yb = GL + sh - 1
+
+        def infill(st):
+            return st not in (AIR, "<void>") and not any(k in st for k in ("door", "glass", "bars", "fence", "trapdoor", "sign",
+                                                                           "lantern", "pot", "slab", "stairs", "torch"))
+        for f in faces:
+            shop = f == street and trade and not passage
+            if f in ("north", "south"):
+                zz = z0 if f == "north" else z1
+                for x in range(x0, x1 + 1):
+                    if infill(g.get(x, yb, zz)):
+                        g.set(x, yb, zz, f"{BEAM}[axis=x]")
+                for x in sorted(set(list(range(x0, x1 + 1, 3)) + [x1])):
+                    if shop and x0 < x < x1:
+                        continue
+                    for y in range(GL, yb):
+                        if infill(g.get(x, y, zz)):
+                            g.set(x, y, zz, f"{TIMBER}[axis=y]")
+            else:
+                xx = x0 if f == "west" else x1
+                for z in range(z0, z1 + 1):
+                    if infill(g.get(xx, yb, z)):
+                        g.set(xx, yb, z, f"{BEAM}[axis=z]")
+                for z in sorted(set(list(range(z0, z1 + 1, 3)) + [z1])):
+                    if shop and z0 < z < z1:
+                        continue
+                    for y in range(GL, yb):
+                        if infill(g.get(xx, y, z)):
+                            g.set(xx, y, z, f"{TIMBER}[axis=y]")
     # ---- roof: gable, ridge along the party-wall direction so neighbours' roofs line up ----
     axis = "x" if along_x else "z"
     fill = ROOF_FILL.get(roof, "minecraft:deepslate_tiles")

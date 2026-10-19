@@ -45,6 +45,12 @@ BASE = {
     "polished_andesite_stairs": (132, 135, 134), "polished_andesite_slab": (132, 135, 134), "stone_stairs": (128, 128, 128),
     "stone_slab": (128, 128, 128), "smooth_stone": (160, 160, 160), "smooth_stone_slab": (160, 160, 160),
     "brick_wall": (150, 97, 83), "mud_brick_wall": (137, 104, 79), "sandstone": (216, 203, 155), "cut_sandstone": (216, 203, 155),
+    "quartz_bricks": (234, 229, 221), "calcite": (222, 223, 219), "diorite": (190, 190, 190), "polished_diorite": (196, 197, 198),
+    "smooth_quartz": (236, 231, 224), "chiseled_quartz_block": (231, 226, 218), "quartz_stairs": (234, 229, 221),
+    "quartz_slab": (234, 229, 221), "smooth_quartz_stairs": (236, 231, 224), "smooth_quartz_slab": (236, 231, 224),
+    "diorite_stairs": (190, 190, 190), "diorite_slab": (190, 190, 190), "diorite_wall": (190, 190, 190),
+    "polished_diorite_stairs": (196, 197, 198), "polished_diorite_slab": (196, 197, 198), "sand": (219, 207, 163),
+    "sugar_cane": (140, 190, 90), "lily_pad": (40, 110, 40),
 }
 WOOL = {"red": (160, 39, 34), "yellow": (248, 197, 39), "blue": (53, 57, 157), "green": (84, 109, 27), "white": (230, 230, 230),
         "orange": (240, 118, 19), "purple": (121, 42, 172), "lime": (112, 185, 25), "brown": (114, 71, 40), "cyan": (21, 137, 145),

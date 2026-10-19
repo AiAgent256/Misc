@@ -692,3 +692,270 @@ def great_castle_d(seed=41):
 
 
 great_castle_d.cap_style = "spire"
+
+
+# ---------------------------------------------------------------- the lake castle
+
+# White stone for the lake castle: the northern palette's greys swapped for calcite, quartz and diorite, the
+# dark trim and the slate spires left as they are. The theme processor in the game only swaps the northern
+# greys, so the lake castle stays white in every region.
+WHITEN = {
+    "minecraft:stone_bricks": "minecraft:quartz_bricks",
+    "minecraft:cracked_stone_bricks": "minecraft:calcite",
+    "minecraft:mossy_stone_bricks": "minecraft:polished_diorite",
+    "minecraft:chiseled_stone_bricks": "minecraft:chiseled_quartz_block",
+    "minecraft:cobblestone": "minecraft:calcite",
+    "minecraft:mossy_cobblestone": "minecraft:diorite",
+    "minecraft:stone": "minecraft:calcite",
+    "minecraft:smooth_stone": "minecraft:smooth_quartz",
+    "minecraft:andesite": "minecraft:diorite",
+    "minecraft:polished_andesite": "minecraft:polished_diorite",
+    "minecraft:tuff": "minecraft:calcite",
+    "minecraft:stone_brick_stairs": "minecraft:quartz_stairs",
+    "minecraft:mossy_stone_brick_stairs": "minecraft:polished_diorite_stairs",
+    "minecraft:cobblestone_stairs": "minecraft:diorite_stairs",
+    "minecraft:polished_andesite_stairs": "minecraft:polished_diorite_stairs",
+    "minecraft:andesite_stairs": "minecraft:diorite_stairs",
+    "minecraft:stone_stairs": "minecraft:smooth_quartz_stairs",
+    "minecraft:stone_brick_slab": "minecraft:quartz_slab",
+    "minecraft:mossy_stone_brick_slab": "minecraft:polished_diorite_slab",
+    "minecraft:cobblestone_slab": "minecraft:diorite_slab",
+    "minecraft:polished_andesite_slab": "minecraft:polished_diorite_slab",
+    "minecraft:andesite_slab": "minecraft:diorite_slab",
+    "minecraft:stone_slab": "minecraft:smooth_quartz_slab",
+    "minecraft:smooth_stone_slab": "minecraft:smooth_quartz_slab",
+    "minecraft:stone_brick_wall": "minecraft:diorite_wall",
+    "minecraft:mossy_stone_brick_wall": "minecraft:diorite_wall",
+    "minecraft:cobblestone_wall": "minecraft:diorite_wall",
+    "minecraft:andesite_wall": "minecraft:diorite_wall",
+}
+
+
+def whiten(g):
+    """Swap the greys for white stone across the whole grid, keeping each block's properties."""
+    for i, s in enumerate(g.palette):
+        name = s.split("[")[0]
+        to = WHITEN.get(name)
+        if to is None:
+            continue
+        g.palette[i] = to + s[len(name):]
+    g.index = {}
+    for i, s in enumerate(g.palette):
+        g.index.setdefault(s, i)
+
+
+def _raise(g, K):
+    """The same castle K blocks higher in a taller grid, the new bottom layers copied from the old bottom."""
+    g2 = Grid(g.X, g.Y + K, g.Z, 1)
+    g2.palette = list(g.palette)
+    g2.index = dict(g.index)
+    g2.a[:, :, K:] = g.a
+    for k in range(K):
+        g2.a[:, :, k] = g.a[:, :, 0]
+    g2.rng = g.rng
+    g2.block_nbt = {(x, y + K, z): v for (x, y, z), v in g.block_nbt.items()}
+    for role, pts in g.markers.items():
+        g2.markers[role] = [(x, y + K, z) for (x, y, z) in pts]
+    g2.banners = [(x, y + K, z) for (x, y, z) in g.banners]
+    if hasattr(g, "gate_planes"):
+        g2.gate_planes = [[p[0], p[1] + K, p[2], p[3], p[4] + K, p[5]] for p in g.gate_planes]
+    for attr in ("protected_xz", "spiral_cells", "narrow_spirals", "last_cap"):
+        if hasattr(g, attr):
+            setattr(g2, attr, getattr(g, attr))
+    return g2
+
+
+OPEN_GROUND = ("minecraft:grass_block", "minecraft:coarse_dirt", "minecraft:dirt", "minecraft:moss_block", "minecraft:gravel",
+               "minecraft:mud", "minecraft:clay", "minecraft:sand", "minecraft:dirt_path", "minecraft:podzol")
+
+
+def lake(fn, style="spire", seed_shift=5, margin=20, raise_by=4, name="lake_castle"):
+    """The castle {fn} standing on an island in its own lake: everything outside its walls drowned, the island's
+    edge faced in stone from the water up, a long bridge on arches from the gate to the shore, a sandy shore with
+    reeds, a jetty for the boats, and the whole castle in white stone under its dark spires."""
+    def build(seed=None):
+        g0, meta = fn(seed=(fn.__defaults__[0] + seed_shift) if seed is None else seed)
+        K, M = raise_by, margin
+        GL = meta["GL"] + K
+        g = _grow(_raise(g0, K), M)
+        X, Z = g.X, g.Z
+        rng = g.rng
+        top, bed = GL - 5, GL - 9                 # the water's top block and the lake bed
+        # the new margin: ground at the old ground level, so the flood below can walk it
+        xs, zs = g.xz()
+        border = np.minimum(np.minimum(xs, X - 1 - xs), np.minimum(zs, Z - 1 - zs))
+        margin_m = (xs < M) | (xs >= M + g0.X) | (zs < M) | (zs >= M + g0.Z)
+        g.fill_mask(margin_m, 0, GL - 2, FOUND)
+        g.fill_mask(margin_m, GL - 1, GL - 1, "minecraft:grass_block")
+        g.fill_mask(margin_m, GL, GL + 8, "minecraft:air")
+        # everything outside the walls: open ground or water reachable from the edge of the grid
+        open_ = np.zeros((X, Z), dtype=bool)
+        A = g.a
+        # a column the plan leaves empty (structure void) is nothing built: the lake takes it too
+        ground_ids = {g.index[s] for s in g.palette if s.split("[")[0] in OPEN_GROUND or "water" in s or s in ("minecraft:air", "<void>")}
+        clear_ids = {g.index[s] for s in g.palette if s in ("minecraft:air", "<void>") or "lily_pad" in s or "grass" == s.split(":")[-1]
+                     or s.endswith(":fern") or "tall_grass" in s}
+        floor_ok = np.isin(A[:, :, GL - 1], list(ground_ids))
+        clear = np.ones((X, Z), dtype=bool)
+        for y in range(GL, GL + 4):
+            clear &= np.isin(A[:, :, y], list(clear_ids))
+        cand = floor_ok & clear
+        from collections import deque
+        q = deque()
+        for x in range(X):
+            for z in (0, Z - 1):
+                if cand[x, z] and not open_[x, z]:
+                    open_[x, z] = True; q.append((x, z))
+        for z in range(Z):
+            for x in (0, X - 1):
+                if cand[x, z] and not open_[x, z]:
+                    open_[x, z] = True; q.append((x, z))
+        while q:
+            x, z = q.popleft()
+            for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, nz = x + dx, z + dz
+                if 0 <= nx < X and 0 <= nz < Z and cand[nx, nz] and not open_[nx, nz]:
+                    open_[nx, nz] = True; q.append((nx, nz))
+        lake_m = open_ & (border >= 5)
+        shore = open_ & (border < 5)
+        # the island's edge: the castle's own cells next to the water, faced in stone from the bed to its floor
+        island = ~open_
+        rim = np.zeros((X, Z), dtype=bool)
+        rim[1:, :] |= island[1:, :] & lake_m[:-1, :]
+        rim[:-1, :] |= island[:-1, :] & lake_m[1:, :]
+        rim[:, 1:] |= island[:, 1:] & lake_m[:, :-1]
+        rim[:, :-1] |= island[:, :-1] & lake_m[:, 1:]
+        # the lake: a bed of sand, gravel and clay, five of water, open air to well over the walls' feet
+        g.fill_mask(lake_m, 0, bed - 1, FOUND)
+        g.fill_mask(lake_m, bed, bed, Mix(("minecraft:sand", 40), ("minecraft:gravel", 35), ("minecraft:clay", 25)))
+        g.fill_mask(lake_m, bed + 1, top, "minecraft:water")
+        g.fill_mask(lake_m, top + 1, GL + 8, "minecraft:air")
+        g.fill_mask(rim, bed, GL - 2, STONE)
+        # the shore: grass stepping down a block a ring to a sandy beach at the water's edge
+        for d, y, block in ((0, GL - 1, "minecraft:grass_block"), (1, GL - 2, "minecraft:grass_block"),
+                            (2, GL - 3, Mix(("minecraft:grass_block", 50), ("minecraft:sand", 50))),
+                            (3, GL - 4, "minecraft:sand"), (4, top, "minecraft:sand")):
+            ring_m = shore & (border == d)
+            g.fill_mask(ring_m, 0, y - 1, FOUND)
+            g.fill_mask(ring_m, y, y, block)
+            g.fill_mask(ring_m, y + 1, GL + 8, "minecraft:air")
+        for _ in range(int(X * Z / 160)):
+            x, z = int(rng.integers(0, X)), int(rng.integers(0, Z))
+            if not shore[x, z]:
+                continue
+            d = int(border[x, z])
+            y = (GL - 1, GL - 2, GL - 3, GL - 4, top)[d]
+            if d == 4:
+                # reeds on the beach where the water laps it
+                if any(0 <= x + dx < X and 0 <= z + dz < Z and lake_m[x + dx, z + dz] for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                    for k in range(1, 2 + int(rng.integers(0, 3))):
+                        g.set(x, y + k, z, "minecraft:sugar_cane")
+            elif d <= 2:
+                g.set(x, y + 1, z, "minecraft:grass" if rng.random() < 0.8 else "minecraft:oxeye_daisy")
+        for _ in range(int(X * Z / 300)):
+            x, z = int(rng.integers(0, X)), int(rng.integers(0, Z))
+            if lake_m[x, z] and g.get(x, top, z) == "minecraft:water" and g.get(x, top + 1, z) == "minecraft:air":
+                g.set(x, top + 1, z, "minecraft:lily_pad")
+        # the bridge: from the gate's outer end straight out to the shore, on piers, arched between them
+        gx, gy, gz = g.markers["gate"][0]
+        box = (M, M + g0.X - 1, M, M + g0.Z - 1)
+        side = min((("west", gx - box[0]), ("east", box[1] - gx), ("north", gz - box[2]), ("south", box[3] - gz)), key=lambda t: t[1])[0]
+        along = gx if side in ("north", "south") else gz
+        runs = [r for r in _openings(g, side, box, GL) if r[0] - 1 <= along <= r[1] + 1]
+        ra, rb = runs[0] if runs else (along - 3, along + 3)
+        ra, rb = max(ra, along - 3), min(rb, along + 3)
+        # the bridge starts where the castle's own causeway or drawbridge ends: walk out from the gate
+        def cell(u, w):           # u along the bridge's width, w outward from the castle
+            if side == "south":
+                return u, w
+            if side == "north":
+                return u, Z - 1 - w
+            if side == "east":
+                return w, u
+            return X - 1 - w, u
+        span_end = (Z if side in ("north", "south") else X) - 1
+        # the castle's own approach (a drawbridge, a causeway) is rebuilt as the bridge's first span: walk in from
+        # the gate marker while the way is open floor between rails or fences, and stop at the gatehouse's walls
+        w_gate = gz if side == "south" else Z - 1 - gz if side == "north" else gx if side == "east" else X - 1 - gx
+        def approach(w):
+            x, z = cell(along, w)
+            if not (g.is_solid(x, GL - 1, z) and not g.is_solid(x, GL, z)):
+                return False
+            for u in (ra - 1, rb + 1):
+                sx, sz = cell(u, w)
+                st = g.get(sx, GL, sz)
+                if g.is_solid(sx, GL, sz) and "fence" not in st and "wall" not in st:
+                    return False
+            return True
+        w = w_gate
+        while w - 1 > 0 and approach(w - 1):
+            w -= 1
+        k = 0
+        while w <= span_end:
+            for u in range(ra - 1, rb + 2):
+                x, z = cell(u, w)
+                pier = k % 7 in (0, 1) and border[x, z] >= 5
+                if pier:
+                    g.fill(x, bed, z, x, GL - 2, z, STONE)
+                else:
+                    if border[x, z] >= 5:
+                        g.fill(x, 0, z, x, bed - 1, z, FOUND)
+                        g.set(x, bed, z, "minecraft:gravel")
+                        g.fill(x, bed + 1, z, x, top, z, "minecraft:water")
+                        g.fill(x, top + 1, z, x, GL - 3, z, "minecraft:air")
+                    g.set(x, GL - 2, z, STONE)
+                g.set(x, GL - 1, z, ROAD if ra <= u <= rb else STONE)
+                g.fill(x, GL, z, x, GL + 4, z, "minecraft:air")
+                if u in (ra - 1, rb + 1):
+                    g.set(x, GL, z, RAIL)
+                    if k % 7 == 0:
+                        g.set(x, GL + 1, z, "minecraft:lantern[hanging=false]")
+            # the arch: a shoulder either side of each pier, under the deck
+            if k % 7 in (2, 6):
+                f_out, f_in = {"south": ("north", "south"), "north": ("south", "north"),
+                               "east": ("west", "east"), "west": ("east", "west")}[side]
+                for u in range(ra - 1, rb + 2):
+                    x, z = cell(u, w)
+                    if border[x, z] >= 5:
+                        g.stair(x, GL - 3, z, STONE_STAIR, f_out if k % 7 == 2 else f_in, half="top")
+            w += 1
+            k += 1
+        # a jetty for the boats on the shore to the right of the bridge
+        jside = {"south": "east", "north": "west", "east": "north", "west": "south"}[side]
+        if jside in ("east", "west"):
+            jz = Z // 2
+            xs_ = range(X - 1, X - 14, -1) if jside == "east" else range(0, 13)
+            for i, x in enumerate(xs_):
+                for z in (jz - 1, jz, jz + 1):
+                    g.set(x, top + 1, z, "minecraft:spruce_planks")
+                    if i >= 5 and i % 4 == 1 and z != jz:
+                        g.fill(x, bed, z, x, top, z, "minecraft:spruce_log[axis=y]")
+                    g.fill(x, top + 2, z, x, top + 5, z, "minecraft:air")
+                if i >= 5:
+                    g.set(x, top + 2, jz - 2, "minecraft:spruce_fence") if g.get(x, top + 1, jz - 2) != "minecraft:air" else None
+            end = xs_[-1]
+            g.barrel(end, top + 2, jz - 1, None); g.barrel(end, top + 2, jz + 1, None)
+            g.set(end, top + 2, jz, "minecraft:lantern[hanging=false]")
+        else:
+            jx = X // 2
+            zs_ = range(Z - 1, Z - 14, -1) if jside == "south" else range(0, 13)
+            for i, z in enumerate(zs_):
+                for x in (jx - 1, jx, jx + 1):
+                    g.set(x, top + 1, z, "minecraft:spruce_planks")
+                    if i >= 5 and i % 4 == 1 and x != jx:
+                        g.fill(x, bed, z, x, top, z, "minecraft:spruce_log[axis=y]")
+                    g.fill(x, top + 2, z, x, top + 5, z, "minecraft:air")
+            end = zs_[-1]
+            g.barrel(jx - 1, top + 2, end, None); g.barrel(jx + 1, top + 2, end, None)
+            g.set(jx, top + 2, end, "minecraft:lantern[hanging=false]")
+        whiten(g)
+        meta = dict(meta)
+        meta["name"] = name
+        meta["GL"] = GL
+        if meta.get("levels"):
+            meta["levels"] = tuple(v + K for v in meta["levels"])
+        return g, meta
+    build.__name__ = name
+    build.__defaults__ = (fn.__defaults__[0] + seed_shift,)
+    build.cap_style = style
+    return build
