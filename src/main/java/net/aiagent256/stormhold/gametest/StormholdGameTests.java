@@ -1875,7 +1875,10 @@ public class StormholdGameTests {
                 for (int yy = y - 24; yy < y - 3; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.STONE.defaultBlockState(), 2);
                 for (int yy = y - 3; yy < y - 1; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), 2);
                 level.setBlock(new BlockPos(x, y - 1, z), net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(), 2);
-                for (int yy = y; yy < y + 24; yy++) {
+                // and everything above it, mountains included: the test's spot moves as tests are added, and a peak left
+                // standing over the field is where the fief would put its mine
+                int top = Math.max(y + 24, level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x, z));
+                for (int yy = y; yy < top; yy++) {
                     if (!level.getBlockState(new BlockPos(x, yy, z)).isAir()) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
                 }
             }
