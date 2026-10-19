@@ -627,6 +627,26 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
         }
     }
 
+    private static final EquipmentSlot[] KIT = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET, EquipmentSlot.MAINHAND};
+
+    /** Each piece of kit at its drop chance, worn the way the game wears dropped kit. Public for tests. */
+    public int stripKit() {
+        int n = 0;
+        for (EquipmentSlot s : KIT) {
+            ItemStack st = this.getItemBySlot(s);
+            float chance = this.getEquipmentDropChance(s);
+            if (st.isEmpty() || chance <= 0 || chance > 1 || net.minecraft.world.item.enchantment.EnchantmentHelper.hasVanishingCurse(st)
+                    || this.random.nextFloat() >= chance) continue;
+            ItemStack drop = st.copy();
+            if (drop.isDamageableItem())
+                drop.setDamageValue(drop.getMaxDamage() - this.random.nextInt(1 + this.random.nextInt(Math.max(drop.getMaxDamage() - 3, 1))));
+            this.spawnAtLocation(drop);
+            this.setItemSlot(s, ItemStack.EMPTY);
+            n++;
+        }
+        return n;
+    }
+
     /** A company man drops everything he carries: it's the lord's kit. */
     @Override
     protected void dropCustomDeathLoot(DamageSource src, int looting, boolean recentlyHit) {
@@ -635,6 +655,8 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
             // a house's man carries coin, for the lord who cuts him down or whose men do
             if (this.level() instanceof net.minecraft.server.level.ServerLevel sl && Sides.playerId(side) == null) {
                 Entity k = src.getEntity();
+                // the game only strips kit off men the player hit himself; his own men strip it too, at the same chance
+                if (!recentlyHit && k instanceof GarrisonEntity g && Sides.playerId(g.side()) != null) stripKit();
                 boolean lord = k instanceof Player || (k instanceof GarrisonEntity g && Sides.playerId(g.side()) != null);
                 if (lord) {
                     int n = net.aiagent256.stormhold.holding.Rewards.purse(this.random, role(), side,

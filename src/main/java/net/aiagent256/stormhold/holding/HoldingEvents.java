@@ -187,8 +187,7 @@ public final class HoldingEvents {
                 + (near > 0 ? " " + near + " still stand near it, archers on the roof count." : "")));
         if (h.isHouseOwned() && !h.counterattackSpawned) {
             h.counterattackSpawned = true;
-            // brigands squatting in a ruin have no reserve to speak of: two of them, no crossbows
-            int n = h.ruined ? 2 : Math.max(3, (int) Math.ceil(h.capacity(Role.KNIGHT) * 0.35));
+            int n = counterattack(h);
             BlockPos at = h.rallyPos.equals(BlockPos.ZERO) ? h.gatePos : h.rallyPos;
             Garrisons.reinforce(level, mgr, h, Role.KNIGHT, n, at, player);
             if (!h.ruined) Garrisons.reinforce(level, mgr, h, Role.CROSSBOWMAN, Math.max(1, n / 3), at, player);
@@ -253,15 +252,49 @@ public final class HoldingEvents {
      * The bigger the castle, the harder it is to hold the stand alone. A watchtower has only its counterattack;
      * a holdfast sends one more wave, a great castle three, the city five and the king's guard with the last.
      */
+    /** Knights who rally to retake the keep when a banner goes up on the stand (crossbowmen come too, a third as many). */
+    public static int counterattack(Holding h) {
+        // brigands squatting in a ruin have no reserve to speak of: two of them, no crossbows
+        return h.ruined ? 2 : Math.max(3, (int) Math.ceil(h.capacity(Role.KNIGHT) * 0.35));
+    }
+
+    /** How many relief waves come to the stand while it's held, and how many men in each. */
+    public static int waveCount(Holding h) {
+        if (!h.isHouseOwned() || h.isTown() || h.ruined) return 0;
+        return h.tier >= 4 ? 5 : h.tier == 3 ? 3 : h.tier == 2 ? 1 : 0;
+    }
+
+    public static int waveSize(Holding h) {
+        return h.tier >= 4 ? 16 : h.tier == 3 ? 12 : 8;
+    }
+
+    /**
+     * About how many men stand between you and the place, all told: the garrison, the lord and the guard he
+     * calls, the rally when your banner goes up and the waves that follow while you hold the stand.
+     */
+    public static int defendersInAll(Holding h) {
+        int n = 0;
+        for (Role r : Role.TROOPS) n += h.count(r);
+        if (!h.isHouseOwned()) return n;
+        if (h.lordAlive) n += 1 + 2 + h.tier;
+        if (!h.counterattackSpawned) {
+            int k = counterattack(h);
+            n += k + (h.ruined ? 0 : Math.max(1, k / 3));
+        }
+        int waves = Math.max(0, waveCount(h) - h.wavesSent);
+        n += waves * waveSize(h);
+        if (waves > 0 && h.tier >= 4) n += 3;
+        return n;
+    }
+
     private static void waves(ServerLevel level, HoldingManager mgr, Holding h) {
-        if (!h.isHouseOwned() || h.isTown() || h.ruined) return;
-        int total = h.tier >= 4 ? 5 : h.tier == 3 ? 3 : h.tier == 2 ? 1 : 0;
-        if (h.wavesSent >= total) return;
+        int total = waveCount(h);
+        if (total == 0 || h.wavesSent >= total) return;
         int cap = Config.CAPTURE_SECONDS.get();
         int at = cap * (h.wavesSent + 1) / (total + 1);
         if (h.contestProgress < at) return;
         h.wavesSent++;
-        int n = h.tier >= 4 ? 16 : h.tier == 3 ? 12 : 8;
+        int n = waveSize(h);
         BlockPos spot = h.rallyPos.equals(BlockPos.ZERO) ? h.gatePos : h.rallyPos;
         ServerPlayer claimant = h.claimant != null ? level.getServer().getPlayerList().getPlayer(h.claimant) : null;
         Garrisons.reinforce(level, mgr, h, Role.KNIGHT, (int) Math.ceil(n * 0.7), spot, claimant);

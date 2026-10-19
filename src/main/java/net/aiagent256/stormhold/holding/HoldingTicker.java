@@ -86,6 +86,7 @@ public final class HoldingTicker {
         if (now % 200 == 160) {
             Steward.tick(level, mgr, h);
             Scouts.hangPending(level, mgr, h);
+            Spoils.unload(level, mgr, h);
         }
         if (now % 100 == 40) {
             Market.tick(level, mgr, h);

@@ -43,6 +43,7 @@ public class Stormhold {
         ModStructures.STRUCTURE_TYPES.register(bus);
         ModStructures.PIECES.register(bus);
         ModStructures.PROCESSORS.register(bus);
+        net.aiagent256.stormhold.registry.ModLoot.MODIFIERS.register(bus);
         bus.addListener(this::commonSetup);
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }

@@ -62,6 +62,9 @@ public final class Guide {
                     + ", zone " + z + " of " + Frontier.MAX + ": its knights wear " + kit
                     + (z >= 4 ? ", and its markets carry the frontier's goods" : "") + ".").withStyle(ChatFormatting.GRAY));
         }
+        String odds = mine ? null : Readiness.guideLine(level, mgr, h, p);
+        if (odds != null) out.add(Component.literal("  Taking it: ").withStyle(ChatFormatting.GOLD)
+                .append(Component.literal(odds).withStyle(ChatFormatting.WHITE)));
         if (!h.gatePos.equals(BlockPos.ZERO)) out.add(line("Gate", from, h.gatePos, ""));
         if (!h.isCity() && !h.isTown() && !h.rallyPos.equals(BlockPos.ZERO)) out.add(line("Yard", from, h.rallyPos, "Where the garrison musters"));
         if (!h.lordPos.equals(BlockPos.ZERO) && h.lordAlive) {

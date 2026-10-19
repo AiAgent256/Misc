@@ -1243,6 +1243,145 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** A treasury far out pays the land's own kit: a set from a great castle, netherite and the template at level 7. */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void treasuriesPayTheZonesKit(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = sample(g);
+        h.tier = 3;
+        h.forged = 7;
+        mgr.add(h);
+        BlockPos at = g.absolutePos(new BlockPos(4, 3, 4));
+        try {
+            var r = net.minecraft.util.RandomSource.create(7);
+            java.util.Set<net.minecraft.world.item.Item> pieces = new java.util.HashSet<>();
+            boolean template = false;
+            int calls = 0;
+            for (List<net.minecraft.world.item.ItemStack> got; !(got = net.aiagent256.stormhold.holding.Treasure.zoneKit(level, at, r)).isEmpty(); calls++) {
+                for (var st : got) {
+                    if (st.is(net.minecraft.world.item.Items.NETHERITE_UPGRADE_SMITHING_TEMPLATE)) template = true;
+                    else if (st.isDamageableItem()) {
+                        if (!net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(st.getItem()).getPath().startsWith("netherite_"))
+                            throw new IllegalStateException("level 7 kit that isn't netherite: " + st);
+                        if (st.getEnchantmentLevel(net.minecraft.world.item.enchantment.Enchantments.ALL_DAMAGE_PROTECTION) < 3
+                                && st.getEnchantmentLevel(net.minecraft.world.item.enchantment.Enchantments.SHARPNESS) < 3)
+                            throw new IllegalStateException("level 7 kit with a light enchant: " + st);
+                        pieces.add(st.getItem());
+                    }
+                }
+                if (calls > 10) throw new IllegalStateException("the treasury never runs dry");
+            }
+            if (pieces.size() != 5) throw new IllegalStateException("a great castle should give a set and a sword, gave " + pieces);
+            if (!template) throw new IllegalStateException("no upgrade template at level 7");
+            // and through the loot table itself, the way a chest opens in play
+            Holding w = sample(g);
+            w.key = w.key + "#2";
+            w.forged = 4;
+            mgr.holdings.remove(h.id);
+            mgr.byKey.remove(h.key);
+            mgr.add(w);
+            level.setBlock(at, net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState(), 3);
+            if (!(level.getBlockEntity(at) instanceof net.minecraft.world.level.block.entity.ChestBlockEntity chest))
+                throw new IllegalStateException("no chest");
+            chest.setLootTable(new net.minecraft.resources.ResourceLocation(Stormhold.MODID, "chests/watchtower_treasury"), 11L);
+            chest.unpackLootTable(null);
+            int diamondKit = 0;
+            for (int i = 0; i < chest.getContainerSize(); i++)
+                if (net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(chest.getItem(i).getItem()).getPath().startsWith("diamond_")
+                        && chest.getItem(i).isDamageableItem()) diamondKit++;
+            mgr.holdings.remove(w.id);
+            mgr.byKey.remove(w.key);
+            if (diamondKit != 2) throw new IllegalStateException("a level 4 watchtower's treasury should hold 2 pieces of diamond kit, held " + diamondKit);
+        } finally {
+            mgr.holdings.remove(h.id);
+            mgr.byKey.remove(h.key);
+            level.setBlock(at, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+        }
+        g.succeed();
+    }
+
+    /** Your men strip the enemy dead too, and what they take far from home rides back to the spoils chest. */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void campaignKitRidesHome(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        GarrisonEntity foe = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(4, 3, 4)), Sides.house("testhouse"), false);
+        if (foe == null) throw new IllegalStateException("no knight");
+        for (var s : net.minecraft.world.entity.EquipmentSlot.values()) foe.setDropChance(s, 1.0F);
+        List<net.minecraft.world.entity.item.ItemEntity> dropped = new ArrayList<>();
+        foe.captureDrops(dropped);
+        int n = foe.stripKit();
+        foe.captureDrops(null);
+        foe.discard();
+        if (n < 4 || dropped.size() != n) throw new IllegalStateException("a knight in full kit at certain chance gave " + n + " pieces, " + dropped.size() + " drops");
+        for (var ie : dropped)
+            if (ie.getItem().isDamageableItem() && ie.getItem().getDamageValue() <= 0) throw new IllegalStateException("stripped kit came off unworn");
+        Holding h = sample(g);
+        UUID me = UUID.randomUUID();
+        h.owner = Sides.player(me);
+        h.houseId = "";
+        h.warTablePos = BlockPos.ZERO;                       // nowhere to put it yet: it rides with the carts
+        mgr.add(h);
+        try {
+            int moved = net.aiagent256.stormhold.holding.Spoils.take(level, mgr, h, new ArrayList<>(dropped).iterator(), s -> true, true);
+            if (moved != n || h.spoilsCarried.size() != n) throw new IllegalStateException("carried " + h.spoilsCarried.size() + " of " + n);
+            h.warTablePos = g.absolutePos(new BlockPos(8, 3, 8));
+            net.aiagent256.stormhold.holding.Spoils.unload(level, mgr, h);
+            if (!h.spoilsCarried.isEmpty()) throw new IllegalStateException("the carts didn't unload");
+            CompoundTag t = h.save();
+            if (!t.contains("GearLeft")) throw new IllegalStateException("the treasury's kit count isn't saved");
+        } finally {
+            for (BlockPos p : BlockPos.betweenClosed(g.absolutePos(new BlockPos(3, 3, 3)), g.absolutePos(new BlockPos(13, 4, 13))))
+                level.setBlock(p, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+            dropped.forEach(Entity::discard);
+            net.aiagent256.stormhold.holding.Steward.SPOILS_AT.remove(h.id);
+            mgr.holdings.remove(h.id);
+            mgr.byKey.remove(h.key);
+        }
+        g.succeed();
+    }
+
+    /** The odds before the fight: a third of their number at the same kit, half as many again per step behind. */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void readinessCountsKitAndNumbers(GameTestHelper g) {
+        // a great castle's 98, in diamond, against men in iron and a lord in diamond: (98/3 x 2.25 - 3 x 2.25) / 1.5 = 44.5
+        int need = net.aiagent256.stormhold.holding.Readiness.needed(98, 2, 1, 2);
+        if (need != 45) throw new IllegalStateException("needed " + need + ", want 45");
+        if (net.aiagent256.stormhold.holding.Readiness.needed(98, 2, 2, 2) != 30) throw new IllegalStateException("in diamond it should be 30");
+        if (net.aiagent256.stormhold.holding.Readiness.tier(9) != 4 || net.aiagent256.stormhold.holding.Readiness.tier(4) != 2
+                || net.aiagent256.stormhold.holding.Readiness.tier(1) != 0) throw new IllegalStateException("kit steps are off");
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding enemy = sample(g);
+        int want = 0;
+        for (Role r : Role.TROOPS) want += enemy.count(r);
+        want += 1 + 2 + enemy.tier;                                             // the lord and his guard
+        int k = HoldingEvents.counterattack(enemy);
+        want += k + Math.max(1, k / 3);                                           // the rally at the stand; a watchtower has no waves
+        if (HoldingEvents.defendersInAll(enemy) != want)
+            throw new IllegalStateException("defenders " + HoldingEvents.defendersInAll(enemy) + ", want " + want);
+        Holding mine = sample(g);
+        mine.key = mine.key + "#mine";
+        mine.owner = Sides.player(UUID.randomUUID());
+        mine.houseId = "";
+        mine.tier = 3;
+        mine.fillGarrison(1.0);
+        mgr.add(enemy);
+        try {
+            String line = net.aiagent256.stormhold.holding.Readiness.tableLine(level, mgr, mine, enemy.bannerPos);
+            if (line == null || !line.contains(enemy.name) || !line.contains("Sent alone"))
+                throw new IllegalStateException("no odds on the War Table: " + line);
+            int before = mine.count(Role.KNIGHT);
+            if (Campaigns.sends(mine, Role.KNIGHT) != Math.max(0, Math.min(before - 3, (int) Math.ceil(before * 0.6))))
+                throw new IllegalStateException("a war party's size changed");
+        } finally {
+            mgr.holdings.remove(enemy.id);
+            mgr.byKey.remove(enemy.key);
+        }
+        g.succeed();
+    }
+
     /** A man coming back from disk takes his place only if it's free: one lord, never more than the count. */
     @GameTest(template = "arena", timeoutTicks = 200)
     public static void savedSoldiersAreNotDoubled(GameTestHelper g) {

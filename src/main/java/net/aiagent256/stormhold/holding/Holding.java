@@ -95,6 +95,10 @@ public class Holding {
     public int renown = 2;
     /** Treasury chests still carrying a renown bonus (the first few opened in the keep after the lord falls). */
     public int bonusLeft;
+    /** Pieces of the zone's own kit still in the treasury chests (-1: not counted yet), and which slots have gone. */
+    public int gearLeft = -1, gearGiven;
+    /** Kit your men took off the enemy dead on campaign, riding home to the spoils chest. */
+    public final List<net.minecraft.world.item.ItemStack> spoilsCarried = new ArrayList<>();
     public BoundingBox box = new BoundingBox(0, 0, 0, 0, 0, 0);
     public String houseId = "outlaws";
     public String owner = Sides.OUTLAWS;
@@ -342,6 +346,13 @@ public class Holding {
         t.putInt("Tier", tier);
         t.putInt("Renown", renown);
         t.putInt("BonusLeft", bonusLeft);
+        t.putInt("GearLeft", gearLeft);
+        t.putInt("GearGiven", gearGiven);
+        if (!spoilsCarried.isEmpty()) {
+            net.minecraft.nbt.ListTag carried = new net.minecraft.nbt.ListTag();
+            for (net.minecraft.world.item.ItemStack st : spoilsCarried) carried.add(st.save(new CompoundTag()));
+            t.put("SpoilsCarried", carried);
+        }
         t.putIntArray("Box", new int[]{box.minX(), box.minY(), box.minZ(), box.maxX(), box.maxY(), box.maxZ()});
         t.putString("House", houseId);
         t.putString("Owner", owner);
@@ -473,6 +484,12 @@ public class Holding {
         h.tier = t.getInt("Tier");
         h.renown = t.contains("Renown") ? Math.max(1, Math.min(5, t.getInt("Renown"))) : Math.min(5, h.tier + 1);
         h.bonusLeft = t.getInt("BonusLeft");
+        h.gearLeft = t.contains("GearLeft") ? t.getInt("GearLeft") : -1;
+        h.gearGiven = t.getInt("GearGiven");
+        for (net.minecraft.nbt.Tag x : t.getList("SpoilsCarried", net.minecraft.nbt.Tag.TAG_COMPOUND)) {
+            net.minecraft.world.item.ItemStack st = net.minecraft.world.item.ItemStack.of((CompoundTag) x);
+            if (!st.isEmpty()) h.spoilsCarried.add(st);
+        }
         int[] b = t.getIntArray("Box");
         if (b.length == 6) h.box = new BoundingBox(b[0], b[1], b[2], b[3], b[4], b[5]);
         h.houseId = t.getString("House");

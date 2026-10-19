@@ -95,6 +95,80 @@ public final class Treasure {
         return out;
     }
 
+    // ------------------------------------------------------------ the zone's own kit
+
+    private static final java.util.Set<String> TREASURIES = java.util.Set.of("chests/castle_treasury", "chests/holdfast_treasury", "chests/watchtower_treasury");
+
+    public static boolean isTreasury(@org.jetbrains.annotations.Nullable net.minecraft.resources.ResourceLocation id) {
+        return id != null && id.getNamespace().equals(net.aiagent256.stormhold.Stormhold.MODID) && TREASURIES.contains(id.getPath());
+    }
+
+    /** Pieces of the zone's own kit a place keeps in its treasury chests, all told: a great castle about a set. */
+    public static int gearBudget(Holding h) {
+        int n = h.isCity() ? 8 : h.isTown() ? 1 : h.isNether() ? 3 : switch (h.tier) {
+            case 1 -> 2;
+            case 2 -> 3;
+            default -> 5;
+        };
+        return h.ruined ? (n + 1) / 2 : n;
+    }
+
+    /** The kit a treasury chest at {@code at} gives on top of its loot: up to two pieces of the place's level, while they last. */
+    public static List<ItemStack> zoneKit(ServerLevel level, net.minecraft.core.BlockPos at, RandomSource r) {
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = mgr.at(at, 0);
+        if (h == null) return List.of();
+        if (h.gearLeft < 0) h.gearLeft = gearBudget(h);
+        int n = Math.min(2, h.gearLeft);
+        if (n <= 0) return List.of();
+        int lvl = Frontier.level(level, h);
+        boolean first = h.gearGiven == 0;
+        List<ItemStack> out = new ArrayList<>();
+        for (int i = 0; i < n; i++) out.add(kitPiece(nextSlot(h, r), lvl));
+        h.gearLeft -= n;
+        if (first && lvl >= 7) {
+            out.add(new ItemStack(Items.NETHERITE_UPGRADE_SMITHING_TEMPLATE));
+            out.add(new ItemStack(Items.NETHERITE_INGOT, 2));
+        } else if (lvl >= 4) {
+            out.add(new ItemStack(Items.DIAMOND, 2 + r.nextInt(3)));
+        }
+        mgr.setDirty();
+        return out;
+    }
+
+    /** Helmet, chest, legs, boots, sword: each once before any twice. */
+    private static int nextSlot(Holding h, RandomSource r) {
+        if ((h.gearGiven & 31) == 31) h.gearGiven = 32;          // a full set gone: start over, and remember it's not the first
+        List<Integer> open = new ArrayList<>();
+        for (int i = 0; i < 5; i++) if ((h.gearGiven & (1 << i)) == 0) open.add(i);
+        int s = open.get(r.nextInt(open.size()));
+        h.gearGiven |= 1 << s;
+        return s;
+    }
+
+    private static final Item[][] KIT = {
+            {Items.CHAINMAIL_HELMET, Items.CHAINMAIL_CHESTPLATE, Items.CHAINMAIL_LEGGINGS, Items.CHAINMAIL_BOOTS, Items.IRON_SWORD},
+            {Items.IRON_HELMET, Items.IRON_CHESTPLATE, Items.IRON_LEGGINGS, Items.IRON_BOOTS, Items.IRON_SWORD},
+            {Items.DIAMOND_HELMET, Items.DIAMOND_CHESTPLATE, Items.DIAMOND_LEGGINGS, Items.DIAMOND_BOOTS, Items.DIAMOND_SWORD},
+            {Items.NETHERITE_HELMET, Items.NETHERITE_CHESTPLATE, Items.NETHERITE_LEGGINGS, Items.NETHERITE_BOOTS, Items.NETHERITE_SWORD}};
+
+    /** One piece of kit at a level, the same metal the level's knights wear, enchanted to match. */
+    public static ItemStack kitPiece(int slot, int lvl) {
+        int metal = Math.min(3, Readiness.tier(lvl));
+        ItemStack s = new ItemStack(KIT[metal][slot]);
+        int unbreaking = lvl >= 8 ? 3 : lvl >= 5 ? 2 : 0;
+        if (slot < 4) {
+            s.enchant(Enchantments.ALL_DAMAGE_PROTECTION, Math.min(4, 1 + lvl / 3));
+            if (slot == 3 && lvl >= 3) s.enchant(Enchantments.FALL_PROTECTION, Math.min(4, 1 + lvl / 3));
+        } else {
+            s.enchant(Enchantments.SHARPNESS, Math.min(5, 1 + lvl / 2));
+            if (lvl >= 7) s.enchant(Enchantments.FIRE_ASPECT, lvl >= 9 ? 2 : 1);
+        }
+        if (unbreaking > 0) s.enchant(Enchantments.UNBREAKING, unbreaking);
+        if (lvl >= 9) s.enchant(Enchantments.MENDING, 1);
+        return s;
+    }
+
     private static ItemStack armor(Item item, int protection, RandomSource r, boolean unbreaking) {
         ItemStack s = new ItemStack(item);
         s.enchant(Enchantments.ALL_DAMAGE_PROTECTION, protection);

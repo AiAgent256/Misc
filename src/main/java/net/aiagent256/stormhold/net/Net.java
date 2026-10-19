@@ -86,6 +86,12 @@ public final class Net {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), build(player));
     }
 
+    /** The odds against the castle a place is set to march on, in chat. */
+    private static void tellOdds(ServerLevel level, HoldingManager mgr, ServerPlayer player, Holding h) {
+        String odds = net.aiagent256.stormhold.holding.Readiness.tableLine(level, mgr, h, h.attackTarget);
+        if (odds != null) player.sendSystemMessage(Component.literal(odds).withStyle(net.minecraft.ChatFormatting.GOLD));
+    }
+
     private static WarTableData build(ServerPlayer player) {
         List<HoldingInfo> out = new ArrayList<>();
         for (ServerLevel level : player.server.getAllLevels()) {
@@ -193,14 +199,19 @@ public final class Net {
                     h.mode = Holding.Mode.ATTACK;
                     if (h.attackTarget == null) player.sendSystemMessage(Component.literal("Set a target to march on."));
                 }
-                case SET_ATTACK -> h.attackTarget = a.pos();
+                case SET_ATTACK -> {
+                    h.attackTarget = a.pos();
+                    tellOdds(level, mgr, player, h);
+                }
                 case SET_SUPPLY -> h.supplyTarget = a.pos();
                 case CLEAR_SUPPLY -> h.supplyTarget = null;
                 case MARCH_NOW -> {
                     if (h.attackTarget == null) {
                         player.sendSystemMessage(Component.literal("Set a target first."));
-                    } else if (Campaigns.launchParty(level, mgr, h, h.attackTarget) == null) {
-                        player.sendSystemMessage(Component.literal("Not enough men to spare, or a war party is already out."));
+                    } else {
+                        tellOdds(level, mgr, player, h);
+                        if (Campaigns.launchParty(level, mgr, h, h.attackTarget) == null)
+                            player.sendSystemMessage(Component.literal("Not enough men to spare, or a war party is already out."));
                     }
                 }
                 case MUSTER, MUSTER_KNIGHTS -> Company.muster(level, mgr, player, h, Role.KNIGHT, Math.max(1, Math.min(musterCap(mgr, player), a.amount())));

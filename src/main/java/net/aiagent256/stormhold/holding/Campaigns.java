@@ -118,6 +118,36 @@ public final class Campaigns {
     }
 
     @Nullable
+    /** How many men of a kind a war party takes from {@code h}: six in ten, leaving three knights and one of the rest; one captain. */
+    public static int sends(Holding h, Role r) {
+        if (r == Role.CAPTAIN) return h.count(Role.CAPTAIN) > 0 ? 1 : 0;
+        int keep = r == Role.KNIGHT ? 3 : 1;
+        return Math.max(0, Math.min(h.count(r) - keep, (int) Math.ceil(h.count(r) * 0.6)));
+    }
+
+    /** A side's fighting worth in a battle fought out of sight: its numbers by its kit. */
+    static double kit(int level) {
+        return Readiness.factor(Readiness.tier(level));
+    }
+
+    /** The chance a war party from {@code from}, sent alone, takes {@code enemy}: in words, with the odds. */
+    public static String odds(ServerLevel level, Holding from, Holding enemy) {
+        double att = 0;
+        for (Role r : new Role[]{Role.CAPTAIN, Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN}) att += sends(from, r) * r.strength();
+        att *= kit(Frontier.level(level, from));
+        double def = enemy.strength() * 1.3 * kit(Frontier.level(level, enemy));
+        if (att <= 0) return "no one to send";
+        // each side's luck on the day is 0.8 to 1.2 of its worth
+        int win = 0, n = 40;
+        for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) {
+            double a = att * (0.8 + 0.4 * (i + 0.5) / n), d = def * (0.8 + 0.4 * (j + 0.5) / n);
+            if (a > d) win++;
+        }
+        int pct = (int) Math.round(100.0 * win / (n * n));
+        return pct >= 95 ? "they'll take it" : pct >= 60 ? "likely to take it (" + pct + "%)" : pct >= 30 ? "a gamble (" + pct + "%)"
+                : pct > 0 ? "likely to break (" + pct + "%)" : "they'll break against the walls";
+    }
+
     public static Campaign launchParty(ServerLevel level, HoldingManager mgr, Holding h, BlockPos target) {
         if (active(mgr, h.id, Campaign.Kind.PARTY)) return null;
         Campaign c = new Campaign();
@@ -125,6 +155,7 @@ public final class Campaigns {
         c.side = h.owner;
         c.origin = h.id;
         c.tier = h.tier;
+        c.renown = Frontier.level(level, h);           // the men ride out in the kit their castle arms them with
         Holding enemy = mgr.at(target, 16);
         c.target = enemy != null && !enemy.owner.equals(h.owner) ? enemy.id : null;
         if (enemy != null && enemy.isHouseOwned() && c.target != null) {
@@ -134,17 +165,12 @@ public final class Campaigns {
         c.to = enemy != null ? enemy.bannerPos : target;
         c.from = gateOutside(h);
         BlockPos via = gateInside(h), via2 = gateOutside(h);
-        for (Role r : new Role[]{Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN}) {
-            int keep = r == Role.KNIGHT ? 3 : 1;
-            int send = Math.max(0, Math.min(h.count(r) - keep, (int) Math.ceil(h.count(r) * 0.6)));
+        for (Role r : new Role[]{Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN, Role.CAPTAIN}) {
+            int send = sends(h, r);
             if (send > 0) {
                 c.add(r, send);
                 h.add(r, -send);
             }
-        }
-        if (h.count(Role.CAPTAIN) > 0) {
-            c.add(Role.CAPTAIN, 1);
-            h.add(Role.CAPTAIN, -1);
         }
         if (c.total() < 3) {
             for (var e : c.counts.entrySet()) h.add(e.getKey(), e.getValue());
@@ -344,8 +370,8 @@ public final class Campaigns {
         if (!Config.ABSTRACT_RAIDS.get()) return;
         // fought out while the lord is away
         double def = h.strength() * (h.mode == Holding.Mode.DEFEND ? 1.6 : 1.2) * (0.8 + level.random.nextDouble() * 0.4)
-                * (Council.has(h.ownerPlayer(), Council.Seat.MARSHAL) ? 1.2 : 1.0);
-        double att = c.strength() * (0.8 + level.random.nextDouble() * 0.4);
+                * (Council.has(h.ownerPlayer(), Council.Seat.MARSHAL) ? 1.2 : 1.0) * kit(Frontier.level(level, h));
+        double att = c.strength() * (0.8 + level.random.nextDouble() * 0.4) * kit(c.renown);
         if (att > def) {
             HoldingEvents.transfer(level, mgr, h, c.side);
         } else {
@@ -459,8 +485,8 @@ public final class Campaigns {
             }
             Holding enemy = c.target != null ? mgr.holdings.get(c.target) : null;
             if (enemy != null && c.live.isEmpty()) {
-                double def = enemy.strength() * 1.3 * (0.8 + level.random.nextDouble() * 0.4);
-                double att = c.strength() * (0.8 + level.random.nextDouble() * 0.4);
+                double def = enemy.strength() * 1.3 * (0.8 + level.random.nextDouble() * 0.4) * kit(Frontier.level(level, enemy));
+                double att = c.strength() * (0.8 + level.random.nextDouble() * 0.4) * kit(c.renown);
                 if (att > def && !enemy.owner.equals(c.side)) {
                     enemy.lordAlive = false;
                     HoldingEvents.transfer(level, mgr, enemy, c.side);

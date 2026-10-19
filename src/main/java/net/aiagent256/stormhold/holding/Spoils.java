@@ -45,8 +45,15 @@ public final class Spoils {
         if (dead instanceof GarrisonEntity d && lord.equals(Sides.playerId(d.side()))) return;
         HoldingManager mgr = HoldingManager.get(level);
         Holding h = home(mgr, g, lord, dead.blockPosition());
+        java.util.function.Predicate<ItemStack> which = s -> true;
+        if (h == null && dead instanceof GarrisonEntity foe && Sides.playerId(foe.side()) == null) {
+            // a house's man cut down on campaign, far from home: his kit goes back on the baggage carts
+            h = nearestOwned(mgr, lord, dead.blockPosition());
+            which = ItemStack::isDamageableItem;
+        }
         if (h == null) return;
-        int moved = take(level, mgr, h, e.getDrops().iterator());
+        boolean carried = !h.box.inflatedBy(REACH).isInside(dead.blockPosition());
+        int moved = take(level, mgr, h, e.getDrops().iterator(), which, carried);
         if (moved > 0) {
             h.spoilsTaken += moved;
             mgr.setDirty();
@@ -73,8 +80,33 @@ public final class Spoils {
         return best;
     }
 
+    /** The place the lord holds nearest to {@code at}, however far. */
+    @Nullable
+    static Holding nearestOwned(HoldingManager mgr, UUID lord, BlockPos at) {
+        Holding best = null;
+        double bestD = Double.MAX_VALUE;
+        for (Holding h : mgr.holdings.values()) {
+            if (!lord.equals(h.ownerPlayer())) continue;
+            double d = h.center().distSqr(at);
+            if (d < bestD) {
+                bestD = d;
+                best = h;
+            }
+        }
+        return best;
+    }
+
     /** Into the chest, then the stores. How many items were carried off the ground. */
     public static int take(ServerLevel level, HoldingManager mgr, Holding h, Iterator<ItemEntity> drops) {
+        return take(level, mgr, h, drops, s -> true, false);
+    }
+
+    /**
+     * As above, for the drops {@code which} picks. {@code carried}: taken on campaign, far from the place, so
+     * whatever can't go in its chest right now rides home and goes in when the place is next loaded.
+     */
+    public static int take(ServerLevel level, HoldingManager mgr, Holding h, Iterator<ItemEntity> drops,
+                           java.util.function.Predicate<ItemStack> which, boolean carried) {
         Container chest = null;
         BlockPos at = Steward.spoilsChest(level, h);
         if (at == null) at = setUp(level, h);
@@ -82,6 +114,7 @@ public final class Spoils {
         int moved = 0;
         while (drops.hasNext()) {
             ItemEntity ie = drops.next();
+            if (!which.test(ie.getItem())) continue;
             ItemStack st = ie.getItem().copy();
             int before = st.getCount();
             if (chest != null) st = put(chest, st);
@@ -91,6 +124,10 @@ public final class Spoils {
                     h.addStock(id, st.getCount());
                     st = ItemStack.EMPTY;
                 }
+            }
+            if (!st.isEmpty() && carried && h.spoilsCarried.size() < CARRY) {
+                h.spoilsCarried.add(st);
+                st = ItemStack.EMPTY;
             }
             moved += before - st.getCount();
             if (st.isEmpty()) {
@@ -102,6 +139,32 @@ public final class Spoils {
         }
         if (chest != null) chest.setChanged();
         return moved;
+    }
+
+    /** How much kit the baggage carts hold for a place before what's taken is left on the field. */
+    public static final int CARRY = 54;
+
+    /** The kit carried home from campaign goes into the spoils chest, once the place is loaded. Once in a while. */
+    public static void unload(ServerLevel level, HoldingManager mgr, Holding h) {
+        if (h.spoilsCarried.isEmpty()) return;
+        BlockPos at = Steward.spoilsChest(level, h);
+        if (at == null) at = setUp(level, h);
+        Container chest = at == null ? null : Steward.container(level, at);
+        if (chest == null) return;
+        int in = 0;
+        for (java.util.Iterator<ItemStack> it = h.spoilsCarried.iterator(); it.hasNext(); ) {
+            ItemStack left = put(chest, it.next());
+            if (!left.isEmpty()) break;
+            it.remove();
+            in++;
+        }
+        if (in == 0) return;
+        chest.setChanged();
+        mgr.setDirty();
+        HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The baggage carts unload at " + h.name + ": " + in
+                + (in == 1 ? " piece" : " pieces") + " of kit taken off the enemy dead, in the spoils chest ("
+                + at.getX() + ", " + at.getY() + ", " + at.getZ() + ")" + (h.spoilsCarried.isEmpty() ? "." : ". The chest is full: "
+                + h.spoilsCarried.size() + " more wait on the carts.")).withStyle(ChatFormatting.GOLD));
     }
 
     /** Into a container: onto stacks of the same thing first, then empty slots. What didn't fit. */
