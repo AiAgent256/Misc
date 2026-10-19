@@ -318,6 +318,23 @@ def sell_homes(g, rng, n=10):
 # ---------------------------------------------------------------- the three towns
 
 
+def _framed(fn):
+    """Build a town with the timber-framed ground storeys on (its third revision), and turn them off after."""
+    import functools
+    import town as _town
+
+    @functools.wraps(fn)
+    def build(seed=fn.__defaults__[0]):
+        _town.FACADES = True
+        try:
+            return fn(seed)
+        finally:
+            _town.FACADES = False
+    build.__defaults__ = fn.__defaults__
+    return build
+
+
+@_framed
 def town_walled(seed=301):
     """A walled hill town: one gate, a main street up to the market under the church."""
     X, Z, H = 100, 100, 48
@@ -358,6 +375,7 @@ def town_walled(seed=301):
     return g, {"name": "town_walled", "tier": 1, "GL": GL, "kind": "town", "character": "rustic"}
 
 
+@_framed
 def town_cross(seed=302):
     """A crossroads town: two roads meet at a market; the church and the hall face the crossing."""
     X, Z, H = 104, 88, 48
@@ -396,6 +414,7 @@ def town_cross(seed=302):
     return g, {"name": "town_cross", "tier": 1, "GL": GL, "kind": "town", "character": "martial"}
 
 
+@_framed
 def town_green(seed=303):
     """A village round a green: a ring road, a pond, the church at the top, houses facing in."""
     X, Z, H = 96, 96, 48

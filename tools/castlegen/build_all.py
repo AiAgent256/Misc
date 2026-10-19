@@ -37,10 +37,11 @@ LAYOUTS = (castle.great_castle_a, castle2.great_castle_b, castle2.great_castle_c
            market_town.town_walled, market_town.town_cross, market_town.town_green,
            variety.temple_ruin, variety.great_castle_d,
            variety.moated(castle2.holdfast_b, "spire"), variety.moated(castle2.holdfast_c, "cone"),
-           variety.moated(castle.great_castle_a, "spire"), variety.moated(castle2.great_castle_c, "hoard"))
+           variety.moated(castle.great_castle_a, "spire"), variety.moated(castle2.great_castle_c, "hoard"),
+           variety.lake(castle2.great_castle_b, "spire"))
 # A second build of each castle with a different seed, roof style and temper, so two castles of the same
 # plan don't read as copies. The city is one of a kind.
-VARIANTS = {"great_castle_d": ("cone", 3), "great_castle_a": ("hoard", 2), "great_castle_b": ("spire", 3), "great_castle_c": ("low", 1),
+VARIANTS = {"lake_castle": ("cone", 4), "great_castle_d": ("cone", 3), "great_castle_a": ("hoard", 2), "great_castle_b": ("spire", 3), "great_castle_c": ("low", 1),
             "holdfast_a": ("pyramid", 4), "holdfast_b": ("hoard", 2), "holdfast_c": ("spire", 3),
             "watchtower_a": ("flat", 3), "watchtower_b": ("spire", 1), "watchtower_c": ("hoard", 2)}
 
@@ -69,14 +70,17 @@ SCALE_LIMITS = {"*": {"narrow_stairs": 0, "pinches": 3, "dark_rooms": 0},
                 # a ruin is meant to be broken: gaps between fallen drums, shade under the last of the entablature
                 "temple_ruin": {"narrow_stairs": 0, "pinches": 10, "dark_rooms": 3},
                 "great_castle_d": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
-                "great_castle_d2": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0}}
+                "great_castle_d2": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
+                # the ring fortress on its island: the same castle as great_castle_b inside
+                "lake_castle": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
+                "lake_castle2": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0}}
 
 
 # Plans rebuilt since they first went out into worlds. A rebuilt plan is exported under a new name
 # (great_city_r2), so the castles already standing, and the half-generated ones whose chunks are still
 # to come, keep the tiles they were started with and the Master Builder repairs them to their own plans.
 # New castles use the newest revision. Bump a plan's number whenever its blocks change.
-REVISIONS = {"great_city": 2, "canal_city": 2, "town_walled": 2, "town_cross": 2, "town_green": 2}
+REVISIONS = {"great_city": 2, "canal_city": 2, "town_walled": 3, "town_cross": 3, "town_green": 3}
 
 
 def export_name(name):
