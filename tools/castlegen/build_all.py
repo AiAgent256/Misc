@@ -13,6 +13,7 @@ import castle2
 import city
 import city2
 import crypt
+import gatehouse
 import defense_audit
 import loops
 import market_town
@@ -40,12 +41,12 @@ LAYOUTS = (castle.great_castle_a, castle2.great_castle_b, castle2.great_castle_c
            variety.temple_ruin, variety.great_castle_d,
            variety.moated(castle2.holdfast_b, "spire"), variety.moated(castle2.holdfast_c, "cone"),
            variety.moated(castle.great_castle_a, "spire"), variety.moated(castle2.great_castle_c, "hoard"),
-           variety.lake(castle2.great_castle_b, "spire"))
+           variety.lake(castle2.great_castle_b, "spire"), gatehouse.gatehouse_castle)
 # A second build of each castle with a different seed, roof style and temper, so two castles of the same
 # plan don't read as copies. The city is one of a kind.
 VARIANTS = {"lake_castle": ("cone", 4), "great_castle_d": ("cone", 3), "great_castle_a": ("hoard", 2), "great_castle_b": ("spire", 3), "great_castle_c": ("low", 1),
             "holdfast_a": ("pyramid", 4), "holdfast_b": ("hoard", 2), "holdfast_c": ("spire", 3),
-            "watchtower_a": ("flat", 3), "watchtower_b": ("spire", 1), "watchtower_c": ("hoard", 2)}
+            "gatehouse_castle": ("flat", 3), "watchtower_a": ("flat", 3), "watchtower_b": ("spire", 1), "watchtower_c": ("hoard", 2)}
 
 
 # What a plan may get away with before the build is refused. Round towers too small for a two-wide spiral
@@ -93,7 +94,9 @@ DEFENSE_LIMITS = {"*": {"one_wide": 0, "two_wide": 0.10, "foot": 0.35, "field": 
                   "great_castle_c2": {"one_wide": 0, "two_wide": 0.15, "foot": 0.35, "field": 0.85},
                   # the cities' walls run for half a mile: their foot is watched from the towers, not all of it
                   "great_city": {"one_wide": 3, "two_wide": 0.12, "foot": 0.10, "field": 0.80},
-                  "canal_city": {"one_wide": 3, "two_wide": 0.12, "foot": 0.10, "field": 0.80}}
+                  "canal_city": {"one_wide": 3, "two_wide": 0.12, "foot": 0.10, "field": 0.80},
+                  # the gatehouse castle was built to the audit: its towers and bastions flank every wall
+                  "gatehouse_castle": {"one_wide": 0, "two_wide": 0.10, "foot": 0.60, "field": 0.85}}
 
 
 # Plans rebuilt since they first went out into worlds. A rebuilt plan is exported under a new name
