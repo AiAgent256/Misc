@@ -38,7 +38,7 @@ public class Holding {
 
     /** A market town: a settlement between the castles, held by a reeve, with a town watch for a garrison. */
     public boolean isTown() {
-        return layout != null && layout.startsWith("town_");
+        return layout != null && (layout.startsWith("town_") || layout.startsWith("hill_town"));
     }
 
     /** A holdfast of the Nether: the holdfast plans in blackstone, under the roof of the world. */

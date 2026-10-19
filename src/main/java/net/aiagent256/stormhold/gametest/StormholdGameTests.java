@@ -41,7 +41,16 @@ public class StormholdGameTests {
             // moated castles and the chateau
             "holdfast_b_moat", "holdfast_c_moat", "great_castle_a_moat", "great_castle_c_moat", "great_castle_d", "great_castle_d2",
             // the lake castles and the timber-framed towns
-            "lake_castle", "lake_castle2", "town_walled_r3", "town_cross_r3", "town_green_r3"};
+            "lake_castle", "lake_castle2", "town_walled_r3", "town_cross_r3", "town_green_r3",
+            // the defence rebuild: sills, roofs on the merlons, loops, three-wide walks
+            "great_castle_a_r2", "great_castle_b_r2", "great_castle_c_r2", "great_castle_a2_r2", "great_castle_b2_r2",
+            "great_castle_c2_r2", "holdfast_a_r2", "holdfast_b_r2", "holdfast_c_r2", "holdfast_a2_r2", "holdfast_b2_r2",
+            "holdfast_c2_r2", "watchtower_a_r2", "watchtower_b_r2", "watchtower_c_r2", "watchtower_a2_r2", "watchtower_b2_r2",
+            "watchtower_c2_r2", "great_city_r3", "canal_city_r3", "town_walled_r4", "town_cross_r4", "town_green_r4",
+            "great_castle_d_r2", "great_castle_d2_r2", "holdfast_b_moat_r2", "holdfast_c_moat_r2", "great_castle_a_moat_r2",
+            "great_castle_c_moat_r2", "lake_castle_r2", "lake_castle2_r2",
+            // built to the audit from the start
+            "fortified_manor", "fortified_manor2", "gatehouse_castle", "gatehouse_castle2", "hill_town"};
 
     @GameTest(template = "arena")
     public static void castleDataLoads(GameTestHelper g) {
@@ -60,7 +69,8 @@ public class StormholdGameTests {
         // every town and city has its shops, its notice board and homes for sale
         for (String n : new String[]{"town_walled", "town_cross", "town_green", "great_city", "canal_city",
                 "town_walled_r2", "town_cross_r2", "town_green_r2", "great_city_r2", "canal_city_r2",
-                "town_walled_r3", "town_cross_r3", "town_green_r3"}) {
+                "town_walled_r3", "town_cross_r3", "town_green_r3", "town_walled_r4", "town_cross_r4", "town_green_r4",
+                "great_city_r3", "canal_city_r3", "hill_town"}) {
             var lay = DataRegistries.layout(n);
             int shops = 0;
             java.util.Set<String> kinds = new java.util.HashSet<>();
@@ -78,7 +88,9 @@ public class StormholdGameTests {
         }
         // every keep has its crypt: the marker the generator leaves at the founder's tomb
         for (String n : new String[]{"holdfast_a", "holdfast_b", "holdfast_c", "great_castle_a", "great_castle_b", "great_castle_c", "great_city", "canal_city",
-                "great_city_r2", "canal_city_r2", "holdfast_b_moat", "great_castle_a_moat", "great_castle_d", "great_castle_d2", "lake_castle"}) {
+                "great_city_r2", "canal_city_r2", "holdfast_b_moat", "great_castle_a_moat", "great_castle_d", "great_castle_d2", "lake_castle",
+                "holdfast_a_r2", "holdfast_b_r2", "holdfast_c_r2", "great_castle_a_r2", "great_castle_b_r2", "great_castle_c_r2",
+                "great_city_r3", "canal_city_r3", "lake_castle_r2", "gatehouse_castle"}) {
             var crypt = DataRegistries.layout(n).extras.get("crypt");
             if (crypt == null || crypt.isEmpty()) throw new IllegalStateException("no crypt under " + n);
         }
