@@ -2,7 +2,7 @@
 import numpy as np
 
 from grid import Grid, Mix, disk, ring, rect, rect_ring, spiral_stair, dogleg_stair, gable_roof, cone_roof, angle_index
-from parts import (STONE, DARK, FOUND, PAVE, ROAD, FLOOR_STONE, ROOF, ROOF_STAIR, STONE_STAIR,
+from parts import (SILL, STONE, DARK, FOUND, PAVE, ROAD, FLOOR_STONE, ROOF, ROOF_STAIR, STONE_STAIR,
                    DARK_STAIR, SLAB_CAP, RAIL, PLANK, DARK_PLANK, PORTCULLIS, GLASS,
                    curtain, ring_grids, posts_on_walk, round_tower, square_tower, straight_wall,
                    pointed_arch, building, lamp_post, tree_weirwood)
@@ -27,14 +27,14 @@ def parapet_rect(g, x0, z0, x1, z1, y):
         for z in (z0, z1):
             if (x, z) in p:
                 continue
-            g.set(x, y, z, STONE)
+            g.set(x, y, z, STONE if x % 4 < 2 else SILL)
             if x % 4 < 2:
                 g.set(x, y + 1, z, STONE); g.set(x, y + 2, z, SLAB_CAP)
     for z in range(z0, z1 + 1):
         for x in (x0, x1):
             if (x, z) in p:
                 continue
-            g.set(x, y, z, STONE)
+            g.set(x, y, z, STONE if z % 4 < 2 else SILL)
             if z % 4 < 2:
                 g.set(x, y + 1, z, STONE); g.set(x, y + 2, z, SLAB_CAP)
 
@@ -551,12 +551,13 @@ def holdfast_b(seed=13):
     # barmkin wall
     wtop = GL + 8
     o = W - 5          # the wall's outer line on the far side
-    body = rect_ring(g, 4, 4, o, o, 2)
+    # four thick, so the walk behind the parapet is three: a man can pass another with his bow drawn
+    body = rect_ring(g, 4, 4, o, o, 4)
     g.fill_mask(body, 0, wtop - 1, STONE)
     g.fill_mask(rect_ring(g, 3, 3, o + 1, o + 1, 1), 0, GL + 1, DARK)
     g.fill_mask(rect_ring(g, 4, 4, o, o, 1), GL + 3, GL + 3, DARK)
     parapet_rect(g, 4, 4, o, o, wtop)
-    g.fill_mask(rect(g, 5, 5, o - 1, o - 1) & ~rect(g, 6, 6, o - 2, o - 2), wtop, wtop + 3, AIR)
+    g.fill_mask(rect(g, 5, 5, o - 1, o - 1) & ~rect(g, 8, 8, o - 4, o - 4), wtop, wtop + 3, AIR)
     for x in range(8, o - 2, 5):
         g.mark("archer", x, wtop, 5); g.mark("archer", x, wtop, o - 1)
     for z in range(8, o - 2, 5):
@@ -565,14 +566,14 @@ def holdfast_b(seed=13):
         round_tower(g, cx, cz, 3, wtop + 4, GL, floors=(wtop - 1,), spiral=False, cone=True, t=1,
                     doors=((1 if cx < c else -1, 0, wtop), (0, 1 if cz < c else -1, wtop)))
     # stairs up to the wall walk, along the inner face of the south wall, landing onto the walk
-    sz = o - 2
-    for zz in (sz, sz - 1):
+    sz = o - 4
+    for zz in (sz, sz - 1, sz - 2):
         for k in range(wtop - GL):
             g.stair(10 + k, GL + k, zz, STONE_STAIR, "east")
             g.fill(10 + k, GL, zz, 10 + k, GL + k - 1, zz, STONE)
             g.fill(10 + k, GL + k + 1, zz, 10 + k, GL + k + 3, zz, AIR)
         g.fill(10 + wtop - GL, GL, zz, 11 + wtop - GL, wtop - 1, zz, STONE)
-    g.fill(10 + wtop - GL, wtop, sz - 1, 11 + wtop - GL, wtop + 1, sz + 1, AIR)
+    g.fill(10 + wtop - GL, wtop, sz - 2, 11 + wtop - GL, wtop + 1, sz + 1, AIR)
     # gatehouse
     gx0, gx1 = c - 5, c + 4
     g.fill(gx0, 0, o - 5, gx1, wtop + 5, o + 2, STONE)
@@ -584,7 +585,7 @@ def holdfast_b(seed=13):
     for x in (gx0 + 1, gx1 - 1):
         g.mark("crossbowman", x, wtop + 6, o + 1)
     # a stair cut up through the gatehouse from the west wall-walk to its roof
-    for zz in (o - 1, o - 2):
+    for zz in (o - 1, o - 2, o - 3):
         for k in range(6):
             g.stair(gx0 + k, wtop + k, zz, STONE_STAIR, "east")
             g.fill(gx0 + k, wtop + k + 1, zz, gx0 + k, wtop + k + 3, zz, AIR)
@@ -640,17 +641,17 @@ def holdfast_b(seed=13):
         g.mark("knight", x, GL, z)
     g.mark("captain", c - 1, GL, hz1 + 3); g.mark("rally", c - 1, GL, hz1 + 17)
     # outbuildings: barracks and a lodging on the west, stable and smithy on the east, a well on the way to the gate
-    building(g, 7, 40, 16, 56, GL, 6, "z", door_cells=((16, 48),), chimney=(9, 42))
+    building(g, 9, 40, 18, 56, GL, 6, "z", door_cells=((18, 48),), chimney=(11, 42))
     for z in range(42, 56, 3):
-        g.bed(8, GL, z, "west", "brown")
-    g.barrel(15, GL, 55, LOOT + "castle_barracks", facing="west")
-    building(g, 7, 10, 14, 22, GL, 5, "z", door_cells=((14, 16),), chimney=(9, 12))
+        g.bed(10, GL, z, "west", "brown")
+    g.barrel(17, GL, 55, LOOT + "castle_barracks", facing="west")
+    building(g, 9, 10, 16, 22, GL, 5, "z", door_cells=((16, 16),), chimney=(11, 12))
     for z in range(12, 21, 3):
-        g.bed(8, GL, z, "west", "brown")
-    building(g, o - 12, 42, o - 3, 54, GL, 5, "z")
-    g.fill(o - 12, GL, 44, o - 12, GL + 2, 52, AIR)
-    g.set(o - 4, GL, 46, "minecraft:hay_block[axis=y]"); g.set(o - 4, GL, 51, "minecraft:hay_block[axis=y]")
-    building(g, o - 14, 10, o - 5, 20, GL, 5, "x", door_cells=((o - 14, 15),), chimney=(o - 7, 12))
+        g.bed(10, GL, z, "west", "brown")
+    building(g, o - 14, 42, o - 5, 54, GL, 5, "z")
+    g.fill(o - 14, GL, 44, o - 14, GL + 2, 52, AIR)
+    g.set(o - 6, GL, 46, "minecraft:hay_block[axis=y]"); g.set(o - 6, GL, 51, "minecraft:hay_block[axis=y]")
+    building(g, o - 16, 10, o - 7, 20, GL, 5, "x", door_cells=((o - 16, 15),), chimney=(o - 9, 12))
     g.set(o - 12, GL, 12, "minecraft:anvil[facing=north]"); g.set(o - 12, GL, 18, "minecraft:blast_furnace[facing=north]")
     g.set(o - 9, GL, 12, "minecraft:grindstone[face=floor,facing=north]")
     g.fill(c + 2, GL - 3, 44, c + 4, GL - 1, 46, "minecraft:stone_bricks")
@@ -665,6 +666,34 @@ def holdfast_b(seed=13):
     return g, {"name": "holdfast_b", "tier": 2, "GL": GL}
 
 
+def palisade(g, W, GL, gate=None):
+    """A ring of stakes two in from the plan's edge with a fighting platform three planks wide behind it. Every
+    other pair of stakes is cut down to a half-height sill, so a man on the platform can step up into the gap,
+    lean out and see the ditch at its foot; the stakes between stand two higher, pointed with fence."""
+    xs, zs = g.xz()
+    log = "minecraft:spruce_log[axis=y]"
+    pal = rect_ring(g, 2, 2, W - 3, W - 3, 1)
+    merlon = pal & (np.mod(xs + zs, 4) < 2)
+    g.fill_mask(pal, GL - 1, GL + 2, log)
+    g.fill_mask(merlon, GL + 3, GL + 4, log)
+    g.fill_mask(merlon & (np.mod(xs + zs, 2) == 0), GL + 5, GL + 5, "minecraft:spruce_fence")
+    g.fill_mask(pal & ~merlon, GL + 3, GL + 3, "minecraft:spruce_slab[type=bottom]")
+    plat = rect_ring(g, 3, 3, W - 4, W - 4, 3)
+    g.fill_mask(plat, GL + 2, GL + 2, "minecraft:spruce_planks")
+    g.fill_mask(plat & (np.mod(xs, 4) == 0) & (np.mod(zs, 4) == 0), GL, GL + 1, "minecraft:spruce_fence")
+    g.fill_mask(rect_ring(g, 6, 6, W - 7, W - 7, 1), GL + 3, GL + 3, "minecraft:spruce_fence")
+    # a bowman's place at every gap: one man to a gap, on its sill
+    taken = set()
+    for x, z in zip(*np.nonzero(pal & ~merlon)):
+        x, z = int(x), int(z)
+        if any((x + dx, z + dz) in taken for dx in (-1, 0, 1) for dz in (-1, 0, 1)):
+            continue
+        if gate is not None and z >= W - 4 and gate[0] - 3 <= x <= gate[1] + 3:
+            continue                     # the gate's own posts, either side of the passage, are cut away
+        taken.add((x, z))
+        g.mark("archer", x, GL + 3, z)
+
+
 def watchtower_b(seed=9):
     """Tier 1 square peel tower inside a timber palisade, with a fighting platform behind the stakes."""
     W, H, GL = 48, 46, 4
@@ -675,16 +704,7 @@ def watchtower_b(seed=9):
     g.fill(0, GL - 1, 0, W - 1, GL - 1, W - 1, Mix(("minecraft:grass_block", 50), ("minecraft:coarse_dirt", 25),
                                                      ("minecraft:dirt_path", 15), ("minecraft:gravel", 10)))
     g.fill(0, GL, 0, W - 1, GL + 8, W - 1, AIR)
-    # the palisade: a double row of stakes, five high, pointed with fence on top
-    pal = rect_ring(g, 2, 2, W - 3, W - 3, 1)
-    g.fill_mask(pal, GL - 1, GL + 4, "minecraft:spruce_log[axis=y]")
-    xs2, zs2 = g.xz()
-    g.fill_mask(pal & (np.mod(xs2 + zs2, 2) == 0), GL + 5, GL + 5, "minecraft:spruce_fence")
-    # the fighting platform behind it: two planks wide, three up, on posts, with a step up by the gate
-    plat = rect_ring(g, 3, 3, W - 4, W - 4, 2)
-    g.fill_mask(plat, GL + 2, GL + 2, "minecraft:spruce_planks")
-    g.fill_mask(plat & (np.mod(xs2, 4) == 0) & (np.mod(zs2, 4) == 0), GL, GL + 1, "minecraft:spruce_fence")
-    g.fill_mask(rect_ring(g, 5, 5, W - 6, W - 6, 1), GL + 3, GL + 3, "minecraft:spruce_fence")
+    palisade(g, W, GL, gate=(W // 2 - 2, W // 2 + 1))
     # gate in the south stakes
     gx0, gx1 = c - 2, c + 1
     g.fill(gx0, GL - 1, W - 3, gx1, GL + 5, W - 3, AIR)
@@ -699,16 +719,13 @@ def watchtower_b(seed=9):
     portcullis_plane(g, gx0, gx1, GL, 5, W - 3)
     g.mark("gate", c, GL, W - 1)
     # steps up to the platform either side of the gate passage, straight flights out of the yard
-    for sx in (gx0 - 5, gx0 - 4, gx1 + 4, gx1 + 5):
+    for sx in (gx0 - 6, gx0 - 5, gx0 - 4, gx1 + 4, gx1 + 5, gx1 + 6):
         for k in range(3):
-            z = W - 8 + k
+            z = W - 9 + k
             g.stair(sx, GL + k, z, "minecraft:spruce_stairs", "south")
             g.fill(sx, GL - 1, z, sx, GL + k - 1, z, "minecraft:spruce_log[axis=y]") if k > 0 else None
             g.fill(sx, GL + k + 1, z, sx, GL + 5, z, AIR)
-        g.set(sx, GL + 3, W - 6, AIR)
-    for (x, z) in ((8, 4), (c, 4), (W - 9, 4), (4, 12), (4, c), (4, W - 12), (W - 5, 12), (W - 5, c), (W - 5, W - 12),
-                   (10, W - 5), (W - 11, W - 5)):
-        g.mark("archer", x, GL + 3, z)
+        g.set(sx, GL + 3, W - 7, AIR)
     # the peel tower: eighteen across, four floors, a stair two men wide
     tx0, tz0, tx1, tz1 = c - 10, 8, c + 7, 25
     top = GL + 28
@@ -870,13 +887,7 @@ def watchtower_c(seed=19):
                                                      ("minecraft:dirt_path", 15), ("minecraft:gravel", 10)))
     g.fill(0, GL, 0, W - 1, GL + 8, W - 1, AIR)
     # the palisade and its platform, as at the timber tower
-    pal = rect_ring(g, 2, 2, W - 3, W - 3, 1)
-    g.fill_mask(pal, GL - 1, GL + 4, "minecraft:spruce_log[axis=y]")
-    g.fill_mask(pal & (np.mod(xs + zs, 2) == 0), GL + 5, GL + 5, "minecraft:spruce_fence")
-    plat = rect_ring(g, 3, 3, W - 4, W - 4, 2)
-    g.fill_mask(plat, GL + 2, GL + 2, "minecraft:spruce_planks")
-    g.fill_mask(plat & (np.mod(xs, 4) == 0) & (np.mod(zs, 4) == 0), GL, GL + 1, "minecraft:spruce_fence")
-    g.fill_mask(rect_ring(g, 5, 5, W - 6, W - 6, 1), GL + 3, GL + 3, "minecraft:spruce_fence")
+    palisade(g, W, GL, gate=(W // 2 - 2, W // 2 + 1))
     gx0, gx1 = c - 2, c + 1
     g.fill(gx0, GL - 1, W - 3, gx1, GL + 5, W - 3, AIR)
     g.fill(gx0 - 1, GL, W - 6, gx1 + 1, GL + 4, W - 4, AIR)
@@ -887,16 +898,13 @@ def watchtower_c(seed=19):
     g.fill(gx0, GL + 5, W - 4, gx1, GL + 6, W - 4, "minecraft:spruce_planks")
     portcullis_plane(g, gx0, gx1, GL, 5, W - 3)
     g.mark("gate", c, GL, W - 1)
-    for sx in (gx0 - 5, gx0 - 4, gx1 + 4, gx1 + 5):
+    for sx in (gx0 - 6, gx0 - 5, gx0 - 4, gx1 + 4, gx1 + 5, gx1 + 6):
         for k in range(3):
-            z = W - 8 + k
+            z = W - 9 + k
             g.stair(sx, GL + k, z, "minecraft:spruce_stairs", "south")
             g.fill(sx, GL - 1, z, sx, GL + k - 1, z, "minecraft:spruce_log[axis=y]") if k > 0 else None
             g.fill(sx, GL + k + 1, z, sx, GL + 5, z, AIR)
-        g.set(sx, GL + 3, W - 6, AIR)
-    for (x, z) in ((8, 4), (c, 4), (W - 9, 4), (4, 12), (4, c), (4, W - 12), (W - 5, 12), (W - 5, c), (W - 5, W - 12),
-                   (10, W - 5), (W - 11, W - 5)):
-        g.mark("archer", x, GL + 3, z)
+        g.set(sx, GL + 3, W - 7, AIR)
     # the motte: an earth mound, radius twenty at the foot and twelve at the top, six high, turfed
     mx, mz = c, c - 8
     MT = GL + 6

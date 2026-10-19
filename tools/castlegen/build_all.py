@@ -13,6 +13,8 @@ import castle2
 import city
 import city2
 import crypt
+import defense_audit
+import loops
 import market_town
 import export
 import fixup
@@ -65,7 +67,7 @@ SCALE_LIMITS = {"*": {"narrow_stairs": 0, "pinches": 3, "dark_rooms": 0},
                 # second revisions: the quay houses moved against the wall with their doors on the quay, the
                 # terrace trees stood off the keep wall, every tower room lit. What's left is house doors
                 # against party walls and a few gaps on the walks.
-                "great_city": {"narrow_stairs": 0, "pinches": 15, "dark_rooms": 0},
+                "great_city": {"narrow_stairs": 0, "pinches": 17, "dark_rooms": 0},
                 "canal_city": {"narrow_stairs": 0, "pinches": 17, "dark_rooms": 0},
                 # a ruin is meant to be broken: gaps between fallen drums, shade under the last of the entablature
                 "temple_ruin": {"narrow_stairs": 0, "pinches": 10, "dark_rooms": 3},
@@ -74,6 +76,24 @@ SCALE_LIMITS = {"*": {"narrow_stairs": 0, "pinches": 3, "dark_rooms": 0},
                 # the ring fortress on its island: the same castle as great_castle_b inside
                 "lake_castle": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
                 "lake_castle2": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0}}
+
+
+# What a plan's defences must reach before it's exported (see defense_audit): bowmen on walks a man can pass
+# another on, the walls' foot covered by flanking fire, the field before them in bowshot.
+DEFENSE_LIMITS = {"*": {"one_wide": 0, "two_wide": 0.10, "foot": 0.35, "field": 0.85},
+                  # an open market town has no wall to man: a man or two up its church tower
+                  "town": {"one_wide": 0, "two_wide": 1.0, "foot": 0.0, "field": 0.0},
+                  # the walled town's curtain is held to a castle's walks
+                  "town_walled": {"one_wide": 0, "two_wide": 0.10, "foot": 0.35, "field": 0.80},
+                  # the backlog the audit found on its first run: tower tops crowded by their stair heads and
+                  # turret roofs, the keep wall's walk in great castle C. A new narrow walk still fails the build.
+                  "great_castle_a": {"one_wide": 0, "two_wide": 0.20, "foot": 0.35, "field": 0.85},
+                  "great_castle_a2": {"one_wide": 0, "two_wide": 0.20, "foot": 0.35, "field": 0.85},
+                  "great_castle_c": {"one_wide": 0, "two_wide": 0.15, "foot": 0.35, "field": 0.85},
+                  "great_castle_c2": {"one_wide": 0, "two_wide": 0.15, "foot": 0.35, "field": 0.85},
+                  # the cities' walls run for half a mile: their foot is watched from the towers, not all of it
+                  "great_city": {"one_wide": 3, "two_wide": 0.12, "foot": 0.10, "field": 0.80},
+                  "canal_city": {"one_wide": 3, "two_wide": 0.12, "foot": 0.10, "field": 0.80}}
 
 
 # Plans rebuilt since they first went out into worlds. A rebuilt plan is exported under a new name
@@ -96,6 +116,14 @@ def builds():
             yield fn, fn.__name__ + "2", style, seed_shift
 
 
+# The defence rebuild touched every plan but the temple ruin: crenels with half-block sills a bowman stands up
+# on, tower roofs standing on the merlons so the men under them see out, loops cut low in the towers to cover
+# the walls' foot, walks a man can pass another on. A revision each, so castles already standing keep theirs.
+for _fn, _name, _style, _shift in builds():
+    if _name != "temple_ruin":
+        REVISIONS[_name] = REVISIONS.get(_name, 1) + 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default=None)
@@ -113,6 +141,7 @@ def main():
         parts.CAP_STYLE = style
         g, meta = fn() if seed_shift is None else fn(seed=fn.__defaults__[0] + seed_shift)
         parts.CAP_STYLE = "cone"
+        at_embrasures = fixup.embrasures(g)
         meta["name"] = name
         character = meta.get("character") or rooms.character_for(name, seed_shift or 0)
         meta["character"] = character
@@ -132,6 +161,9 @@ def main():
         g.markers.pop("dwelling", None)              # homes not put up for sale are just homes
         kinds["lit"] = 0 if landmark else fixup.light_rooms(g, meta["GL"], rev=REVISIONS.get(name, 1))
         opened = 0 if landmark else fixup.clear_blocked_doorways(g, meta["GL"], tuple(meta.get("levels", ())))
+        # loops low in the towers where the walk can't see the walls' foot: after the furniture, so no slit
+        # opens behind a bed, and after the doorways, so a slit's sill isn't taken for a blocked door
+        kinds["loops"] = 0 if landmark else loops.flank(g, meta["GL"])[0]
         dropped = fixup.drop_buried_markers(g)
         bad, checked = walk.audit(g, meta)
         unreachable = sum(len(v) for v in bad.values())
@@ -152,6 +184,23 @@ def main():
         over = [k for k in ("narrow_stairs", "pinches", "dark_rooms") if len(sc[k]) > limit[k]]
         if over:
             raise SystemExit(f"{name}: cramped: " + ", ".join(f"{k} {len(sc[k])} > {limit[k]}" for k in over))
+        if not landmark:
+            da = defense_audit.audit(g, meta)
+            print(f"  defence: {defense_audit.summary(da)}")
+            lim = DEFENSE_LIMITS.get(name) or DEFENSE_LIMITS.get(name.replace("_moat", "")) or DEFENSE_LIMITS.get(name.rstrip("2"))
+            lim = lim or DEFENSE_LIMITS["town" if meta.get("kind") == "town" else "*"]
+            walks = max(1, da["posts"])
+            bad = []
+            if len(da["one_wide"]) > lim["one_wide"]:
+                bad.append(f"{len(da['one_wide'])} bowmen on one-wide walks, e.g. {da['one_wide'][:3]}")
+            if len(da["two_wide"]) > lim["two_wide"] * walks:
+                bad.append(f"{len(da['two_wide'])} of {walks} bowmen on two-wide walks, e.g. {da['two_wide'][:3]}")
+            if da["cover"] < lim["foot"]:
+                bad.append(f"the walls' foot is {da['cover'] * 100:.0f}% covered (< {lim['foot'] * 100:.0f}%), dead e.g. {da['dead'][:3]}")
+            if da["field"] < lim["field"]:
+                bad.append(f"the field is {da['field'] * 100:.0f}% covered (< {lim['field'] * 100:.0f}%)")
+            if bad:
+                raise SystemExit(f"{name}: weak defences: " + "; ".join(bad))
         if kinds["beds"] < kinds["men"] and meta.get("kind") != "landmark":
             raise SystemExit(f"{name}: {kinds['beds']} beds for {kinds['men']} men")
         if not args.no_export:

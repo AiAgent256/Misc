@@ -117,7 +117,7 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
                 .add(Attributes.MAX_HEALTH, r.health)
                 .add(Attributes.MOVEMENT_SPEED, r.speed)
                 .add(Attributes.ATTACK_DAMAGE, r.damage)
-                .add(Attributes.FOLLOW_RANGE, r.ranged ? 44.0 : 32.0)
+                .add(Attributes.FOLLOW_RANGE, r.ranged ? 56.0 : 32.0)
                 .add(Attributes.KNOCKBACK_RESISTANCE, r.knockbackResist)
                 .add(Attributes.ARMOR, r == Role.LORD ? 6.0 : 0.0)
                 .add(Attributes.ATTACK_KNOCKBACK, r == Role.LORD ? 1.0 : 0.0);
@@ -625,6 +625,19 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
                         .append(net.minecraft.network.chat.Component.literal("\u2764" + hp).withStyle(net.minecraft.ChatFormatting.RED)));
             }
         }
+    }
+
+    /** A bowman at his embrasure braces against the parapet: no knocking him out through the crenel. */
+    @Override
+    public void knockback(double strength, double x, double z) {
+        if (role().ranged && holdsPosition()) return;
+        super.knockback(strength, x, z);
+    }
+
+    /** Nor does a comrade shouldering past on the walk push him off his sill. */
+    @Override
+    public boolean isPushable() {
+        return !(role().ranged && holdsPosition()) && super.isPushable();
     }
 
     private static final EquipmentSlot[] KIT = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET, EquipmentSlot.MAINHAND};

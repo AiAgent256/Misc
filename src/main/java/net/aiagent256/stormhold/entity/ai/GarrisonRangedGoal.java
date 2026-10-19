@@ -74,7 +74,7 @@ public class GarrisonRangedGoal extends Goal {
         LivingEntity t = mob.getTarget();
         if (t == null) return;
         Role role = mob.role();
-        double range = role.range;
+        double range = reach(mob, t);
         double d2 = mob.distanceToSqr(t);
         boolean see = mob.getSensing().hasLineOfSight(t);
         boolean inRange = d2 <= range * range;
@@ -108,6 +108,11 @@ public class GarrisonRangedGoal extends Goal {
             int base = role == Role.CROSSBOWMAN ? 45 : 28;
             cooldown = base + mob.getRandom().nextInt(15) - mob.tier() * 2;
         }
+    }
+
+    /** A bow shot from up high carries further: a man on a wall reaches a block further for every block he stands above. */
+    public static double reach(GarrisonEntity mob, LivingEntity t) {
+        return mob.role().range + Math.min(24.0, Math.max(0.0, mob.getY() - t.getY()));
     }
 
     private void tickWall(LivingEntity t, boolean see, boolean inRange, double d2) {
@@ -155,7 +160,8 @@ public class GarrisonRangedGoal extends Goal {
                     if (!Garrisons.canStand(level, p)) continue;
                     Vec3 eye = new Vec3(p.getX() + 0.5, p.getY() + mob.getEyeHeight(), p.getZ() + 0.5);
                     double d = eye.distanceToSqr(eyeTarget);
-                    if (d > mob.role().range * mob.role().range) continue;
+                    double r = mob.role().range + Math.min(24.0, Math.max(0.0, eye.y - eyeTarget.y));
+                    if (d > r * r) continue;
                     if (!seesFrom(level, eye, eyeTarget)) continue;
                     // prefer a short walk and a shorter shot
                     double score = p.distSqr(mob.blockPosition()) * 0.6 + d * 0.1;

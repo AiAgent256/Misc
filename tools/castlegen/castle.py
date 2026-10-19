@@ -2,7 +2,7 @@
 import numpy as np
 
 from grid import Grid, Mix, disk, ring, rect, rect_ring, spiral_stair, dogleg_stair, gable_roof, cone_roof
-from parts import (STONE, DARK, FOUND, PAVE, ROAD, FLOOR_STONE, ROOF, ROOF_STAIR, STONE_STAIR,
+from parts import (SILL, STONE, DARK, FOUND, PAVE, ROAD, FLOOR_STONE, ROOF, ROOF_STAIR, STONE_STAIR,
                    DARK_STAIR, SLAB_CAP, RAIL, PLANK, DARK_PLANK, PORTCULLIS, GLASS,
                    curtain, posts_on_walk, round_tower, square_tower, straight_wall,
                    pointed_arch, building, lamp_post, tree_weirwood, side_grids, wall_stair)
@@ -140,8 +140,9 @@ def great_castle_a(seed=7):
     g.fill(57, 0, b - 7, 71, gtop - 1, b + 7, STONE)
     g.fill(57, GL + 3, b + 7, 71, GL + 3, b + 7, DARK)
     for (tx, bd) in ((53, ((-1, 0), (0, 1))), (75, ((1, 0), (0, 1)))):
-        round_tower(g, tx, b + 2, 6, gtop + 4, GL, floors=(GL + 8, GL + 16, walk - 1), spiral=False,
-                    cone=True, doors=((0, -1, walk), (0, -1, GL + 9), (-1 if tx < 64 else 1, 0, gtop)), banner_dirs=bd)
+        # a stair up each flanking tower to its top, where the crossbowmen command the gate's approach
+        round_tower(g, tx, b + 2, 6, gtop + 4, GL, floors=(GL + 8, GL + 16, walk - 1), spiral=True,
+                    cone=True, doors=((0, -1, GL), (0, -1, walk), (0, -1, GL + 9), (-1 if tx < 64 else 1, 0, gtop)), banner_dirs=bd)
     # passage
     pointed_arch(g, gx0, gx1, GL, 10, b - 7, b + 7)
     g.fill(gx0, GL - 1, b - 7, gx1, GL - 1, b + 7, ROAD)
@@ -732,34 +733,46 @@ def watchtower_a(seed=5):
     g.fill_mask(yard, 0, GL - 2, FOUND)
     g.fill_mask(yard, GL - 1, GL - 1, PAVE)
     g.fill_mask(yard, GL, GL + 8, "minecraft:air")
-    wall = ring(g, c, c, R, R - 2)
+    # the enclosure: four thick, its walk on top three men wide behind a crenellated parapet with half-block
+    # sills; it stands a block further out than the yard's edge so the yard keeps its room
+    Ro = R + 1
+    wall = ring(g, c, c, Ro, R - 2)
     g.fill_mask(wall, 0, GL + 4, STONE)
     from grid import angle_index
-    ai = angle_index(g, c, c, R)
-    g.fill_mask(ring(g, c, c, R, R - 1) & (np.mod(ai, 3) == 0), GL + 5, GL + 5, STONE)
-    g.fill_mask(ring(g, c, c, R - 1, R - 2), GL + 5, GL + 5, "minecraft:air")
-    # a wall-walk behind the parapet: the inner ring of the wall is a block lower, reached by two stairs
-    g.fill_mask(ring(g, c, c, R - 1, R - 3), GL + 3, GL + 4, "minecraft:air")
-    g.fill_mask(ring(g, c, c, R - 1, R - 3), GL + 2, GL + 2, STONE)
-    for x in (c - 8, c - 7, c + 7, c + 8):
-        for k in range(3):
-            g.stair(x, GL + k, c + R - 6 + k, STONE_STAIR, "south")
-            # the step's footing is a double slab, which the doorway fixer leaves alone
-            g.fill(x, GL, c + R - 6 + k, x, GL + k - 1, c + R - 6 + k, "minecraft:stone_brick_slab[type=double]") if k > 0 else None
-            g.fill(x, GL + k + 1, c + R - 6 + k, x, GL + 5, c + R - 6 + k, "minecraft:air")
+    ai = angle_index(g, c, c, Ro)
+    par = ring(g, c, c, Ro, Ro - 1)
+    merl = par & (np.mod(ai, 4) < 2)
+    g.fill_mask(wall, GL + 5, GL + 8, "minecraft:air")
+    g.fill_mask(par, GL + 5, GL + 5, SILL)
+    g.fill_mask(merl, GL + 5, GL + 6, STONE)
+    g.fill_mask(merl, GL + 7, GL + 7, SLAB_CAP)
+    g.fill_mask(ring(g, c, c, R - 2, R - 3), GL + 5, GL + 5, RAIL)
+    # three-wide flights up to the walk, east and west, climbing to the wall's inner face
+    for sgn, face in ((-1, "west"), (1, "east")):
+        for z in (c - 1, c, c + 1):
+            xin = next(x for x in (range(c, -1, -1) if sgn < 0 else range(c, W)) if wall[x, z])
+            for k in range(5):
+                x = xin - sgn * (5 - k)
+                g.stair(x, GL + k, z, STONE_STAIR, face)
+                g.fill(x, GL, z, x, GL + k - 1, z, "minecraft:stone_brick_slab[type=double]") if k > 0 else None
+                g.fill(x, GL + k + 1, z, x, GL + 8, z, "minecraft:air")
+            g.set(xin, GL + 5, z, "minecraft:air")             # no rail where the flight lands
     # gate gap (south)
-    g.fill(c - 2, GL, c + R - 3, c + 2, GL + 5, c + R + 1, "minecraft:air")
+    g.fill(c - 2, GL, c + R - 3, c + 2, GL + 5, c + Ro + 1, "minecraft:air")
     g.fill(c - 2, GL - 1, c + R - 3, c + 2, GL - 1, W - 1, ROAD)
     for x in (c - 3, c + 3):
-        g.fill(x, GL, c + R - 2, x, GL + 7, c + R - 1, STONE)
-    # lintel and a portcullis between the pillars
-    g.fill(c - 3, GL + 7, c + R - 2, c + 3, GL + 7, c + R - 1, STONE)
-    g.fill(c - 3, GL + 8, c + R - 2, c + 3, GL + 8, c + R - 1, SLAB_CAP)
-    portcullis_plane(g, c - 2, c + 2, GL, 7, c + R - 1)
+        g.fill(x, GL, c + R - 2, x, GL + 8, c + Ro, STONE)
+    # lintel and a portcullis between the pillars, the walk carried over the gate
+    g.fill(c - 3, GL + 6, c + R - 2, c + 3, GL + 8, c + Ro, STONE)
+    g.fill(c - 2, GL + 9, c + R - 2, c + 2, GL + 11, c + Ro - 1, "minecraft:air")
+    g.fill(c - 3, GL + 9, c + Ro, c + 3, GL + 9, c + Ro, SILL)
+    for x in (c - 3, c, c + 3):
+        g.fill(x, GL + 9, c + Ro, x, GL + 10, c + Ro, STONE)
+    portcullis_plane(g, c - 2, c + 2, GL, 6, c + Ro)
     g.mark("gate", c, GL, W - 1)
-    for k in range(8):
-        ang = (k + 0.5) * np.pi / 4
-        g.mark("archer", int(round(c + (R - 2) * np.cos(ang))), GL + 3, int(round(c + (R - 2) * np.sin(ang))))
+    for k in range(16):
+        ang = (k + 0.5) * np.pi / 8
+        g.mark("archer", int(round(c + (R - 1) * np.cos(ang))), GL + 5, int(round(c + (R - 1) * np.sin(ang))))
     top = GL + 30
     # a proper tower: 21 wide, so the floors are rooms around the stair and not a ledge beside it
     tz = c - 5

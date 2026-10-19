@@ -21,6 +21,8 @@ ROOF_STAIR = "minecraft:deepslate_tile_stairs"
 STONE_STAIR = "minecraft:stone_brick_stairs"
 DARK_STAIR = "minecraft:deepslate_brick_stairs"
 SLAB_CAP = "minecraft:stone_brick_slab[type=bottom]"
+# a crenel's sill: a half block, so a man at the embrasure sees down the wall's face at better than one in one
+SILL = "minecraft:stone_brick_slab[type=bottom]"
 RAIL = "minecraft:stone_brick_wall"
 PLANK = "minecraft:spruce_planks"
 DARK_PLANK = "minecraft:dark_oak_planks"
@@ -116,6 +118,7 @@ def curtain(g, a, b, thick, walk_y, GL, gallery=True, banners_every=16, grids=No
     merlon = proj & (np.mod(along, 4) < 2)
     g.fill_mask(merlon, walk_y + 1, walk_y + 2, STONE)
     g.fill_mask(merlon, walk_y + 3, walk_y + 3, SLAB_CAP)
+    g.fill_mask(proj & ~merlon, walk_y, walk_y, SILL)
     stairs_by_facing(g, proj & (np.mod(along, 2) == 0), walk_y - 2, STONE_STAIR, out, half="top", invert=True)
     g.fill_mask(proj & (np.mod(along, 2) == 1), walk_y - 2, walk_y - 2, "minecraft:air")
     rail = d == thick - 1
@@ -141,6 +144,25 @@ CAP_STYLES = ("cone", "spire", "low", "hoard", "flat", "pyramid")
 CAP_STYLE = "cone"          # set by build_all per variant before the layout is built
 
 
+# A tower's roof stands on its merlons, LIFT blocks over the platform, so the men on the platform see out under
+# the eaves through the crenels: a cap set down on the platform would leave every archer up there blind.
+LIFT = 4
+PIER_TOP = "minecraft:stripped_dark_oak_log[axis=y]"
+
+
+def _piers(g, cx, cz, r, top, square=None):
+    """Carry the merlons up to the roof: a timber post on each, the crenels between them left open."""
+    if square is None:
+        proj = ring(g, cx, cz, r + 1, r)
+        merlon = proj & (np.mod(angle_index(g, cx, cz, r + 1), 4) < 2)
+    else:
+        x0, z0, x1, z1 = square
+        xs, zs = g.xz()
+        proj = rect_ring(g, x0 - 1, z0 - 1, x1 + 1, z1 + 1, 1)
+        merlon = proj & (np.mod(xs + zs, 4) < 2)
+    g.fill_mask(merlon, top + 3, top + LIFT - 1, PIER_TOP)
+
+
 def cap_roof(g, cx, cz, r, top, square=None):
     """Roof a tower in the castle's cap style (g.cap_style; 'cone' when unset).
 
@@ -150,6 +172,8 @@ def cap_roof(g, cx, cz, r, top, square=None):
     hoard   a timber hoarding: a covered fighting gallery round the top, slate hat over it
     flat    no roof: the crenellated platform stays open
     pyramid stepped slate pyramid (square towers; round ones get 'low')
+
+    Every roof but the hoarding's stands on the merlons (see LIFT).
     """
     style = CAP_STYLE
     g.last_cap = style
@@ -159,19 +183,20 @@ def cap_roof(g, cx, cz, r, top, square=None):
         style = "low"
     if style == "hoard" and square is not None:
         style = "pyramid"
+    if style in ("cone", "spire", "low", "pyramid"):
+        _piers(g, cx, cz, r, top, square)
+    y = top + LIFT
     if style == "cone":
-        return cone_roof(g, cx, cz, r, top, ROOF)
+        return cone_roof(g, cx, cz, r + 2, y, ROOF)
     if style == "spire":
-        g.fill_mask(disk(g, cx, cz, r + 1) & ~disk(g, cx, cz, r - 1), top, top, STONE)
-        return cone_roof(g, cx, cz, r, top, ROOF, height_factor=2.4)
+        return cone_roof(g, cx, cz, r + 1, y, ROOF, height_factor=2.4)
     if style == "low":
-        return cone_roof(g, cx, cz, r, top, ROOF, height_factor=0.9)
+        return cone_roof(g, cx, cz, r + 2, y, ROOF, height_factor=0.9)
     if style == "pyramid":
         x0, z0, x1, z1 = square
         k = 0
-        y = top
         while x0 + k <= x1 - k and z0 + k <= z1 - k:
-            g.fill(x0 + k - 1, y, z0 + k - 1, x1 - k + 1, y, z1 - k + 1, ROOF)
+            g.fill(x0 + k - 2, y, z0 + k - 2, x1 - k + 2, y, z1 - k + 2, ROOF)
             k += 1
             y += 1
         g.set((x0 + x1) // 2, y, (z0 + z1) // 2, "minecraft:lightning_rod")
@@ -234,6 +259,7 @@ def round_tower(g, cx, cz, r, top, GL, floors=(), spiral=True, cone=False, t=3,
     g.fill_mask(full, top, top + 6, "minecraft:air")
     g.fill_mask(proj & ~merlon, top + 1, top + 6, "minecraft:air")
     g.fill_mask(proj, top, top, STONE)
+    g.fill_mask(proj & ~merlon, top, top, SILL)
     sp = None
     if spiral and r - t >= 3:
         sp = spiral_stair(g, cx, cz, GL, top - 1, STONE_STAIR, STONE, landings=tuple(fy + 1 for fy in floors), wide=wide)
@@ -322,6 +348,7 @@ def square_tower(g, x0, z0, x1, z1, top, GL, floors=(), spiral_at=None, t=3, con
     g.fill_mask(merlon, top + 1, top + 2, STONE)
     g.fill_mask(merlon, top + 3, top + 3, SLAB_CAP)
     g.fill_mask(proj & ~merlon, top + 1, top + 6, "minecraft:air")
+    g.fill_mask(proj & ~merlon, top, top, SILL)
     sp = None
     if stair:
         ix0, iz0, ix1, iz1 = x0 + t, z0 + t, x1 - t, z1 - t
@@ -364,7 +391,7 @@ def straight_wall(g, x0, z0, x1, z1, walk_y, outward, GL):
         pz = z0 if outward == "north" else z1
         rz = z1 if outward == "north" else z0
         for x in range(x0, x1 + 1):
-            g.set(x, walk_y, pz, STONE)
+            g.set(x, walk_y, pz, STONE if x % 4 < 2 else SILL)
             if x % 4 < 2:
                 g.set(x, walk_y + 1, pz, STONE); g.set(x, walk_y + 2, pz, SLAB_CAP)
             g.set(x, walk_y, rz, RAIL)
@@ -378,7 +405,7 @@ def straight_wall(g, x0, z0, x1, z1, walk_y, outward, GL):
         px = x0 if outward == "west" else x1
         rx = x1 if outward == "west" else x0
         for z in range(z0, z1 + 1):
-            g.set(px, walk_y, z, STONE)
+            g.set(px, walk_y, z, STONE if z % 4 < 2 else SILL)
             if z % 4 < 2:
                 g.set(px, walk_y + 1, z, STONE); g.set(px, walk_y + 2, z, SLAB_CAP)
             g.set(rx, walk_y, z, RAIL)
@@ -500,7 +527,7 @@ def tree_weirwood(g, cx, cz, GL):
     g.fill_mask(disk(g, cx + 0.5, cz + 0.5, 2), GL + 10, GL + 10, "minecraft:nether_wart_block")
 
 
-def wall_stair(g, x, z, GL, walk, along, toward):
+def wall_stair(g, x, z, GL, walk, along, toward, width=3):
     """
     A straight open stair against the inner face of a curtain, from the yard at (x, z) up to the
     wall-walk. `along` is the axis the stair runs on ('x' or 'z'), `toward` the facing of the wall
@@ -508,11 +535,11 @@ def wall_stair(g, x, z, GL, walk, along, toward):
     """
     n = walk - GL
     dx, dz = FACING_VEC[toward]
-    # two men wide: the second tread is the one away from the wall
+    # three men wide: the further treads are the ones away from the wall
     if along == "x":
         step_dir = "east" if x < g.X // 2 else "west"
         sx = 1 if step_dir == "east" else -1
-        for zz in (z, z - dz):
+        for zz in [z - k * dz for k in range(width)]:
             for k in range(n):
                 g.stair(x + k * sx, GL + k, zz, STONE_STAIR, step_dir)
                 g.fill(x + k * sx, GL, zz, x + k * sx, GL + k - 1, zz, STONE)
@@ -524,7 +551,7 @@ def wall_stair(g, x, z, GL, walk, along, toward):
     else:
         step_dir = "south" if z < g.Z // 2 else "north"
         sz = 1 if step_dir == "south" else -1
-        for xx in (x, x - dx):
+        for xx in [x - k * dx for k in range(width)]:
             for k in range(n):
                 g.stair(xx, GL + k, z + k * sz, STONE_STAIR, step_dir)
                 g.fill(xx, GL, z + k * sz, xx, GL + k - 1, z + k * sz, STONE)

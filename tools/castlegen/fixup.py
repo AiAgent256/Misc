@@ -63,6 +63,8 @@ def drop_buried_markers(g, keep=("gate", "lord", "war_table", "banner_stand", "r
         for (x, y, z) in lst:
             if passable(g.get(x, y, z)) and passable(g.get(x, y + 1, z)):
                 good.append((x, y, z))
+            elif _sill(g, x, y, z) and passable(g.get(x, y + 1, z)) and passable(g.get(x, y + 2, z)):
+                good.append((x, y, z))              # a bowman up on a crenel's sill
             else:
                 n += 1
         g.markers[role] = good
@@ -126,3 +128,50 @@ def _corner(g, r):
             if walls >= 2:
                 break
     return best
+
+
+def _sill(g, x, y, z):
+    st = g.get(x, y, z)
+    return "slab" in st and "type=bottom" in st
+
+
+def embrasures(g, roles=("archer", "crossbowman"), reach=3):
+    """Put every bowman in an embrasure: standing on the half-block sill of the nearest crenel within `reach`
+    of where the plan stood him, so he leans out over the wall's face and sees down it. One man to a crenel.
+    A man with no crenel near (a slit in a tower room, a hoarding) stays where he was. Returns how many moved."""
+    taken = set()
+    moved = 0
+    dirs = ((1, 0), (-1, 0), (0, 1), (0, -1))
+    for role in roles:
+        out = []
+        for (x, y, z) in g.markers.get(role, []):
+            best = None
+            for dx in range(-reach, reach + 1):
+                for dz in range(-reach, reach + 1):
+                    cx, cz = x + dx, z + dz
+                    if (cx, y, cz) in taken or not _sill(g, cx, y, cz):
+                        continue
+                    if not (passable(g.get(cx, y + 1, cz)) and passable(g.get(cx, y + 2, cz))):
+                        continue
+                    for ox, oz in dirs:
+                        # beyond the sill a drop, behind it the walk he came from
+                        if not (passable(g.get(cx + ox, y, cz + oz)) and passable(g.get(cx + ox, y - 1, cz + oz))):
+                            continue
+                        bx, bz = cx - ox, cz - oz
+                        if not (passable(g.get(bx, y, bz)) and passable(g.get(bx, y + 1, bz)) and supports(g.get(bx, y - 1, bz))):
+                            continue
+                        d = abs(cx - x) + abs(cz - z)
+                        if best is None or d < best[0]:
+                            best = (d, (cx, y, cz), (ox, oz))
+            if best is not None:
+                cx, y_, cz = best[1]
+                ox, oz = best[2]
+                # the whole crenel is his: the sills either side along the parapet
+                for k in (-1, 0, 1):
+                    taken.add((cx + k * oz, y, cz + k * ox))
+                moved += best[1] != (x, y, z)
+                out.append(best[1])
+            else:
+                out.append((x, y, z))
+        g.markers[role] = out
+    return moved

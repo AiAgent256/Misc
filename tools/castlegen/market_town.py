@@ -259,6 +259,67 @@ def toll_gate(g, x0, x1, z, GL):
     portcullis_plane(g, x0, x1, GL, 4, z)
 
 
+def town_curtain(g, x0, z0, x1, z1, GL, gate_x0, gate_x1, rng):
+    """The walled town's curtain: five thick, a walk three men wide behind a crenellated parapet with
+    half-block sills, round towers at the corners and halfway along each side standing out from the face so
+    their loops see along it, a gatehouse between two towers on the south side, and three-wide flights up to
+    the walk from the street inside. Outer faces on x0/z0/x1/z1. Returns the walk's standing level."""
+    from parts import round_tower, SILL, RAIL, wall_stair
+    walk = GL + 7
+    body = rect_ring(g, x0, z0, x1, z1, 5)
+    g.fill_mask(body, 0, walk - 1, STONE)
+    g.fill_mask(rect_ring(g, x0 - 1, z0 - 1, x1 + 1, z1 + 1, 1), 0, GL + 1, DARK)            # plinth
+    g.fill_mask(rect_ring(g, x0, z0, x1, z1, 1), GL + 3, GL + 3, DARK)                    # string course
+    g.fill_mask(rect(g, x0 + 1, z0 + 1, x1 - 1, z1 - 1) & ~rect(g, x0 + 4, z0 + 4, x1 - 4, z1 - 4), walk, walk + 4, AIR)
+    parapet_rect(g, x0, z0, x1, z1, walk)
+    g.fill_mask(rect_ring(g, x0 + 4, z0 + 4, x1 - 4, z1 - 4, 1), walk, walk, RAIL)
+    # towers: the corners, halfway along each side, either side of the gate. Their centres stand on the
+    # wall's outer line, so half of each stands out beyond the face
+    r, top = 5, walk + 6
+    mx, mz = (x0 + x1) // 2, (z0 + z1) // 2
+    spots = [(x0 + 2, z0 + 2), (x1 - 2, z0 + 2), (x0 + 2, z1 - 2), (x1 - 2, z1 - 2),
+             (mx, z0 + 2), (x0 + 2, mz), (x1 - 2, mz), (gate_x0 - 6, z1 - 2), (gate_x1 + 6, z1 - 2)]
+    for (cx, cz) in spots:
+        # into the tower from the street; along the walk through it at walk level
+        inward = (1 if cx < mx else -1 if cx > mx else 0, 1 if cz < mz else -1 if cz > mz else 0)
+        if cx in (x0 + 2, x1 - 2) and cz in (z0 + 2, z1 - 2):
+            ground = (inward[0], inward[1], GL)
+            walks = ((inward[0], 0, walk), (0, inward[1], walk))
+        elif cz in (z0 + 2, z1 - 2):
+            ground = (0, inward[1], GL)
+            walks = ((1, 0, walk), (-1, 0, walk))
+        else:
+            ground = (inward[0], 0, GL)
+            walks = ((0, 1, walk), (0, -1, walk))
+        round_tower(g, cx, cz, r, top, GL, floors=(GL + 4, walk - 1), spiral=True, cone=True, t=2,
+                    doors=(ground,) + walks)
+    # the gate: an arched passage through the wall under the walk, a portcullis at its outer end
+    pointed_arch(g, gate_x0, gate_x1, GL, 6, z1 - 4, z1 + 1)
+    g.fill(gate_x0, GL - 1, z1 - 4, gate_x1, GL - 1, z1 + 1, ROAD)
+    portcullis_plane(g, gate_x0, gate_x1, GL, 6, z1)
+    # machicolation over the gate: the parapet stands out on corbels so the gate is under the walk's eye
+    for x in range(gate_x0 - 1, gate_x1 + 2):
+        g.stair(x, walk - 2, z1 + 1, STONE_STAIR, "north", half="top")
+        g.set(x, walk - 1, z1 + 1, STONE)
+        g.set(x, walk, z1 + 1, STONE if x % 4 < 2 else SILL)
+        if x % 4 < 2:
+            g.set(x, walk + 1, z1 + 1, STONE); g.set(x, walk + 2, z1 + 1, SLAB_CAP)
+        g.set(x, walk, z1, AIR)
+    # flights up to the walk: inside the gate on each side, and on the north wall
+    wall_stair(g, gate_x1 + 21, z1 - 5, GL, walk, "x", "south")
+    wall_stair(g, gate_x0 - 22, z1 - 5, GL, walk, "x", "south")
+    wall_stair(g, mx + 20, z0 + 5, GL, walk, "x", "north")
+    # the walk's posts: every crenel has a man (the embrasure pass puts each on his sill)
+    for x in range(x0 + 6, x1 - 5, 4):
+        g.mark("archer", x, walk, z0 + 1); g.mark("archer", x, walk, z1 - 1)
+    for z in range(z0 + 6, z1 - 5, 4):
+        g.mark("archer", x0 + 1, walk, z); g.mark("archer", x1 - 1, walk, z)
+    for (cx, cz) in spots:
+        g.mark("crossbowman", cx + (1 if cx < mx else -1), top, cz)
+    g.wall_banner(gate_x0 - 1, GL + 5, z1 + 2, "south"); g.wall_banner(gate_x1 + 1, GL + 5, z1 + 2, "south")
+    return walk
+
+
 def town_wall(g, x0, z0, x1, z1, GL, gate_x0, gate_x1):
     """A low town wall two thick with a walk, a crenellated parapet, a gate arch on the south side with
     a portcullis, and a stair up to the walk inside the gate. Archers on the walk."""
@@ -342,12 +403,13 @@ def town_walled(seed=301):
     g = Grid(X, H, Z, seed)
     rng = g.rng
     ground(g, GL, X, Z)
-    x0, z0, x1, z1 = 8, 8, 91, 91
     gx0, gx1 = 46, 51
-    town_wall(g, x0, z0, x1, z1, GL, gx0, gx1)
     # streets: the main street north from the gate, a cross street, the square under the church
     road(g, gx0, 56, gx1, 97, GL)
     road(g, 12, 56, 87, 60, GL)
+    # the curtain stands outside the old wall's line, so the streets inside keep their room; it goes up over
+    # the road, and the gate is cut back through it
+    town_curtain(g, 3, 3, 96, 96, GL, gx0, gx1, rng)
     g.fill(30, GL - 1, 26, 70, GL - 1, 55, SQUARE)
     g.fill(30, GL, 26, 70, GL + 10, 55, AIR)
     church(g, 12, 12, GL, rng, along="z")
