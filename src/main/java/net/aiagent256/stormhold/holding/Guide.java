@@ -69,6 +69,12 @@ public final class Guide {
             out.add(line(who, from, h.lordPos, h.isTown() ? "Sits at the War Table in the market hall"
                     : "Emerald for bread, sneak + emerald for iron" + (h.isCity() ? ". Kill him, raise your banner and hold the donjon to take the city" : "")));
         }
+        if (!mine && !h.bannerPos.equals(BlockPos.ZERO)) {
+            String where = h.isCity() ? "On the donjon roof, by the lantern" : h.isTown() ? "On the church tower roof" : "Up top";
+            out.add(line("Banner stand", from, h.bannerPos, where + ", height " + h.bannerPos.getY() + ". "
+                    + (h.lordAlive ? "Kill the " + (h.isTown() ? "reeve" : h.isCity() ? "king" : "lord") + " first, then raise" : "Raise")
+                    + " a War Banner on it and keep their men 12 blocks off for " + net.aiagent256.stormhold.Config.CAPTURE_SECONDS.get() + "s"));
+        }
         if (mine && !h.warTablePos.equals(BlockPos.ZERO)) out.add(line("War Table", from, h.warTablePos, "Stores, the garrison, repairs and fortifying"));
         var barracks = h.extras.get("barracks");
         if (h.isCity() && barracks != null && !barracks.isEmpty())
