@@ -2672,7 +2672,8 @@ public class StormholdGameTests {
      * A wall six high with a corbelled ledge and a machicolation cut in it. From the middle of his block an archer
      * can't see a man at the wall's foot (the wall's own top is in the way); at the hole's lip he can, and shoots.
      */
-    @GameTest(template = "arena", timeoutTicks = 300)
+    // a batch of its own: the company tests clear every soldier within 64 blocks of their player when they finish
+    @GameTest(template = "arena", timeoutTicks = 300, batch = "lip_archers")
     public static void lipArchersShootDownTheWall(GameTestHelper g) {
         ServerLevel level = g.getLevel();
         HoldingManager mgr = HoldingManager.get(level);
