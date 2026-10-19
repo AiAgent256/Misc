@@ -187,10 +187,11 @@ public final class HoldingEvents {
                 + (near > 0 ? " " + near + " still stand near it, archers on the roof count." : "")));
         if (h.isHouseOwned() && !h.counterattackSpawned) {
             h.counterattackSpawned = true;
-            int n = Math.max(3, (int) Math.ceil(h.capacity(Role.KNIGHT) * 0.35));
+            // brigands squatting in a ruin have no reserve to speak of: two of them, no crossbows
+            int n = h.ruined ? 2 : Math.max(3, (int) Math.ceil(h.capacity(Role.KNIGHT) * 0.35));
             BlockPos at = h.rallyPos.equals(BlockPos.ZERO) ? h.gatePos : h.rallyPos;
             Garrisons.reinforce(level, mgr, h, Role.KNIGHT, n, at, player);
-            Garrisons.reinforce(level, mgr, h, Role.CROSSBOWMAN, Math.max(1, n / 3), at, player);
+            if (!h.ruined) Garrisons.reinforce(level, mgr, h, Role.CROSSBOWMAN, Math.max(1, n / 3), at, player);
             announceNear(level, pos, 96, Component.literal("The garrison of " + h.name + " rallies to retake the keep!")
                     .withStyle(ChatFormatting.RED));
         }
@@ -253,7 +254,7 @@ public final class HoldingEvents {
      * a holdfast sends one more wave, a great castle three, the city five and the king's guard with the last.
      */
     private static void waves(ServerLevel level, HoldingManager mgr, Holding h) {
-        if (!h.isHouseOwned() || h.isTown()) return;
+        if (!h.isHouseOwned() || h.isTown() || h.ruined) return;
         int total = h.tier >= 4 ? 5 : h.tier == 3 ? 3 : h.tier == 2 ? 1 : 0;
         if (h.wavesSent >= total) return;
         int cap = Config.CAPTURE_SECONDS.get();
