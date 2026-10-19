@@ -28,19 +28,26 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class Council {
     public enum Seat {
-        MARSHAL("Marshal", 6, "every garrison holds 15% more men, and raids and warbands fought out while you're away meet 20% more resistance"),
-        SPYMASTER("Spymaster", 5, "raids and warbands are reported three days ahead instead of one, and scouts ride half again as fast at half the risk"),
-        TREASURER("Treasurer", 4, "rents come in 20% higher, and every shop knocks another 10% off for you"),
-        WORKS("Master of Works", 4, "the Master Builders work twice as fast, fortifying costs a quarter less and roads half");
+        MARSHAL("Marshal", 6, "every garrison holds 15% more men, and raids and warbands fought out while you're away meet 20% more resistance",
+                "Garrisons 15% bigger; raids fought while you're away meet 20% more resistance"),
+        SPYMASTER("Spymaster", 5, "raids and warbands are reported three days ahead instead of one, and scouts ride half again as fast at half the risk",
+                "Raids reported 3 days ahead, not 1; scouts 50% faster at half the risk"),
+        TREASURER("Treasurer", 4, "rents come in 20% higher, and every shop knocks another 10% off for you",
+                "Rents 20% higher; every shop 10% cheaper for you"),
+        WORKS("Master of Works", 4, "the Master Builders work twice as fast, fortifying costs a quarter less and roads half",
+                "Builders twice as fast; fortifying 25% cheaper, roads half price");
 
         public final String title;
         public final int wage;
         public final String does;
+        /** The same, short enough for a line on the War Table. */
+        public final String brief;
 
-        Seat(String title, int wage, String does) {
+        Seat(String title, int wage, String does, String brief) {
             this.title = title;
             this.wage = wage;
             this.does = does;
+            this.brief = brief;
         }
 
         @Nullable

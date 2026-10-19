@@ -18,7 +18,8 @@ import java.util.List;
  * you, armies on the march drawn between them; beside it your holdings, the houses, and the record.
  */
 public class RealmScreen extends Screen {
-    private static final int W = 440, H = 340, MAP_W = 262;
+    /** The frame fits the window, down to the smallest GUI: set in init. */
+    private int W = 440, H = 340, MAP_W = 262;
     private static final int BG = 0xE0241c14, PANEL = 0xE03a2e20, MAP_BG = 0xFF151a12, LINE = 0xFF6b5a40;
     private RealmData data;
     private int tab;                 // 0 holdings, 1 houses, 2 record
@@ -47,6 +48,9 @@ public class RealmScreen extends Screen {
 
     @Override
     protected void init() {
+        W = Math.min(440, Math.max(360, this.width - 12));
+        H = Math.min(340, Math.max(214, this.height - 12));
+        MAP_W = W * 262 / 440;
         int x0 = left(), y0 = top();
         int rx = x0 + MAP_W + 8;
         String[] tabs = {"Holdings", "Houses", "Record"};
@@ -56,7 +60,7 @@ public class RealmScreen extends Screen {
                 tab = t;
                 scroll = 0;
                 rebuildWidgets();
-            }).bounds(rx + i * 56, y0 + 20, 54, 16).build());
+            }).bounds(rx + i * ((W - MAP_W - 16) / 3), y0 + 20, (W - MAP_W - 16) / 3 - 2, 16).build());
         }
         this.addRenderableWidget(Button.builder(Component.literal("War Table"), b -> Net.sendAction(new java.util.UUID(0, 0), Net.REFRESH, BlockPos.ZERO, 0))
                 .bounds(x0 + W - 66, y0 + 4, 60, 14).build());

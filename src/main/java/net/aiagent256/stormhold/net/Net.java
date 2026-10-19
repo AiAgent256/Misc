@@ -31,13 +31,14 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 public final class Net {
-    private static final String VERSION = "4";
+    private static final String VERSION = "5";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(Stormhold.id("main"),
             () -> VERSION, VERSION::equals, VERSION::equals);
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
             MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19,
-            SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23, TREASURY = 24, VASSAL = 25, REVOKE = 26, COUNCIL = 27;
+            SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23, TREASURY = 24, VASSAL = 25, REVOKE = 26, COUNCIL = 27,
+            COUNCIL_APPOINT = 28, COUNCIL_DISMISS = 29;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -61,18 +62,36 @@ public final class Net {
 
     // ------------------------------------------------------------ server -> client
 
-    public record WarTableData(List<HoldingInfo> holdings, boolean recruits) {
+    /** One seat of the lord's council as the War Table shows it; holder is empty for an empty seat. */
+    public record Seat(int ordinal, String title, String holder, int wage, String does, String brief) {
+    }
+
+    public record WarTableData(List<HoldingInfo> holdings, boolean recruits, List<Seat> council, int treasury) {
         void write(FriendlyByteBuf b) {
             b.writeVarInt(holdings.size());
             for (HoldingInfo h : holdings) h.write(b);
             b.writeBoolean(recruits);
+            b.writeVarInt(council.size());
+            for (Seat s : council) {
+                b.writeVarInt(s.ordinal());
+                b.writeUtf(s.title());
+                b.writeUtf(s.holder());
+                b.writeVarInt(s.wage());
+                b.writeUtf(s.does());
+                b.writeUtf(s.brief());
+            }
+            b.writeVarInt(treasury);
         }
 
         static WarTableData read(FriendlyByteBuf b) {
             int n = b.readVarInt();
             List<HoldingInfo> l = new ArrayList<>(n);
             for (int i = 0; i < n; i++) l.add(HoldingInfo.read(b));
-            return new WarTableData(l, b.readBoolean());
+            boolean recruits = b.readBoolean();
+            int k = b.readVarInt();
+            List<Seat> c = new ArrayList<>(k);
+            for (int i = 0; i < k; i++) c.add(new Seat(b.readVarInt(), b.readUtf(), b.readUtf(), b.readVarInt(), b.readUtf(), b.readUtf()));
+            return new WarTableData(l, recruits, c, b.readVarInt());
         }
 
         void handle(Supplier<NetworkEvent.Context> ctx) {
@@ -135,12 +154,33 @@ public final class Net {
                 String labour = "Kit level " + kit + " (" + net.aiagent256.stormhold.holding.Labour.kitName(kit) + "). "
                         + (h.labourReport.isEmpty() ? "" : h.labourReport + " ")
                         + "Working: " + h.minersAt + " of " + h.miners + " miners, " + h.smithsAt + " of " + h.smiths + " smiths.";
+                String odds = h.attackTarget == null ? "" : java.util.Objects.requireNonNullElse(
+                        net.aiagent256.stormhold.holding.Readiness.tableLine(level, mgr, h, h.attackTarget),
+                        "No castle of another house stands at the target: a war party marches there and back.");
                 out.add(new HoldingInfo(h.id, h.name, h.isTown() ? 0 : h.tier, h.mode.name(), counts, cap, Economy.stockSummary(h), h.center(),
                         h.attackTarget, h.supplyTarget, status.toString(), fief, Economy.realmSummary(mgr, h, player.getUUID()),
-                        h.miners, h.smiths, labour));
+                        h.miners, h.smiths, labour, odds));
             }
         }
-        return new WarTableData(out, RecruitsCompat.loaded());
+        // the council is the lord's, not a castle's: who sits, what each seat does, and the emeralds that pay them
+        ServerLevel over = player.server.overworld();
+        HoldingManager record = HoldingManager.get(over);
+        var seats = record.councils.getOrDefault(player.getUUID(), new java.util.EnumMap<>(net.aiagent256.stormhold.holding.Council.Seat.class));
+        List<Seat> council = new ArrayList<>();
+        for (var s : net.aiagent256.stormhold.holding.Council.Seat.values())
+            council.add(new Seat(s.ordinal(), s.title, seats.getOrDefault(s, ""), s.wage, s.does, s.brief));
+        int treasury = 0;
+        Holding any = null;
+        for (ServerLevel level : player.server.getAllLevels()) {
+            var mine = HoldingManager.get(level).ownedBy(player.getUUID());
+            if (!mine.isEmpty()) {
+                any = mine.get(0);
+                treasury = net.aiagent256.stormhold.holding.Stores.realmStock(HoldingManager.get(level), any, player.getUUID(),
+                        net.aiagent256.stormhold.holding.Rewards.EMERALD);
+                break;
+            }
+        }
+        return new WarTableData(out, RecruitsCompat.loaded(), council, treasury);
     }
 
     // ------------------------------------------------------------ client -> server
@@ -183,6 +223,15 @@ public final class Net {
             return;
         }
         if (a.action() == REFRESH && a.holding().equals(new UUID(0, 0))) {
+            openWarTable(player);
+            return;
+        }
+        if (a.action() == COUNCIL_APPOINT || a.action() == COUNCIL_DISMISS) {
+            var seats = net.aiagent256.stormhold.holding.Council.Seat.values();
+            if (a.amount() >= 0 && a.amount() < seats.length) {
+                if (a.action() == COUNCIL_APPOINT) net.aiagent256.stormhold.holding.Council.appoint(player.serverLevel(), player, seats[a.amount()]);
+                else net.aiagent256.stormhold.holding.Council.dismiss(player.serverLevel(), player, seats[a.amount()]);
+            }
             openWarTable(player);
             return;
         }

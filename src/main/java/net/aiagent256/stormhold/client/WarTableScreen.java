@@ -1,25 +1,57 @@
 package net.aiagent256.stormhold.client;
 
+import net.aiagent256.stormhold.holding.Builder;
+import net.aiagent256.stormhold.holding.Columns;
+import net.aiagent256.stormhold.holding.Company;
+import net.aiagent256.stormhold.holding.Labour;
+import net.aiagent256.stormhold.holding.Scouts;
+import net.aiagent256.stormhold.holding.Vassals;
 import net.aiagent256.stormhold.net.HoldingInfo;
 import net.aiagent256.stormhold.net.Net;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
-/** Command every castle you hold: stance, march orders, supply lines, mustering. */
+/**
+ * Command every castle you hold. Your places down the left; for the chosen one, four pages: Overview (what
+ * it has and what's happening), Orders (stance, target, war parties, scouts), Company (the men who ride with
+ * you and their kit) and Works (builder, the people at the mine and forge, couriers). A fifth page, Council,
+ * is your four officers, who serve the whole realm. The frame fits the window down to the smallest GUI, and
+ * the last thing the server says while it's open shows along its bottom instead of behind it in the chat.
+ */
 public class WarTableScreen extends Screen {
-    private static final int W = 430, H = 358;
+    private static final int BG = 0xF0241c14, PANEL = 0xF0302619, CARD = 0xF0423525, LINE = 0xFF6b5a40;
+    private static final int GOLD = 0xF0D8A0, TEXT = 0xE0D0B0, DIM = 0x9C8C6C, WARN = 0xE89060, BLUE = 0xA8B8C8, NAME = 0xFFE8B0;
+    private static final String[] TABS = {"Overview", "Orders", "Company", "Works", "Council"};
+    private static final int OVERVIEW = 0, ORDERS = 1, COMPANY = 2, WORKS = 3, COUNCIL = 4;
+    private static final int SIDE = 104, BH = 20, STEP = 22, MIN_BUTTON = 64;
+
     private Net.WarTableData data;
-    private int selected;
-    private int page;
+    private int selected, page, tab, scroll;
+    private int W, H;
     private EditBox ax, az, sx, sy, sz;
+    /** What the player typed into the target and courier boxes, kept while he clicks about; reset for another place. */
+    @Nullable private UUID typedFor;
+    @Nullable private String[] typed;
+    private Component notice = Component.empty();
+    private long noticeAt;
+    /** How many of each (knights, archers, crossbowmen) the player wants to take; kept between refreshes. */
+    private final int[] want = {4, 2, 0};
+    private boolean enchant;
+    // where init put things, for render to draw their labels beside them
+    private int textBottom, stanceTextY, targetY, oddsY, noteY, armouryY, peopleY, stepY, labourY, courierY;
+    private int overviewHeight;
 
     public WarTableScreen(Net.WarTableData data) {
         super(Component.literal("War Table"));
@@ -30,6 +62,12 @@ public class WarTableScreen extends Screen {
         this.data = d;
         if (selected >= d.holdings().size()) selected = Math.max(0, d.holdings().size() - 1);
         this.rebuildWidgets();
+    }
+
+    /** Something the server said while the table is open: it shows along the bottom for a while. */
+    public void notice(Component c) {
+        this.notice = c;
+        this.noticeAt = System.currentTimeMillis();
     }
 
     @Nullable
@@ -46,254 +84,576 @@ public class WarTableScreen extends Screen {
         return (this.height - H) / 2;
     }
 
+    private int mainX() {
+        return left() + SIDE + 8;
+    }
+
+    private int mainW() {
+        return W - SIDE - 14;
+    }
+
+    private int contentTop() {
+        return top() + 54;
+    }
+
+    private int contentBottom() {
+        return top() + H - 18;
+    }
+
+    // ------------------------------------------------------------------ widgets
+
     @Override
     protected void init() {
+        W = Math.min(480, Math.max(360, this.width - 12));
+        H = Math.min(300, Math.max(214, this.height - 12));
+        keepTyped();
         int x0 = left(), y0 = top();
+        sideList(x0, y0);
+        int mx = mainX(), mw = mainW();
+        // the pages: the one you're on is lit and can't be pressed
+        int tw = (mw + 2) / TABS.length;
+        for (int i = 0; i < TABS.length; i++) {
+            final int t = i;
+            Button b = Button.builder(Component.literal(TABS[i]), x -> {
+                tab = t;
+                scroll = 0;
+                rebuildWidgets();
+            }).bounds(mx + i * tw, y0 + 31, tw - 2, 16).build();
+            b.active = tab != i;
+            this.addRenderableWidget(b);
+        }
+        HoldingInfo h = current();
+        if (tab == COUNCIL) councilWidgets(mx, mw);
+        else if (h != null) {
+            switch (tab) {
+                case ORDERS -> ordersWidgets(h, mx, mw);
+                case COMPANY -> companyWidgets(h, mx, mw);
+                case WORKS -> worksWidgets(h, mx, mw);
+                default -> overviewWidgets(h, mx, mw);
+            }
+        }
+    }
+
+    /** Your places, a page at a time, then the Realm map. */
+    private void sideList(int x0, int y0) {
         List<HoldingInfo> l = data.holdings();
-        int perPage = 8;
+        int listTop = y0 + 20, listBottom = y0 + H - (l.size() > 1 ? 46 : 28);
+        int perPage = Math.max(1, (listBottom - listTop) / 18);
+        page = Math.min(page, Math.max(0, (l.size() - 1) / perPage));
         int start = page * perPage;
         for (int i = start; i < Math.min(l.size(), start + perPage); i++) {
             final int idx = i;
             HoldingInfo h = l.get(i);
-            String label = (idx == selected ? "> " : "") + h.name();
-            this.addRenderableWidget(Button.builder(Component.literal(trim(label, 17)), b -> {
+            boolean alarm = h.status().contains("Under attack") || h.status().contains("Illager warband");
+            Button b = Button.builder(Component.literal((alarm ? "! " : "") + trim(h.name(), alarm ? 13 : 15)), x -> {
                 selected = idx;
+                scroll = 0;
+                if (tab == COUNCIL) tab = OVERVIEW;
                 rebuildWidgets();
-            }).bounds(x0 + 6, y0 + 22 + (i - start) * 22, 112, 20).build());
+            }).tooltip(Tooltip.create(Component.literal(h.name() + "\n" + (h.status().isEmpty() ? "All quiet." : h.status()))))
+                    .bounds(x0 + 6, listTop + (i - start) * 18, SIDE - 12, 16).build();
+            b.active = idx != selected || tab == COUNCIL;
+            this.addRenderableWidget(b);
         }
         if (l.size() > perPage) {
-            this.addRenderableWidget(Button.builder(Component.literal("<"), b -> {
+            Button prev = Button.builder(Component.literal("<"), b -> {
                 page = Math.max(0, page - 1);
                 rebuildWidgets();
-            }).bounds(x0 + 6, y0 + H - 26, 54, 20).build());
-            this.addRenderableWidget(Button.builder(Component.literal(">"), b -> {
+            }).bounds(x0 + 6, y0 + H - 42, 20, 16).build();
+            prev.active = page > 0;
+            this.addRenderableWidget(prev);
+            Button next = Button.builder(Component.literal(">"), b -> {
                 page = Math.min((l.size() - 1) / perPage, page + 1);
                 rebuildWidgets();
-            }).bounds(x0 + 64, y0 + H - 26, 54, 20).build());
+            }).bounds(x0 + SIDE - 26, y0 + H - 42, 20, 16).build();
+            next.active = page < (l.size() - 1) / perPage;
+            this.addRenderableWidget(next);
         }
-        this.addRenderableWidget(Button.builder(Component.literal("Realm"), b -> Net.sendAction(new java.util.UUID(0, 0), Net.OPEN_REALM, BlockPos.ZERO, 0))
-                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("The map of every castle you know, the houses and how they stand with you, and the realm's record.")))
-                .bounds(x0 + W - 60, y0 + 4, 54, 14).build());
-        HoldingInfo h = current();
-        if (h != null) this.addRenderableWidget(Button.builder(Component.literal("Treasury"), b -> Net.sendAction(h.id(), Net.TREASURY, BlockPos.ZERO, 0))
-                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Take up to 64 emeralds from the realm's stores into your pack. "
-                        + "Spoils, the steward's sales and rents paid while you're away collect there.")))
-                .bounds(x0 + 6, y0 + H - 50, 112, 20).build());
-        if (h != null) this.addRenderableWidget(Button.builder(Component.literal("Council"), b -> {
-                    Net.sendAction(h.id(), Net.COUNCIL, BlockPos.ZERO, 0);
-                    this.onClose();
-                })
-                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Your council: a Marshal (bigger, harder garrisons), "
-                        + "a Spymaster (earlier warnings, faster and safer scouts), a Treasurer (more rent, cheaper shops) and a Master of Works "
-                        + "(builders twice as fast, cheaper works). Each is paid daily from the stores. Opens in chat.")))
-                .bounds(x0 + 6, y0 + H - 122, 112, 20).build());
-        if (h != null) {
-            boolean vassal = h.status().contains("Vassal: ");
-            int gift = net.aiagent256.stormhold.holding.Vassals.GIFT;
-            this.addRenderableWidget(Button.builder(Component.literal(vassal ? "Gift vassal (" + gift + ")" : "Grant to vassal"),
-                    b -> Net.sendAction(h.id(), Net.VASSAL, BlockPos.ZERO, 0))
-                    .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(vassal
-                            ? "A purse of " + gift + " emeralds for the lord who holds " + h.name() + " for you, from your pack and then the stores: "
-                            + "loyalty +" + net.aiagent256.stormhold.holding.Vassals.GIFT_LOYALTY + ". Loyal vassals send more rent and ride to your aid."
-                            : "Raise one of " + h.name() + "'s knights to hold it in your name. He sits in the hall and fights for it, keeps the garrison "
-                            + "up from his own purse, rides with his knights to your other places when they're attacked (within "
-                            + net.aiagent256.stormhold.holding.Vassals.HELP_RANGE + " blocks), and sends you 30% to 80% of its rents by his loyalty. "
-                            + "Loyalty grows in peace and with gifts, falls when his place is sacked; at nothing he breaks faith.")))
-                    .bounds(x0 + 6, y0 + H - 98, 112, 20).build());
-            if (vassal) this.addRenderableWidget(Button.builder(Component.literal("Revoke grant"), b -> Net.sendAction(h.id(), Net.REVOKE, BlockPos.ZERO, 0))
-                    .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Take " + h.name() + " back into your own hands. "
-                            + "He returns to the ranks as a knight.")))
-                    .bounds(x0 + 6, y0 + H - 74, 112, 20).build());
-        }
-        if (h == null) return;
-        int rx = x0 + 128;
-        int y = y0 + 128;
-        this.addRenderableWidget(Button.builder(Component.literal("Expand"), b -> Net.sendAction(h.id(), Net.EXPAND_FIEF, BlockPos.ZERO, 0))
-                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("The people raise one more building (a pasture, a mine, a mill, "
-                        + "then more cottages) for 32 bread and 8 iron from the stores. More folk, more produce.")))
-                .bounds(rx + 236, y0 + 96, 54, 16).build());
+        this.addRenderableWidget(Button.builder(Component.literal("Realm map"), b -> Net.sendAction(new UUID(0, 0), Net.OPEN_REALM, BlockPos.ZERO, 0))
+                .tooltip(Tooltip.create(Component.literal("Every castle you know on a map, the houses and how they stand with you, and the realm's record.")))
+                .bounds(x0 + 6, y0 + H - 24, SIDE - 12, 16).build());
+    }
+
+    private void overviewWidgets(HoldingInfo h, int mx, int mw) {
+        List<Button> row = new ArrayList<>();
+        row.add(button("Take 64 emeralds", "From the realm's stores into your pack (" + data.treasury() + " there now). Rents, the steward's "
+                + "sales and spoils collect there while you're away.", () -> Net.sendAction(h.id(), Net.TREASURY, BlockPos.ZERO, 0)));
+        boolean vassal = h.status().contains("Vassal: ");
+        row.add(button(vassal ? "Gift vassal" : "Grant to a vassal", vassal
+                ? "A purse of " + Vassals.GIFT + " emeralds for the lord who holds " + h.name() + " for you, from your pack and then the stores: "
+                + "loyalty +" + Vassals.GIFT_LOYALTY + ". Loyal vassals send more rent and ride to your aid."
+                : "Raise one of " + h.name() + "'s knights to hold it in your name. He keeps the garrison up from his own purse, rides to your "
+                + "other places within " + Vassals.HELP_RANGE + " blocks when they're attacked, and sends you 30% to 80% of the rents by his "
+                + "loyalty. Loyalty grows in peace and with gifts and falls when the place is sacked; at nothing he breaks faith.",
+                () -> Net.sendAction(h.id(), Net.VASSAL, BlockPos.ZERO, 0)));
+        if (vassal) row.add(button("Revoke", "Take " + h.name() + " back into your own hands. He returns to the ranks as a knight.",
+                () -> Net.sendAction(h.id(), Net.REVOKE, BlockPos.ZERO, 0)));
+        textBottom = layUp(row, mx, contentBottom() - BH, mw) - 4;
+    }
+
+    private void ordersWidgets(HoldingInfo h, int mx, int mw) {
+        int y = contentTop();
         String[] modes = {"DEFEND", "PRODUCE", "ATTACK"};
         String[] labels = {"Defend", "Produce", "Attack"};
+        int bw = (mw - 48) / 3;
         for (int i = 0; i < 3; i++) {
             final int act = i;
-            boolean on = modes[i].equals(h.mode());
-            this.addRenderableWidget(Button.builder(Component.literal((on ? "[" : "") + labels[i] + (on ? "]" : "")),
-                    b -> Net.sendAction(h.id(), act, BlockPos.ZERO, 0)).bounds(rx + i * 98, y, 94, 20).build());
+            Button b = Button.builder(Component.literal(labels[i]), x -> Net.sendAction(h.id(), act, BlockPos.ZERO, 0))
+                    .tooltip(Tooltip.create(Component.literal(stanceText(modes[i])))).bounds(mx + 48 + i * bw, y, bw - 2, BH).build();
+            b.active = !modes[i].equals(h.mode());
+            this.addRenderableWidget(b);
         }
-        BlockPos me = Minecraft.getInstance().player != null ? Minecraft.getInstance().player.blockPosition() : BlockPos.ZERO;
-        y += 34;
-        ax = box(rx + 66, y, h.attack() != null ? h.attack().getX() : me.getX());
-        az = box(rx + 122, y, h.attack() != null ? h.attack().getZ() : me.getZ());
+        stanceTextY = y + BH + 4;
+        targetY = stanceTextY + this.font.split(Component.literal(stanceText(h.mode())), mw).size() * 9 + 6;
+        BlockPos me = playerPos();
+        ax = box(mx + 48, targetY, 46, typedOr(0, h.attack() != null ? h.attack().getX() : me.getX()));
+        az = box(mx + 108, targetY, 46, typedOr(1, h.attack() != null ? h.attack().getZ() : me.getZ()));
+        int rest = mw - 158, here = Math.min(40, rest / 3);
         this.addRenderableWidget(Button.builder(Component.literal("Here"), b -> {
-            ax.setValue(String.valueOf(me.getX()));
-            az.setValue(String.valueOf(me.getZ()));
-        }).bounds(rx + 170, y, 32, 18).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Set"), b -> {
+            ax.setValue(String.valueOf(playerPos().getX()));
+            az.setValue(String.valueOf(playerPos().getZ()));
+        }).tooltip(Tooltip.create(Component.literal("Fill in where you're standing."))).bounds(mx + 158, targetY, here, 18).build());
+        this.addRenderableWidget(Button.builder(Component.literal("Set target"), b -> {
             BlockPos p = parse(ax, null, az);
             if (p != null) Net.sendAction(h.id(), Net.SET_ATTACK, p, 0);
-        }).bounds(rx + 204, y, 28, 18).build());
-        this.addRenderableWidget(Button.builder(Component.literal("March"), b -> Net.sendAction(h.id(), Net.MARCH_NOW, BlockPos.ZERO, 0))
-                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Send a war party at the target now.")))
-                .bounds(rx + 234, y, 34, 18).build());
-        Button scout = Button.builder(Component.literal("Scout"), b -> {
+        }).tooltip(Tooltip.create(Component.literal("Make this " + h.name() + "'s target. The odds against whatever stands there show below.")))
+                .bounds(mx + 160 + here, targetY, rest - here - 2, 18).build());
+        oddsY = targetY + 24;
+        List<Button> row = new ArrayList<>();
+        Button march = button("March now", "Send a war party from " + h.name() + " at the target now, without waiting for the Attack stance's next one.",
+                () -> Net.sendAction(h.id(), Net.MARCH_NOW, BlockPos.ZERO, 0));
+        march.active = h.attack() != null;
+        row.add(march);
+        Button scout = button("Scout there", "Two riders go to the x and z above (up to " + Scouts.MAX_RANGE + " blocks), look over "
+                + Scouts.RADIUS + " blocks round it and come home to report every castle, town and city: who holds it, how many men, how they "
+                + "stand with you. What they find goes on the Realm map. Hostile country and the far frontier cost riders.", () -> {
             BlockPos p = parse(ax, null, az);
             if (p != null) Net.sendAction(h.id(), Net.SCOUT, p, 0);
-        }).tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Two riders from the garrison ride to the x and z above "
-                        + "(up to " + net.aiagent256.stormhold.holding.Scouts.MAX_RANGE + " blocks), look over the country for "
-                        + net.aiagent256.stormhold.holding.Scouts.RADIUS + " blocks round it and ride home to tell you every castle, town and city there: "
-                        + "who holds it, how many men, how they stand with you, and where the castles nobody has seen yet will be found. "
-                        + "What they find goes on the Realm page. Hostile country and the far frontier cost riders.")))
-                .bounds(rx + 270, y, 30, 18).build();
+        });
         scout.active = !h.status().contains("Scouts out");
-        this.addRenderableWidget(scout);
-        y += 30;
-        BlockPos depot = markedDepot();
-        BlockPos sup = h.supply() != null ? h.supply() : depot != null ? depot : me.below();
-        sx = box(rx + 66, y, sup.getX());
-        sy = box(rx + 122, y, sup.getY());
-        sz = box(rx + 178, y, sup.getZ());
-        this.addRenderableWidget(Button.builder(Component.literal("Set"), b -> {
-            BlockPos p = parse(sx, sy, sz);
-            if (p != null) Net.sendAction(h.id(), Net.SET_SUPPLY, p, 0);
-        }).bounds(rx + 226, y, 28, 18).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Clear"), b -> Net.sendAction(h.id(), Net.CLEAR_SUPPLY, BlockPos.ZERO, 0))
-                .bounds(rx + 256, y, 34, 18).build());
-        y += 30;
-        // ---- your company: how many ride with you
+        row.add(scout);
+        textBottom = layUp(row, mx, contentBottom() - BH, mw) - 4;
+    }
+
+    private void companyWidgets(HoldingInfo h, int mx, int mw) {
+        int y = contentTop();
         int[] c = h.counts();
         int[] max = {Math.max(0, c[1] - 1), Math.max(0, c[2] - 1), Math.max(0, c[3] - 1)};
-        int[] acts = {Net.MUSTER_KNIGHTS, Net.MUSTER_ARCHERS, Net.MUSTER_CROSSBOWMEN};
         for (int i = 0; i < 3; i++) {
             final int k = i;
             want[k] = Math.min(want[k], max[k]);
-            int bx = rx + 52 + i * 70;
-            this.addRenderableWidget(Button.builder(Component.literal("-"), b -> {
+            int ry = y + i * 18;
+            Button minus = Button.builder(Component.literal("-"), b -> {
                 want[k] = Math.max(0, want[k] - (hasShiftDown() ? 5 : 1));
                 rebuildWidgets();
-            }).bounds(bx, y, 14, 18).build());
-            this.addRenderableWidget(Button.builder(Component.literal("+"), b -> {
+            }).tooltip(Tooltip.create(Component.literal("One fewer (shift: five)."))).bounds(mx + 66, ry, 16, 16).build();
+            minus.active = want[k] > 0;
+            this.addRenderableWidget(minus);
+            Button plus = Button.builder(Component.literal("+"), b -> {
                 want[k] = Math.min(max[k], want[k] + (hasShiftDown() ? 5 : 1));
                 rebuildWidgets();
-            }).bounds(bx + 40, y, 14, 18).build());
+            }).tooltip(Tooltip.create(Component.literal("One more (shift: five). One of each always stays home."))).bounds(mx + 108, ry, 16, 16).build();
+            plus.active = want[k] < max[k];
+            this.addRenderableWidget(plus);
         }
+        int n = want[0] + want[1] + want[2];
         boolean near = inCallRange(h);
-        Button muster = Button.builder(Component.literal("Muster"), b -> {
+        List<Button> row = new ArrayList<>();
+        int[] acts = {Net.MUSTER_KNIGHTS, Net.MUSTER_ARCHERS, Net.MUSTER_CROSSBOWMEN};
+        Button muster = button("Call here", "The chosen men step out of " + h.name() + "'s garrison and join you where you stand. You must be "
+                + "within " + Company.CALL_RANGE + " blocks of it.", () -> {
             for (int i = 0; i < 3; i++) if (want[i] > 0) Net.sendAction(h.id(), acts[i], BlockPos.ZERO, want[i]);
-        }).bounds(rx + 250, y, 48, 18).build();
-        muster.active = near && (want[0] + want[1] + want[2]) > 0;
-        this.addRenderableWidget(muster);
-        y += 24;
-        Button dismiss = Button.builder(Component.literal("Dismiss here"), b -> Net.sendAction(h.id(), Net.DISMISS, BlockPos.ZERO, 0))
-                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Every man of yours within 24 blocks joins the garrison of "
-                        + h.name() + ". You must be within " + net.aiagent256.stormhold.holding.Company.CALL_RANGE + " blocks of it.")))
-                .bounds(rx, y, 84, 18).build();
-        dismiss.active = near;
-        this.addRenderableWidget(dismiss);
-        Button send = Button.builder(Component.literal("Send to me"), b -> Net.sendAction(h.id(), Net.SEND_COLUMN,
-                new BlockPos(want[0], want[1], want[2]), 0))
-                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("The chosen men leave " + h.name()
-                        + " now as a column and ride to you on the clock, " + (int) net.aiagent256.stormhold.holding.Columns.SPEED
-                        + " blocks a second (about " + etaFrom(h) + " from here). They join your company when they arrive. "
-                        + "A castle of a house that hates you near the road will take a bite out of them.")))
-                .bounds(rx + 88, y, 72, 18).build();
-        send.active = (want[0] + want[1] + want[2]) > 0;
-        this.addRenderableWidget(send);
+        });
+        muster.active = near && n > 0;
+        row.add(muster);
+        Button send = button("Send to me", "The chosen men ride out as a column, " + (int) Columns.SPEED + " blocks a second (about "
+                + etaFrom(h) + " from here), and join you when they arrive. A castle that hates you near the road will take a bite out of them.",
+                () -> Net.sendAction(h.id(), Net.SEND_COLUMN, new BlockPos(want[0], want[1], want[2]), 0));
+        send.active = n > 0;
+        row.add(send);
         boolean supply = h.status().contains("Supply line");
-        this.addRenderableWidget(Button.builder(Component.literal(supply ? "Supply: on" : "Supply line"), b -> Net.sendAction(h.id(), Net.KEEP_WITH_ME,
-                BlockPos.ZERO, supply ? 0 : Math.max(1, want[0] + want[1] + want[2])))
-                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(supply
-                        ? "Click to cancel the standing order."
-                        : "Standing order: keep " + Math.max(1, want[0] + want[1] + want[2]) + " men (the counts above) with you. "
-                        + "Whenever your company runs short, " + h.name() + " sends a column, at most one every five minutes.")))
-                .bounds(rx + 164, y, 70, 18).build());
-        this.addRenderableWidget(Button.builder(Component.literal("Refresh"), b -> Net.sendAction(h.id(), Net.REFRESH, BlockPos.ZERO, 0))
-                .bounds(rx + 238, y, 52, 18).build());
-        // ---- armoury: kit for the men around you
-        y += 32;
-        String[] kits = {"Iron", "Diamond", "Netherite"};
+        row.add(button(supply ? "Stop resupply" : "Keep me supplied", supply ? "Cancel the standing order."
+                : "Standing order: keep " + Math.max(1, n) + " men (the counts above) with you. Whenever you run short, " + h.name()
+                + " sends a column, at most one every five minutes.", () -> Net.sendAction(h.id(), Net.KEEP_WITH_ME, BlockPos.ZERO, supply ? 0 : Math.max(1, n))));
+        Button dismiss = button("Dismiss here", "Every man of yours within 24 blocks joins " + h.name() + "'s garrison. You must be within "
+                + Company.CALL_RANGE + " blocks of it.", () -> Net.sendAction(h.id(), Net.DISMISS, BlockPos.ZERO, 0));
+        dismiss.active = near;
+        row.add(dismiss);
+        noteY = layDown(row, mx, y + 58, mw) + 3;
+        // the armoury, along the bottom
+        String[] kits = {"Iron kit", "Diamond kit", "Netherite kit"};
+        List<Button> arm = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
             final int tier = i + 1;
-            this.addRenderableWidget(Button.builder(Component.literal(kits[i]),
-                    b -> Net.sendAction(h.id(), Net.ARM, new BlockPos(enchant ? 1 : 0, 0, 0), tier))
-                    .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Full " + kits[i].toLowerCase()
-                            + " armour and a weapon for every man of yours within 24 blocks who's wearing worse. Paid from your pack, then "
-                            + h.name() + "'s stores when you're within " + net.aiagent256.stormhold.holding.Company.CALL_RANGE
-                            + " blocks. Old kit comes back to you.")))
-                    .bounds(rx + 52 + i * 64, y, 60, 18).build());
+            arm.add(button(kits[i], "Full " + kits[i].toLowerCase().replace(" kit", "") + " armour and a weapon for every man of yours within "
+                    + "24 blocks who wears worse. Paid from your pack, then " + h.name() + "'s stores when you're within " + Company.CALL_RANGE
+                    + " blocks. Old kit comes back to you.", () -> Net.sendAction(h.id(), Net.ARM, new BlockPos(enchant ? 1 : 0, 0, 0), tier)));
         }
-        this.addRenderableWidget(Button.builder(Component.literal(enchant ? "[Enchanted]" : "Enchanted"), b -> {
+        arm.add(button(enchant ? "Enchant: on" : "Enchant: off", "Protection and Sharpness or Power II to IV by metal, Unbreaking III; fire "
+                + "and piercing on netherite. " + net.aiagent256.stormhold.holding.Armoury.ENCHANT_LEVELS + " experience levels a man.", () -> {
             enchant = !enchant;
             rebuildWidgets();
-        }).tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Protection and Sharpness/Power II-IV by metal, Unbreaking III; "
-                + "fire and piercing on netherite. " + net.aiagent256.stormhold.holding.Armoury.ENCHANT_LEVELS + " experience levels per man.")))
-                .bounds(rx + 246, y, 56, 18).build());
-        // ---- works: the master builder (below the armoury notes)
-        y = y0 + 332;
-        boolean busy = h.status().contains("Builder ");
-        Button repair = Button.builder(Component.literal("Repair"), b -> Net.sendAction(h.id(), Net.REPAIR, BlockPos.ZERO, 0))
-                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("The Master Builder puts back every block of the castle's "
-                        + "plans that's missing: walls, gate, portcullis, roofs. A stone from the stores per block keeps the pace; without stone it's slow. "
-                        + "Your own additions are left alone.")))
-                .bounds(rx, y, 46, 18).build();
-        repair.active = !busy;
-        this.addRenderableWidget(repair);
-        int stage = Math.min(3, fortifyStage(h) + 1);
-        int[] cost = net.aiagent256.stormhold.holding.Builder.fortifyCost(stage);
-        Button fort = Button.builder(Component.literal(fortifyStage(h) >= 3 ? "Fortified" : "Fortify " + "I".repeat(stage)),
-                b -> Net.sendAction(h.id(), Net.FORTIFY, BlockPos.ZERO, 0))
-                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Stage " + stage + ": "
-                        + net.aiagent256.stormhold.holding.Builder.stageName(stage) + ". Costs " + cost[0] + " stone and " + cost[1]
-                        + " iron from the stores. Each stage lets the castle hold 15% more men.")))
-                .bounds(rx + 48, y, 56, 18).build();
-        fort.active = !busy && fortifyStage(h) < 3;
-        this.addRenderableWidget(fort);
-        // ---- projects: click the name to pick one, Go to set the builder at it
-        String[] names = {"Light", "Clear", "Road"};
-        String[] tips = {
-                "Light the castle: the builder walks every floor inside the walls and sets a torch wherever a monster could spawn, "
-                        + "as few as will do, on the walls where he can. A coal or charcoal from the stores makes "
-                        + net.aiagent256.stormhold.holding.Builder.TORCHES_PER_COAL + ". Crypts and cellars stay dark.",
-                "Clear the field: woodcutters fell every wild tree within " + net.aiagent256.stormhold.holding.Builder.CLEAR_REACH
-                        + " blocks of the walls, leaves and all, so nothing comes at the gate unseen. The logs go to the stores. "
-                        + "Orchards, fief buildings and anything inside a town are left alone.",
-                "Lay a road from the gate to the nearest place you hold that hasn't one yet (up to "
-                        + net.aiagent256.stormhold.holding.Builder.ROAD_MAX + " blocks), with lamps along it. A stone from the stores per "
-                        + net.aiagent256.stormhold.holding.Builder.ROAD_PER_STONE + " blocks. It goes down as the land it crosses loads."};
-        int pi = Math.floorMod(project, names.length);
-        this.addRenderableWidget(Button.builder(Component.literal(names[pi] + " >"), b -> {
-            project = (project + 1) % names.length;
-            rebuildWidgets();
-        }).tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(tips[pi] + "\n\nClick to see the next project.")))
-                .bounds(rx + 106, y, 50, 18).build());
-        Button go = Button.builder(Component.literal("Go"), b -> Net.sendAction(h.id(), Net.PROJECT, BlockPos.ZERO, pi))
-                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(tips[pi])))
-                .bounds(rx + 158, y, 26, 18).build();
-        go.active = pi == 2 || !busy;
-        this.addRenderableWidget(go);
-        // ---- labour: the people set to the mine and the forge (click for one more, shift-click for one fewer)
-        int mx = net.aiagent256.stormhold.holding.Labour.MAX;
-        this.addRenderableWidget(Button.builder(Component.literal("Mine " + h.miners()),
-                        b -> Net.sendAction(h.id(), Net.SET_MINERS, BlockPos.ZERO, Math.max(0, Math.min(mx, h.miners() + (hasShiftDown() ? -1 : 1)))))
-                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Click to set one more of " + h.name()
-                        + "'s people to the mine, shift-click for one fewer (up to " + mx + "). Each brings up a day's ore into the stores, smelted: "
-                        + "coal, iron, copper, gold, now and then redstone, lapis, emeralds and diamonds; more diamonds on the frontier, and "
-                        + "ancient debris from zone 7.\n\n" + h.labour())))
-                .bounds(rx + 188, y, 52, 18).build());
-        int next = Math.min(net.aiagent256.stormhold.holding.Frontier.MAX, kitLevel(h) + 1);
-        int[] metal = net.aiagent256.stormhold.holding.Labour.cost(next);
-        this.addRenderableWidget(Button.builder(Component.literal("Forge " + h.smiths()),
-                        b -> Net.sendAction(h.id(), Net.SET_SMITHS, BlockPos.ZERO, Math.max(0, Math.min(mx, h.smiths() + (hasShiftDown() ? -1 : 1)))))
-                .tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal("Click to set one more of " + h.name()
-                        + "'s people to the forge, shift-click for one fewer (up to " + mx + "). Smiths forge the garrison's kit a level at a time: "
-                        + "the next, level " + next + " (" + net.aiagent256.stormhold.holding.Labour.kitName(next) + "), takes "
-                        + (metal[0] > 0 ? metal[0] + " iron " : "") + (metal[1] > 0 ? metal[1] + " diamonds " : "") + (metal[2] > 0 ? metal[2] + " netherite " : "")
-                        + "from the stores and " + net.aiagent256.stormhold.holding.Labour.SMITH_DAYS + " smith-days. Then every man on the walls is re-armed.\n\n"
-                        + h.labour())))
-                .bounds(rx + 242, y, 56, 18).build());
+        }));
+        armouryY = layUp(arm, mx, contentBottom() - BH - 10, mw) - 11;
     }
 
-    /** Which project the project button shows; kept between refreshes. */
-    private int project;
+    private void worksWidgets(HoldingInfo h, int mx, int mw) {
+        boolean busy = h.status().contains("Builder ");
+        int stage = Math.min(3, fortifyStage(h) + 1);
+        int[] cost = Builder.fortifyCost(stage);
+        List<Button> row = new ArrayList<>();
+        Button repair = button("Repair", "Put back every block of the castle's plans that's missing: walls, gate, portcullis, roofs. A stone "
+                + "from the stores per block keeps the pace; without stone it's slow. Your own additions are left alone.",
+                () -> Net.sendAction(h.id(), Net.REPAIR, BlockPos.ZERO, 0));
+        repair.active = !busy;
+        row.add(repair);
+        Button fort = button(fortifyStage(h) >= 3 ? "Fortified" : "Fortify " + "I".repeat(stage), "Stage " + stage + ": " + Builder.stageName(stage)
+                + ". " + cost[0] + " stone and " + cost[1] + " iron from the stores. Each stage lets the castle hold 15% more men.",
+                () -> Net.sendAction(h.id(), Net.FORTIFY, BlockPos.ZERO, 0));
+        fort.active = !busy && fortifyStage(h) < 3;
+        row.add(fort);
+        String[] names = {"Light it", "Clear trees", "Lay a road"};
+        String[] tips = {
+                "The builder walks every floor inside the walls and sets a torch wherever a monster could spawn, on the walls where he can. "
+                        + "A coal or charcoal from the stores makes " + Builder.TORCHES_PER_COAL + ". Crypts and cellars stay dark.",
+                "Woodcutters fell every wild tree within " + Builder.CLEAR_REACH + " blocks of the walls, so nothing comes at the gate unseen. "
+                        + "The logs go to the stores. Orchards, fief buildings and anything inside a town are left alone.",
+                "A road from the gate to the nearest place you hold that hasn't one yet (up to " + Builder.ROAD_MAX + " blocks), lamps along it. "
+                        + "A stone from the stores per " + Builder.ROAD_PER_STONE + " blocks. It goes down as the land it crosses loads."};
+        for (int i = 0; i < 3; i++) {
+            final int p = i;
+            Button b = button(names[i], tips[i], () -> Net.sendAction(h.id(), Net.PROJECT, BlockPos.ZERO, p));
+            b.active = i == 2 || !busy;
+            row.add(b);
+        }
+        peopleY = layDown(row, mx, contentTop() + 12, mw) + 6;
+        this.addRenderableWidget(Button.builder(Component.literal("Expand fief"), b -> Net.sendAction(h.id(), Net.EXPAND_FIEF, BlockPos.ZERO, 0))
+                .tooltip(Tooltip.create(Component.literal("The people raise one more building (a pasture, a mine, a mill, then more cottages) for "
+                        + "32 bread and 8 iron from the stores. More folk, more produce."))).bounds(mx + mw - 70, peopleY - 4, 70, 16).build());
+        stepY = peopleY + 16;
+        stepper(mx + 34, stepY, h.miners(), Labour.MAX, v -> Net.sendAction(h.id(), Net.SET_MINERS, BlockPos.ZERO, v),
+                "person at the mine. Each brings up a day's ore, smelted, into the stores: coal, iron, copper, gold, now and then redstone, "
+                        + "lapis, emeralds and diamonds; more diamonds on the frontier, ancient debris from zone 7.");
+        int next = Math.min(net.aiagent256.stormhold.holding.Frontier.MAX, kitLevel(h) + 1);
+        int[] metal = Labour.cost(next);
+        stepper(mx + mw / 2 + 36, stepY, h.smiths(), Labour.MAX, v -> Net.sendAction(h.id(), Net.SET_SMITHS, BlockPos.ZERO, v),
+                "smith at the forge. Smiths forge the garrison's kit a level at a time: the next, level " + next + " (" + Labour.kitName(next)
+                        + "), takes " + (metal[0] > 0 ? metal[0] + " iron " : "") + (metal[1] > 0 ? metal[1] + " diamonds " : "")
+                        + (metal[2] > 0 ? metal[2] + " netherite " : "") + "and " + Labour.SMITH_DAYS + " smith-days; then every man is re-armed.");
+        labourY = stepY + 20;
+        // couriers, along the bottom
+        courierY = contentBottom() - 18;
+        BlockPos depot = markedDepot();
+        BlockPos sup = h.supply() != null ? h.supply() : depot != null ? depot : playerPos().below();
+        sx = box(mx + 50, courierY, 40, typedOr(2, sup.getX()));
+        sy = box(mx + 94, courierY, 30, typedOr(3, sup.getY()));
+        sz = box(mx + 128, courierY, 40, typedOr(4, sup.getZ()));
+        int rest = mw - 172;
+        this.addRenderableWidget(Button.builder(Component.literal("Set"), b -> {
+            BlockPos p = parse(sx, sy, sz);
+            if (p != null) Net.sendAction(h.id(), Net.SET_SUPPLY, p, 0);
+        }).tooltip(Tooltip.create(Component.literal("Each day a courier carries " + h.name() + "'s surplus to a chest at this x, y, z. "
+                + "A War Banner in your pack fills in its depot."))).bounds(mx + 172, courierY, rest / 2 - 1, 18).build());
+        Button stop = Button.builder(Component.literal("Stop"), b -> Net.sendAction(h.id(), Net.CLEAR_SUPPLY, BlockPos.ZERO, 0))
+                .tooltip(Tooltip.create(Component.literal("No more couriers from " + h.name() + ".")))
+                .bounds(mx + 172 + rest / 2 + 1, courierY, rest - rest / 2 - 1, 18).build();
+        stop.active = h.supply() != null;
+        this.addRenderableWidget(stop);
+        textBottom = courierY - 4;
+    }
+
+    private void councilWidgets(int mx, int mw) {
+        List<Net.Seat> seats = data.council();
+        int rh = seatHeight();
+        for (int i = 0; i < seats.size(); i++) {
+            Net.Seat s = seats.get(i);
+            int ry = contentTop() + i * rh;
+            boolean held = !s.holder().isEmpty();
+            Button b = Button.builder(Component.literal(held ? "Dismiss" : "Appoint"),
+                    x -> Net.sendAction(new UUID(0, 0), held ? Net.COUNCIL_DISMISS : Net.COUNCIL_APPOINT, BlockPos.ZERO, s.ordinal()))
+                    .tooltip(Tooltip.create(Component.literal(s.title() + ": " + s.does() + ".\n\n" + (held ? s.holder() + " gives up the seat and the wage stops."
+                            : "Name someone to the seat: " + s.wage() + " emeralds a day from the realm's stores, paid each dawn."))))
+                    .bounds(mx + mw - 56, ry + 1, 56, 16).build();
+            b.active = held || !data.holdings().isEmpty();
+            this.addRenderableWidget(b);
+        }
+    }
+
+    private int seatHeight() {
+        return Math.max(30, (contentBottom() - 12 - contentTop()) / Math.max(1, data.council().size()));
+    }
+
+    // ------------------------------------------------------------------ drawing
+
+    @Override
+    public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
+        this.renderBackground(g);
+        int x0 = left(), y0 = top();
+        g.fill(x0, y0, x0 + W, y0 + H, BG);
+        g.fill(x0 + 2, y0 + 2, x0 + SIDE, y0 + H - 2, PANEL);
+        g.fill(x0 + SIDE, y0 + 4, x0 + SIDE + 1, y0 + H - 4, LINE);
+        g.drawString(this.font, "War Table", x0 + 8, y0 + 7, GOLD, false);
+        HoldingInfo h = current();
+        int mx = mainX(), mw = mainW();
+        if (tab == COUNCIL) {
+            g.drawString(this.font, "Your council", mx, y0 + 7, NAME, false);
+            g.drawString(this.font, fit("Four officers who serve every place you hold. Hover a seat's button for the details.", mw), mx, y0 + 18, DIM, false);
+        } else if (h != null) {
+            String where = net.aiagent256.stormhold.holding.Holding.tierName(h.tier()) + ", " + h.pos().getX() + " " + h.pos().getZ();
+            g.drawString(this.font, fit(h.name(), mw - this.font.width(where) - 8), mx, y0 + 7, NAME, false);
+            g.drawString(this.font, where, mx + mw - this.font.width(where), y0 + 7, DIM, false);
+            String alert = headline(h);
+            g.drawString(this.font, fit(alert, mw), mx, y0 + 18, alert.equals("All quiet.") ? DIM : WARN, false);
+        }
+        g.fill(mx - 2, y0 + 50, mx + mw, y0 + 51, LINE);
+        if (tab == COUNCIL) drawCouncil(g, mx, mw);
+        else if (h == null) {
+            g.drawWordWrap(this.font, Component.literal("You hold no castles yet. Kill a castle's lord, raise a War Banner on its banner stand and "
+                    + "hold it until the garrison yields. Your council can sit once you hold one."), mx, contentTop(), mw, TEXT);
+        } else {
+            switch (tab) {
+                case ORDERS -> drawOrders(g, h, mx, mw);
+                case COMPANY -> drawCompany(g, h, mx, mw);
+                case WORKS -> drawWorks(g, h, mx, mw);
+                default -> drawOverview(g, h, mx, mw);
+            }
+        }
+        // along the bottom: the last word from the server while the table's open, else the build
+        boolean fresh = System.currentTimeMillis() - noticeAt < 20000 && !notice.getString().isEmpty();
+        List<FormattedCharSequence> nl = this.font.split(fresh ? notice : Component.literal("build " + net.aiagent256.stormhold.Stormhold.buildId()), mw);
+        if (!nl.isEmpty()) g.drawString(this.font, nl.get(0), mx, y0 + H - 13, fresh ? 0xF0E0A0 : 0x6C5C3C, false);
+        super.render(g, mouseX, mouseY, partial);
+    }
+
+    private void drawOverview(GuiGraphics g, HoldingInfo h, int mx, int mw) {
+        int top = contentTop(), bottom = textBottom;
+        int[] c = h.counts(), cap = h.capacity();
+        String[][] sections = {
+                {"Garrison", "Knights " + c[1] + " of " + cap[1] + ", archers " + c[2] + " of " + cap[2] + ", crossbowmen " + c[3] + " of " + cap[3]
+                        + ", captains " + c[0] + "."},
+                {"What's happening", h.status().isEmpty() ? "All quiet." : h.status().replace(". ", ".\n")},
+                {"Stores", h.stock()},
+                {"The people", h.fief()},
+                {"The realm", h.realm()}};
+        g.enableScissor(mx - 2, top, mx + mw, bottom);
+        int y = top - scroll;
+        for (String[] s : sections) {
+            g.drawString(this.font, s[0], mx, y, GOLD, false);
+            y += 10;
+            boolean news = s[0].equals("What's happening") && !h.status().isEmpty();
+            for (String para : s[1].split("\n")) {
+                for (FormattedCharSequence line : this.font.split(Component.literal(para.trim()), mw - 8)) {
+                    g.drawString(this.font, line, mx + 4, y, news ? WARN : TEXT, false);
+                    y += 9;
+                }
+            }
+            y += 4;
+        }
+        g.disableScissor();
+        overviewHeight = y + scroll - top;
+        int track = bottom - top;
+        if (overviewHeight > track) {
+            int bar = Math.max(10, track * track / overviewHeight);
+            int by = top + (track - bar) * scroll / Math.max(1, overviewHeight - track);
+            g.fill(mx + mw - 2, top, mx + mw, bottom, 0x40FFFFFF);
+            g.fill(mx + mw - 2, by, mx + mw, by + bar, 0xC0F0D8A0);
+        }
+    }
+
+    private void drawOrders(GuiGraphics g, HoldingInfo h, int mx, int mw) {
+        g.drawString(this.font, "Stance", mx, contentTop() + 6, GOLD, false);
+        lines(g, stanceText(h.mode()), mx, stanceTextY, mw, targetY - 4, TEXT);
+        g.drawString(this.font, "Target", mx, targetY + 5, GOLD, false);
+        g.drawString(this.font, "x", mx + 40, targetY + 5, DIM, false);
+        g.drawString(this.font, "z", mx + 100, targetY + 5, DIM, false);
+        String odds = h.attack() == null ? "No target. Type an x and z (or stand there and press Here), then Set target." : h.odds();
+        lines(g, odds, mx, oddsY, mw, textBottom, h.attack() == null ? DIM : BLUE);
+    }
+
+    private void drawCompany(GuiGraphics g, HoldingInfo h, int mx, int mw) {
+        int y = contentTop();
+        String[] roles = {"Knights", "Archers", "Crossbows"};
+        int[] c = h.counts();
+        int[] have = {c[1], c[2], c[3]};
+        for (int i = 0; i < 3; i++) {
+            int ry = y + i * 18;
+            g.drawString(this.font, roles[i], mx, ry + 4, TEXT, false);
+            g.drawCenteredString(this.font, String.valueOf(want[i]), mx + 95, ry + 4, 0xFFFFFF);
+            g.drawString(this.font, "of " + have[i] + " at home", mx + 132, ry + 4, DIM, false);
+        }
+        boolean near = inCallRange(h);
+        g.drawString(this.font, fit(near ? "You're close enough to call them here." + (data.recruits() ? " (Recruits)" : "")
+                : "Too far to call them: come within " + Company.CALL_RANGE + " blocks, or send for them.", mw), mx, noteY, near ? DIM : WARN, false);
+        g.drawString(this.font, "Armoury", mx, armouryY, GOLD, false);
+        g.drawString(this.font, fit("a man: 26 iron | 26 diamond | 26 diamond + 5 netherite", mw - 50), mx + 50, armouryY, DIM, false);
+        var p = Minecraft.getInstance().player;
+        int iron = p != null ? p.getInventory().countItem(net.minecraft.world.item.Items.IRON_INGOT) : 0;
+        int dia = p != null ? p.getInventory().countItem(net.minecraft.world.item.Items.DIAMOND) : 0;
+        int neth = p != null ? p.getInventory().countItem(net.minecraft.world.item.Items.NETHERITE_INGOT) : 0;
+        g.drawString(this.font, fit("In your pack: " + iron + " iron, " + dia + " diamond, " + neth + " netherite, "
+                + (p != null ? p.experienceLevel : 0) + " levels", mw), mx, contentBottom() - 8, DIM, false);
+    }
+
+    private void drawWorks(GuiGraphics g, HoldingInfo h, int mx, int mw) {
+        String builder = "Idle. Pick a job below.";
+        for (String s : h.status().split("\\. ")) if (s.startsWith("Builder ") || s.startsWith("Fortified")) builder = s.endsWith(".") ? s : s + ".";
+        g.drawString(this.font, "Builder", mx, contentTop(), GOLD, false);
+        g.drawString(this.font, fit(builder, mw - 48), mx + 48, contentTop(), TEXT, false);
+        g.drawString(this.font, "The people", mx, peopleY, GOLD, false);
+        g.drawString(this.font, fit(h.fief(), mw - 140), mx + 62, peopleY, DIM, false);
+        g.drawString(this.font, "Mine", mx, stepY + 4, TEXT, false);
+        g.drawString(this.font, "Forge", mx + mw / 2, stepY + 4, TEXT, false);
+        lines(g, h.labour(), mx, labourY, mw, textBottom, DIM);
+        g.drawString(this.font, "Couriers", mx, courierY + 5, GOLD, false);
+    }
+
+    private void drawCouncil(GuiGraphics g, int mx, int mw) {
+        List<Net.Seat> seats = data.council();
+        int rh = seatHeight();
+        int wages = 0;
+        for (int i = 0; i < seats.size(); i++) {
+            Net.Seat s = seats.get(i);
+            int ry = contentTop() + i * rh;
+            boolean held = !s.holder().isEmpty();
+            if (held) wages += s.wage();
+            g.fill(mx - 2, ry - 1, mx + mw, ry + rh - 3, CARD);
+            g.fill(mx - 2, ry - 1, mx, ry + rh - 3, held ? 0xFFA8D080 : 0xFF6b5a40);
+            String head = s.title() + ": ";
+            g.drawString(this.font, head, mx + 3, ry + 5, GOLD, false);
+            String who = held ? s.holder() : "seat empty (" + s.wage() + " a day)";
+            g.drawString(this.font, fit(who, mw - 64 - this.font.width(head)), mx + 3 + this.font.width(head), ry + 5, held ? 0xFFFFFF : DIM, false);
+            lines(g, s.brief() + (held ? " (" + s.wage() + " emeralds a day)" : ""), mx + 3, ry + 18, mw - 6, ry + rh - 4, TEXT);
+        }
+        g.drawString(this.font, fit("Wages " + wages + " a day, paid at dawn from the stores (" + data.treasury() + " emeralds there). "
+                + "Unpaid officers leave.", mw), mx, contentBottom() - 8, wages > data.treasury() ? WARN : DIM, false);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (tab == OVERVIEW && overviewHeight > 0) {
+            int view = textBottom - contentTop();
+            scroll = (int) Math.max(0, Math.min(Math.max(0, overviewHeight - view), scroll - delta * 18));
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, delta);
+    }
+
+    // ------------------------------------------------------------------ helpers
+
+    /** Wrapped text from y down, stopping before `bottom`. */
+    private void lines(GuiGraphics g, String text, int x, int y, int w, int bottom, int color) {
+        for (FormattedCharSequence line : this.font.split(Component.literal(text), w)) {
+            if (y + 9 > bottom) break;
+            g.drawString(this.font, line, x, y, color, false);
+            y += 9;
+        }
+    }
+
+    /** The text cut to the width, with a dot where it was cut. */
+    private String fit(String s, int w) {
+        if (this.font.width(s) <= w) return s;
+        return this.font.plainSubstrByWidth(s, Math.max(0, w - this.font.width("."))) + ".";
+    }
+
+    private Button button(String label, String tip, Runnable press) {
+        return Button.builder(Component.literal(label), b -> press.run()).tooltip(Tooltip.create(Component.literal(tip))).size(MIN_BUTTON, BH).build();
+    }
+
+    /** Buttons in rows across the width, as many to a row as fit at a readable width, from y down. Returns the y below them. */
+    private int layDown(List<Button> row, int x, int y, int w) {
+        int perRow = perRow(row.size(), w);
+        int bw = (w - 2 * (perRow - 1)) / perRow;
+        for (int i = 0; i < row.size(); i++) {
+            Button b = row.get(i);
+            b.setX(x + (i % perRow) * (bw + 2));
+            b.setY(y + (i / perRow) * STEP);
+            b.setWidth(bw);
+            this.addRenderableWidget(b);
+        }
+        return y + ((row.size() + perRow - 1) / perRow) * STEP;
+    }
+
+    /** The same, with the last row at `bottom` and any others above it. Returns the top of the first row. */
+    private int layUp(List<Button> row, int x, int bottom, int w) {
+        int rows = (row.size() + perRow(row.size(), w) - 1) / perRow(row.size(), w);
+        int y = bottom - (rows - 1) * STEP;
+        layDown(row, x, y, w);
+        return y;
+    }
+
+    private int perRow(int n, int w) {
+        int perRow = Math.max(1, n);
+        while (perRow > 1 && (w - 2 * (perRow - 1)) / perRow < 76) perRow--;
+        return perRow;
+    }
+
+    /** A number between a minus and a plus; each sends the new value. */
+    private void stepper(int x, int y, int value, int max, java.util.function.IntConsumer send, String what) {
+        Button minus = Button.builder(Component.literal("-"), b -> send.accept(Math.max(0, value - 1)))
+                .tooltip(Tooltip.create(Component.literal("One fewer " + what))).bounds(x, y, 16, 16).build();
+        minus.active = value > 0;
+        this.addRenderableWidget(minus);
+        Button plus = Button.builder(Component.literal("+"), b -> send.accept(Math.min(max, value + 1)))
+                .tooltip(Tooltip.create(Component.literal("One more " + what + " Up to " + max + "."))).bounds(x + 40, y, 16, 16).build();
+        plus.active = value < max;
+        this.addRenderableWidget(plus);
+        this.addRenderableOnly((g, mX, mY, pt) -> g.drawCenteredString(this.font, String.valueOf(value), x + 28, y + 4, 0xFFFFFF));
+    }
+
+    private void keepTyped() {
+        HoldingInfo h = current();
+        UUID id = h != null ? h.id() : null;
+        if (id == null || !id.equals(typedFor)) {
+            typed = null;
+            typedFor = id;
+            ax = az = sx = sy = sz = null;
+            return;
+        }
+        String[] t = typed != null ? typed : new String[5];
+        EditBox[] boxes = {ax, az, sx, sy, sz};
+        for (int i = 0; i < 5; i++) if (boxes[i] != null) t[i] = boxes[i].getValue();
+        typed = t;
+        ax = az = sx = sy = sz = null;
+    }
+
+    private int typedOr(int i, int fallback) {
+        if (typed != null && typed[i] != null) {
+            try {
+                return Integer.parseInt(typed[i]);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return fallback;
+    }
+
+    /** The most pressing line of a place's status, for the header. */
+    private static String headline(HoldingInfo h) {
+        String s = h.status();
+        if (s.isEmpty()) return "All quiet.";
+        for (String key : new String[]{"Under attack", "Illager warband", "Raid expected", "War party out", "Column", "Scouts out"}) {
+            int i = s.indexOf(key);
+            if (i >= 0) {
+                int j = s.indexOf(". ", i);
+                return s.substring(i, j < 0 ? s.length() : j + 1).trim();
+            }
+        }
+        int j = s.indexOf(". ");
+        return j < 0 ? s : s.substring(0, j + 1);
+    }
+
+    private static String stanceText(String mode) {
+        return switch (mode) {
+            case "PRODUCE" -> "Produce: the stores fill with a day's goods, rents run a quarter higher and the people make half again as much. "
+                    + "Lost men come back slower and raids hit harder.";
+            case "ATTACK" -> "Attack: while a target is set, a war party marches on it every five minutes. The people make a quarter less.";
+            default -> "Defend: lost men are replaced twice as fast and the walls hold raids much harder while you're away.";
+        };
+    }
+
+    private static BlockPos playerPos() {
+        var p = Minecraft.getInstance().player;
+        return p != null ? p.blockPosition() : BlockPos.ZERO;
+    }
 
     private static int kitLevel(HoldingInfo h) {
         var m = java.util.regex.Pattern.compile("Kit level (\\d)").matcher(h.labour());
@@ -305,16 +665,11 @@ public class WarTableScreen extends Screen {
         return m.find() ? Integer.parseInt(m.group(1)) : 0;
     }
 
-    private boolean enchant;
-
-    /** How many of each (knights, archers, crossbowmen) the player wants to take; kept between refreshes. */
-    private final int[] want = {4, 2, 0};
-
     private static String etaFrom(HoldingInfo h) {
         var p = Minecraft.getInstance().player;
         if (p == null) return "?";
         double dx = p.getX() - h.pos().getX(), dz = p.getZ() - h.pos().getZ();
-        int secs = (int) (Math.sqrt(dx * dx + dz * dz) / net.aiagent256.stormhold.holding.Columns.SPEED);
+        int secs = (int) (Math.sqrt(dx * dx + dz * dz) / Columns.SPEED);
         return secs >= 60 ? (secs / 60) + " min " + (secs % 60) + " s" : secs + " s";
     }
 
@@ -322,7 +677,7 @@ public class WarTableScreen extends Screen {
         var p = Minecraft.getInstance().player;
         if (p == null) return false;
         double dx = p.getX() - h.pos().getX(), dz = p.getZ() - h.pos().getZ();
-        int r = net.aiagent256.stormhold.holding.Company.CALL_RANGE;
+        int r = Company.CALL_RANGE;
         return dx * dx + dz * dz <= (double) r * r;
     }
 
@@ -340,8 +695,8 @@ public class WarTableScreen extends Screen {
         return null;
     }
 
-    private EditBox box(int x, int y, int value) {
-        EditBox b = new EditBox(this.font, x, y, 46, 18, Component.empty());
+    private EditBox box(int x, int y, int w, int value) {
+        EditBox b = new EditBox(this.font, x, y, w, 18, Component.empty());
         b.setValue(String.valueOf(value));
         b.setFilter(s -> s.isEmpty() || s.equals("-") || s.matches("-?\\d{0,8}"));
         this.addRenderableWidget(b);
@@ -359,66 +714,8 @@ public class WarTableScreen extends Screen {
     }
 
     private static String trim(String s, int n) {
+        n = Math.max(4, n);
         return s.length() <= n ? s : s.substring(0, n - 1) + ".";
-    }
-
-    @Override
-    public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
-        this.renderBackground(g);
-        int x0 = left(), y0 = top();
-        g.fill(x0, y0, x0 + W, y0 + H, 0xE0241c14);
-        g.fill(x0 + 2, y0 + 2, x0 + W - 2, y0 + H - 2, 0xE03a2e20);
-        g.fill(x0 + 122, y0 + 18, x0 + 123, y0 + H - 6, 0xFF6b5a40);
-        g.drawString(this.font, "War Table", x0 + 8, y0 + 7, 0xF0D8A0, false);
-        g.drawString(this.font, "build " + net.aiagent256.stormhold.Stormhold.buildId(), x0 + 8, y0 + H - 12, 0x7C6C4C, false);
-        HoldingInfo h = current();
-        int rx = x0 + 128;
-        if (h == null) {
-            g.drawWordWrap(this.font, Component.literal("You hold no castles. Kill a castle's lord, then raise a War Banner on "
-                    + "its banner stand and hold it until the garrison yields."), rx, y0 + 26, W - 136, 0xE0D0B0);
-        } else {
-            String tier = net.aiagent256.stormhold.holding.Holding.tierName(h.tier());
-            g.drawString(this.font, h.name(), rx, y0 + 7, 0xFFE8B0, false);
-            g.drawString(this.font, tier + " at " + h.pos().getX() + ", " + h.pos().getZ(), rx, y0 + 22, 0xC8B898, false);
-            int[] c = h.counts(), cap = h.capacity();
-            g.drawString(this.font, "Knights " + c[1] + "/" + cap[1] + "  Archers " + c[2] + "/" + cap[2]
-                    + "  Crossbows " + c[3] + "/" + cap[3] + "  Captains " + c[0], rx, y0 + 36, 0xE0D0B0, false);
-            g.drawString(this.font, "Stores: " + trim(h.stock(), 56), rx, y0 + 50, 0xC8B898, false);
-            g.drawString(this.font, trim(h.realm(), 58), rx, y0 + 60, 0xA8B8C8, false);
-            g.drawWordWrap(this.font, Component.literal(h.status().isEmpty() ? "Quiet." : h.status()), rx, y0 + 72, W - 136, 0xD8A070);
-            g.drawWordWrap(this.font, Component.literal(h.fief()), rx, y0 + 96, W - 136 - 60, 0xB8C8A0);
-            g.drawString(this.font, "Stance", rx, y0 + 118, 0xF0D8A0, false);
-            g.drawString(this.font, "March on", rx, y0 + 165, 0xE0D0B0, false);
-            g.drawString(this.font, "x", rx + 58, y0 + 165, 0xE0D0B0, false);
-            g.drawString(this.font, "z", rx + 114, y0 + 165, 0xE0D0B0, false);
-            g.drawString(this.font, "Supply to", rx, y0 + 195, 0xE0D0B0, false);
-            g.drawString(this.font, "x", rx + 58, y0 + 195, 0xE0D0B0, false);
-            g.drawString(this.font, "y", rx + 114, y0 + 195, 0xE0D0B0, false);
-            g.drawString(this.font, "z", rx + 170, y0 + 195, 0xE0D0B0, false);
-            g.drawString(this.font, "Company", rx, y0 + 225, 0xF0D8A0, false);
-            String[] roles = {"Knights", "Archers", "Crossbows"};
-            int[] c2 = h.counts();
-            int[] have = {c2[1], c2[2], c2[3]};
-            for (int i = 0; i < 3; i++) {
-                int bx = rx + 52 + i * 70;
-                g.drawString(this.font, roles[i] + " (" + have[i] + ")", bx, y0 + 211, 0xC8B898, false);
-                g.drawCenteredString(this.font, String.valueOf(want[i]), bx + 27, y0 + 225, 0xFFFFFF);
-            }
-            boolean near = inCallRange(h);
-            g.drawString(this.font, near ? "Men you call appear at your side." + (data.recruits() ? " (Recruits)" : "")
-                    : "Too far: get within " + net.aiagent256.stormhold.holding.Company.CALL_RANGE + " blocks of " + trim(h.name(), 14) + ".",
-                    rx, y0 + 265, near ? 0x9C8C6C : 0xD88060, false);
-            g.drawString(this.font, "Armoury", rx, y0 + 281, 0xF0D8A0, false);
-            var mc = Minecraft.getInstance().player;
-            int iron = mc != null ? mc.getInventory().countItem(net.minecraft.world.item.Items.IRON_INGOT) : 0;
-            int dia = mc != null ? mc.getInventory().countItem(net.minecraft.world.item.Items.DIAMOND) : 0;
-            int neth = mc != null ? mc.getInventory().countItem(net.minecraft.world.item.Items.NETHERITE_INGOT) : 0;
-            int lvl = mc != null ? mc.experienceLevel : 0;
-            g.drawString(this.font, "Each: 26 iron | 26 diamond | 26 diamond + 5 netherite", rx, y0 + 300, 0x9C8C6C, false);
-            g.drawString(this.font, "Pack: " + iron + " iron, " + dia + " diamond, " + neth + " netherite, " + lvl + " lvl", rx, y0 + 310, 0x9C8C6C, false);
-            g.drawString(this.font, h.supply() == null ? "No supply line." : "Couriers take surplus to " + h.supply().toShortString() + " daily.", rx, y0 + 320, 0x9C8C6C, false);
-        }
-        super.render(g, mouseX, mouseY, partial);
     }
 
     @Override
