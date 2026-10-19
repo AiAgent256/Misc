@@ -2691,7 +2691,7 @@ public class StormholdGameTests {
             }
         }
         BlockPos post = g.absolutePos(new BlockPos(8, top, 7));
-        BlockPos foot = g.absolutePos(new BlockPos(6, fy, 7));
+        BlockPos foot = g.absolutePos(new BlockPos(7, fy, 7));          // hard against the wall's face, under the hole
         Holding h = sample(g);
         h.lips.put(post, new int[]{-1, 0});
         GarrisonEntity archer = Garrisons.spawn(level, mgr, h, Role.ARCHER, post, h.owner, true);
