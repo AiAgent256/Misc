@@ -10,6 +10,7 @@ public final class Config {
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> ATTACH;
     public static final ForgeConfigSpec.DoubleValue GARRISON_SCALE;
     public static final ForgeConfigSpec.BooleanValue PROTECT_HOUSE_CASTLES;
+    public static final ForgeConfigSpec.BooleanValue SIEGE_BREACH;
     public static final ForgeConfigSpec.BooleanValue SEAL_TREASURY;
     public static final ForgeConfigSpec.BooleanValue DISABLE_FOREIGN_SPAWNERS;
     public static final ForgeConfigSpec.BooleanValue CLEAR_FOREIGN_MOBS;
@@ -65,6 +66,8 @@ public final class Config {
                 .defineInRange("garrisonScale", 1.0, 0.1, 4.0);
         PROTECT_HOUSE_CASTLES = b.comment("Walls of castles held by a house cannot be broken or built on (ladders, scaffolding, torches and TNT allowed; portcullises, doors and glass can be broken).")
                 .define("protectHouseCastles", true);
+        SIEGE_BREACH = b.comment("Siege engines (Medieval Siege Machines' trebuchet, catapult, mortar, culverin and ram, and the War Horn's trebuchet) break castle stone. TNT still can't.")
+                .define("siegeEnginesBreach", true);
         SEAL_TREASURY = b.comment("Containers inside a house castle stay sealed while its lord lives.")
                 .define("sealTreasury", true);
         DISABLE_FOREIGN_SPAWNERS = b.comment("Remove mob spawners inside attached structures from other mods.")

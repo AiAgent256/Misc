@@ -1243,6 +1243,34 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** Castle stone shrugs off powder but falls to an engine; the chests come through. */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void enginesBreachWallsPowderDoesnt(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = sample(g);
+        mgr.add(h);
+        BlockPos p = g.absolutePos(new BlockPos(8, 5, 4));
+        net.minecraft.world.phys.Vec3 at = net.minecraft.world.phys.Vec3.atCenterOf(p);
+        try {
+            level.setBlock(p, net.minecraft.world.level.block.Blocks.STONE_BRICKS.defaultBlockState(), 3);
+            level.explode(null, at.x, at.y, at.z, 3.0F, net.minecraft.world.level.Level.ExplosionInteraction.BLOCK);
+            if (!level.getBlockState(p).is(net.minecraft.world.level.block.Blocks.STONE_BRICKS))
+                throw new IllegalStateException("powder broke a castle's stone");
+            net.aiagent256.stormhold.holding.Engines.blast(level, at);
+            if (!level.getBlockState(p).isAir()) throw new IllegalStateException("a trebuchet stone didn't break the wall: " + level.getBlockState(p));
+            level.setBlock(p, net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState(), 3);
+            net.aiagent256.stormhold.holding.Engines.blast(level, at);
+            if (!level.getBlockState(p).is(net.minecraft.world.level.block.Blocks.CHEST)) throw new IllegalStateException("an engine broke a chest open");
+        } finally {
+            level.setBlock(p, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+            for (var e : level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, new net.minecraft.world.phys.AABB(p).inflate(6))) e.discard();
+            mgr.holdings.remove(h.id);
+            mgr.byKey.remove(h.key);
+        }
+        g.succeed();
+    }
+
     /** A treasury far out pays the land's own kit: a set from a great castle, netherite and the template at level 7. */
     @GameTest(template = "arena", timeoutTicks = 200)
     public static void treasuriesPayTheZonesKit(GameTestHelper g) {

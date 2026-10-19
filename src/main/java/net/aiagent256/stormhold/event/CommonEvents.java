@@ -233,12 +233,14 @@ public final class CommonEvents {
         if (!(e.getLevel() instanceof ServerLevel level)) return;
         HoldingManager mgr = HoldingManager.get(level);
         if (mgr.holdings.isEmpty()) return;
+        boolean engine = net.aiagent256.stormhold.holding.Breach.byEngine(e.getExplosion());
         e.getAffectedBlocks().removeIf(pos -> {
             Holding h = mgr.at(pos, 1);
             if (h == null) return false;
             h.damagedAt = level.getGameTime();
             BlockState s = level.getBlockState(pos);
-            return !s.is(SIEGE_BREAKABLE);
+            if (s.is(SIEGE_BREAKABLE)) return false;
+            return !(engine && net.aiagent256.stormhold.holding.Breach.breaks(level, h, pos, s));
         });
     }
 

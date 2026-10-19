@@ -284,7 +284,17 @@ public final class Engines {
                 }
             }
             it.remove();
+            blast(level, p);
+        }
+    }
+
+    /** A trebuchet stone bursting: an engine's blow, so it can break a castle's stone (see {@link Breach}). */
+    public static void blast(ServerLevel level, Vec3 p) {
+        Breach.engineBlast = true;
+        try {
             level.explode(null, p.x, p.y, p.z, BLAST, Level.ExplosionInteraction.BLOCK);
+        } finally {
+            Breach.engineBlast = false;
         }
     }
 
