@@ -358,6 +358,9 @@ public final class HoldingEvents {
         clearContest(h);
         h.vassal = null;
         h.owner = newSide;
+        h.attackTarget = null;                              // the old lord's war plans aren't the new one's
+        h.mode = Holding.Mode.DEFEND;
+        h.nextCampaign = 0;
         h.contestSide = null;
         h.claimant = null;
         h.counterattackSpawned = false;

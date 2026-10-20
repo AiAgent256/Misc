@@ -3509,6 +3509,44 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** An order left from a castle's old lord never sends its men against your own; Defend turns a party back; taking a castle wipes its orders. */
+    @GameTest(template = "arena")
+    public static void oldOrdersDontMarchOnYourOwnCastles(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        UUID me = UUID.randomUUID();
+        Holding a = sample(g), b = sample(g), enemy = sample(g);
+        b.key = a.key + "/b";
+        enemy.key = a.key + "/e";
+        BlockPos o = a.center();
+        b.box = new BoundingBox(o.getX() + 300, o.getY(), o.getZ(), o.getX() + 315, o.getY() + 7, o.getZ() + 15);
+        enemy.box = new BoundingBox(o.getX() + 600, o.getY(), o.getZ(), o.getX() + 615, o.getY() + 7, o.getZ() + 15);
+        enemy.bannerPos = enemy.box.getCenter();
+        a.owner = Sides.player(me);
+        b.owner = a.owner;
+        for (Holding x : List.of(a, b, enemy)) mgr.holdings.put(x.id, x);
+        try {
+            a.attackTarget = b.center();
+            int k = a.count(Role.KNIGHT);
+            if (Campaigns.launchParty(level, mgr, a, b.center()) != null || a.count(Role.KNIGHT) != k)
+                throw new IllegalStateException("a war party marched on its own side's castle");
+            if (a.attackTarget != null) throw new IllegalStateException("the old order still stands");
+            Campaign c = Campaigns.launchParty(level, mgr, a, enemy.center());
+            if (c == null) throw new IllegalStateException("no war party against the enemy");
+            if (Campaigns.recall(level, mgr, a) != c.total() || c.stage != Campaign.Stage.RETURN)
+                throw new IllegalStateException("Defend didn't turn the party back: " + c.stage);
+            enemy.attackTarget = a.center();
+            enemy.mode = Holding.Mode.ATTACK;
+            HoldingEvents.transfer(level, mgr, enemy, Sides.player(me), true);
+            if (enemy.attackTarget != null || enemy.mode != Holding.Mode.DEFEND) throw new IllegalStateException("the taken castle kept its old orders");
+        } finally {
+            for (Holding x : List.of(a, b, enemy)) mgr.holdings.remove(x.id);
+            mgr.campaigns.removeIf(x -> a.id.equals(x.origin));
+            mgr.seats.remove(me);
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

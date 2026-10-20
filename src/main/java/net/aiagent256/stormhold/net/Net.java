@@ -387,7 +387,12 @@ public final class Net {
             if (h == null) continue;
             if (!me.equals(h.owner)) return;
             switch (a.action()) {
-                case DEFEND -> h.mode = Holding.Mode.DEFEND;
+                case DEFEND -> {
+                    h.mode = Holding.Mode.DEFEND;
+                    int back = Campaigns.recall(level, mgr, h);
+                    if (back > 0) player.sendSystemMessage(net.aiagent256.stormhold.holding.HoldingEvents.gold("The war party from " + h.name
+                            + " (" + back + " men) turns for home."));
+                }
                 case PRODUCE -> h.mode = Holding.Mode.PRODUCE;
                 case ATTACK -> {
                     h.mode = Holding.Mode.ATTACK;
@@ -404,8 +409,13 @@ public final class Net {
                         player.sendSystemMessage(Component.literal("Set a target first."));
                     } else {
                         tellOdds(level, mgr, player, h);
-                        if (Campaigns.launchParty(level, mgr, h, h.attackTarget) == null)
-                            player.sendSystemMessage(Component.literal("Not enough men to spare, or a war party is already out."));
+                        Holding own = mgr.atXZ(h.attackTarget, 16);
+                        if (own != null && own.owner.equals(h.owner)) {
+                            player.sendSystemMessage(Component.literal(own.name + " is yours: pick another target.").withStyle(net.minecraft.ChatFormatting.RED));
+                            h.attackTarget = null;
+                        } else if (Campaigns.launchParty(level, mgr, h, h.attackTarget) == null) {
+                            player.sendSystemMessage(Component.literal(Campaigns.cantSend(mgr, h)).withStyle(net.minecraft.ChatFormatting.RED));
+                        }
                     }
                 }
                 case MUSTER, MUSTER_KNIGHTS -> Company.muster(level, mgr, player, h, Role.KNIGHT, Math.max(1, Math.min(musterCap(mgr, player), a.amount())));

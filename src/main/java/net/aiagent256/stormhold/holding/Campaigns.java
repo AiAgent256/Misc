@@ -261,6 +261,13 @@ public final class Campaigns {
 
     public static Campaign launchParty(ServerLevel level, HoldingManager mgr, Holding h, BlockPos target) {
         if (active(mgr, h.id, Campaign.Kind.PARTY)) return null;
+        Holding at = mgr.atXZ(target, 16);
+        if (at != null && at.owner.equals(h.owner)) {
+            // a target that's your own (an order left from the castle's old lord, or one since taken): no march, and it's forgotten
+            if (h.attackTarget != null && mgr.atXZ(h.attackTarget, 16) == at) h.attackTarget = null;
+            mgr.setDirty();
+            return null;
+        }
         Campaign c = new Campaign();
         c.kind = Campaign.Kind.PARTY;
         c.side = h.owner;
@@ -677,6 +684,15 @@ public final class Campaigns {
             c.stage = Campaign.Stage.DONE;
             return;
         }
+        if (c.stage != Campaign.Stage.RETURN && c.target == null) {
+            // marching on a castle of its own side (an old order): it turns for home
+            Holding at = mgr.atXZ(c.to, 16);
+            if (at != null && at.owner.equals(c.side)) {
+                turnBack(level, c);
+                HoldingEvents.tell(level, origin.ownerPlayer(), HoldingEvents.gold("The war party from " + origin.name + " was marching on "
+                        + at.name + ", which is yours, on an old order. It turns for home."));
+            }
+        }
         if (c.total() <= 0) {
             HoldingEvents.tell(level, origin.ownerPlayer(), Component.literal("The war party from " + origin.name
                     + " was cut down to the last man.").withStyle(ChatFormatting.RED));
@@ -727,19 +743,7 @@ public final class Campaigns {
         if (c.stage == Campaign.Stage.SIEGE && c.live.isEmpty() && enemy != null && (now >= c.siegeUntil || !othersMarching(mgr, c))) {
             if (assault(level, mgr, c, enemy, now)) return;
         }
-        if (c.stage == Campaign.Stage.SIEGE && now >= c.siegeUntil) {
-            c.stage = Campaign.Stage.RETURN;
-            BlockPos a = c.to;
-            c.to = c.from;
-            c.from = a;
-            c.progress = 0;
-            for (UUID id : c.live.keySet()) {
-                if (level.getEntity(id) instanceof GarrisonEntity g) {
-                    g.setPost(null);
-                    g.setMarchTarget(c.to);
-                }
-            }
-        }
+        if (c.stage == Campaign.Stage.SIEGE && now >= c.siegeUntil) turnBack(level, c);
         if (c.stage == Campaign.Stage.RETURN && c.progress >= 0.97) {
             for (var e : c.counts.entrySet()) origin.add(e.getKey(), e.getValue());
             Garrisons.discardLive(level, c.live, false);
@@ -748,6 +752,44 @@ public final class Campaigns {
             c.stage = Campaign.Stage.DONE;
             mgr.setDirty();
         }
+    }
+
+    /** A war party turns for home from where it is now. */
+    static void turnBack(ServerLevel level, Campaign c) {
+        BlockPos here = c.position(), home = c.stage == Campaign.Stage.RETURN ? c.to : c.from;
+        c.stage = Campaign.Stage.RETURN;
+        c.from = here;
+        c.to = home;
+        c.progress = 0;
+        for (UUID id : c.live.keySet()) {
+            if (level.getEntity(id) instanceof GarrisonEntity g) {
+                g.setPost(null);
+                g.setMarchTarget(c.to);
+            }
+        }
+    }
+
+    /** Back to Defend: a war party of this castle's that hasn't gone in yet turns for home. How many men. */
+    public static int recall(ServerLevel level, HoldingManager mgr, Holding h) {
+        int n = 0;
+        for (Campaign c : mgr.campaigns) {
+            if (c.kind != Campaign.Kind.PARTY || !h.id.equals(c.origin)) continue;
+            if (c.stage != Campaign.Stage.MARCH && c.stage != Campaign.Stage.SIEGE) continue;
+            turnBack(level, c);
+            n += c.total();
+        }
+        if (n > 0) mgr.setDirty();
+        return n;
+    }
+
+    /** Why this castle can't send a war party now, for the table. */
+    public static String cantSend(HoldingManager mgr, Holding h) {
+        for (Campaign c : mgr.campaigns) {
+            if (c.kind != Campaign.Kind.PARTY || !h.id.equals(c.origin) || c.stage == Campaign.Stage.DONE) continue;
+            String where = c.stage == Campaign.Stage.RETURN ? "riding home" : c.stage == Campaign.Stage.SIEGE ? "at the walls" : "on the march";
+            return h.name + "'s war party is out already (" + c.total() + " men, " + where + "). Set Defend to call it back.";
+        }
+        return h.name + " can't spare three men: it keeps 3 knights, an archer and a crossbowman at home and sends at most 60% of each.";
     }
 
     private Campaigns() {

@@ -926,8 +926,10 @@ public class WarTableScreen extends Screen {
         return switch (mode) {
             case "PRODUCE" -> "Produce: the stores fill with a day's goods, rents run a quarter higher and the people make half again as much. "
                     + "Lost men come back slower and raids hit harder.";
-            case "ATTACK" -> "Attack: while a target is set, a war party marches on it every five minutes. The people make a quarter less.";
-            default -> "Defend: lost men are replaced twice as fast and the walls hold raids much harder while you're away.";
+            case "ATTACK" -> "Attack: while a target is set, a war party marches on it at once and again every five minutes. The people make "
+                    + "a quarter less.";
+            default -> "Defend: lost men are replaced twice as fast and the walls hold raids much harder while you're away. A war party "
+                    + "of this castle's that hasn't gone in yet turns for home.";
         };
     }
 
