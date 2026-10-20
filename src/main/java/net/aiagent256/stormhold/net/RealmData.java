@@ -244,7 +244,7 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
         net.aiagent256.stormhold.holding.Events.Matter open = net.aiagent256.stormhold.holding.Events.open(mgr, me);
         if (open != null) {
             var card = net.aiagent256.stormhold.holding.Events.card(mgr, open);
-            notes.add(new Note(-2, Chronicle.NEWS, card.text() + " Answer in chat: /stormhold matters"));
+            notes.add(new Note(-2, Chronicle.NEWS, card.text() + " Answer it on the War Table (\"Your word is needed\", under your castles) or with /stormhold matters."));
         }
         return new RealmData(Chronicle.day(level), at.getX(), at.getZ(), castles, houses, own, lines, notes, beasts);
     }

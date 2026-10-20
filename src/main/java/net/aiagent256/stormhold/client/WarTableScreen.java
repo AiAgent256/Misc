@@ -34,7 +34,7 @@ public class WarTableScreen extends Screen {
     private static final int BG = 0xF0241c14, PANEL = 0xF0302619, CARD = 0xF0423525, LINE = 0xFF6b5a40;
     private static final int GOLD = 0xF0D8A0, TEXT = 0xE0D0B0, DIM = 0x9C8C6C, WARN = 0xE89060, BLUE = 0xA8B8C8, NAME = 0xFFE8B0;
     private static final String[] TABS = {"Overview", "Orders", "Company", "Works", "Council"};
-    private static final int OVERVIEW = 0, ORDERS = 1, COMPANY = 2, WORKS = 3, COUNCIL = 4;
+    private static final int OVERVIEW = 0, ORDERS = 1, COMPANY = 2, WORKS = 3, COUNCIL = 4, DECIDE = 5;
     private static final int SIDE = 104, BH = 20, STEP = 22, MIN_BUTTON = 64;
 
     private Net.WarTableData data;
@@ -70,6 +70,7 @@ public class WarTableScreen extends Screen {
     public void update(Net.WarTableData d) {
         this.data = d;
         if (selected >= d.holdings().size()) selected = Math.max(0, d.holdings().size() - 1);
+        if (tab == DECIDE && d.decision() == null) tab = OVERVIEW;
         pick();
         this.rebuildWidgets();
     }
@@ -146,7 +147,8 @@ public class WarTableScreen extends Screen {
             this.addRenderableWidget(b);
         }
         HoldingInfo h = current();
-        if (tab == COUNCIL) councilWidgets(mx, mw);
+        if (tab == DECIDE && data.decision() != null) decisionWidgets(mx, mw);
+        else if (tab == COUNCIL) councilWidgets(mx, mw);
         else if (h != null) {
             switch (tab) {
                 case ORDERS -> ordersWidgets(h, mx, mw);
@@ -160,7 +162,8 @@ public class WarTableScreen extends Screen {
     /** Your places, a page at a time, then the Realm map. */
     private void sideList(int x0, int y0) {
         List<HoldingInfo> l = data.holdings();
-        int listTop = y0 + 20, listBottom = y0 + H - (l.size() > 1 ? 46 : 28);
+        boolean deciding = data.decision() != null;
+        int listTop = y0 + 20, listBottom = y0 + H - (l.size() > 1 ? 46 : 28) - (deciding ? 18 : 0);
         int perPage = Math.max(1, (listBottom - listTop) / 18);
         if (pageToSelected) {
             page = selected / perPage;
@@ -175,11 +178,11 @@ public class WarTableScreen extends Screen {
             Button b = Button.builder(Component.literal((alarm ? "! " : "") + trim(h.name(), alarm ? 13 : 15)), x -> {
                 selected = idx;
                 scroll = 0;
-                if (tab == COUNCIL) tab = OVERVIEW;
+                if (tab == COUNCIL || tab == DECIDE) tab = OVERVIEW;
                 rebuildWidgets();
             }).tooltip(Tooltip.create(Component.literal(h.name() + "\n" + (h.status().isEmpty() ? "All quiet." : h.status()))))
                     .bounds(x0 + 6, listTop + (i - start) * 18, SIDE - 12, 16).build();
-            b.active = idx != selected || tab == COUNCIL;
+            b.active = idx != selected || tab == COUNCIL || tab == DECIDE;
             this.addRenderableWidget(b);
         }
         if (l.size() > perPage) {
@@ -195,6 +198,14 @@ public class WarTableScreen extends Screen {
             }).bounds(x0 + SIDE - 26, y0 + H - 42, 20, 16).build();
             next.active = page < (l.size() - 1) / perPage;
             this.addRenderableWidget(next);
+        }
+        if (deciding) {
+            Button d = Button.builder(Component.literal("! Your word is needed").withStyle(net.minecraft.ChatFormatting.GOLD), b -> {
+                tab = DECIDE;
+                rebuildWidgets();
+            }).tooltip(Tooltip.create(Component.literal(data.decision().text()))).bounds(x0 + 6, listBottom + 2, SIDE - 12, 16).build();
+            d.active = tab != DECIDE;
+            this.addRenderableWidget(d);
         }
         this.addRenderableWidget(Button.builder(Component.literal("Realm map"), b -> Net.sendAction(new UUID(0, 0), Net.OPEN_REALM, BlockPos.ZERO, 0))
                 .tooltip(Tooltip.create(Component.literal("Every castle you know on a map, the houses and how they stand with you, and the realm's record.")))
@@ -259,6 +270,11 @@ public class WarTableScreen extends Screen {
         });
         scout.active = !h.status().contains("Scouts out");
         row.add(scout);
+        Button all = button("All castles march", "A war party from every castle you hold with men to spare, at this target. "
+                + "They wait at the walls for each other (up to five minutes from the first) and go in together.",
+                () -> Net.sendAction(h.id(), Net.MARCH_ALL, BlockPos.ZERO, 0));
+        all.active = h.attack() != null && data.holdings().size() > 1;
+        row.add(all);
         textBottom = layUp(row, mx, contentBottom() - BH, mw) - 4;
     }
 
@@ -389,6 +405,26 @@ public class WarTableScreen extends Screen {
         textBottom = courierY - 4;
     }
 
+    private int decisionY;
+
+    /** The matter waiting on your word: its two answers as buttons under the story, and Later. */
+    private void decisionWidgets(int mx, int mw) {
+        Net.Decision d = data.decision();
+        decisionY = contentTop() + this.font.split(Component.literal(d.text()), mw).size() * 10 + 10;
+        int y = decisionY;
+        for (int i = 1; i <= 2; i++) {
+            final int which = i;
+            this.addRenderableWidget(Button.builder(Component.literal(i == 1 ? d.first() : d.second()),
+                    b -> Net.sendAction(d.id(), Net.MATTER_CHOOSE, BlockPos.ZERO, which)).bounds(mx, y, mw, BH).build());
+            y += STEP;
+        }
+        this.addRenderableWidget(Button.builder(Component.literal("Later"), b -> {
+            tab = OVERVIEW;
+            rebuildWidgets();
+        }).tooltip(Tooltip.create(Component.literal("Leave it for now. Unanswered for two days, it goes the second way.")))
+                .bounds(mx + mw - 70, y + 6, 70, 16).build());
+    }
+
     private void councilWidgets(int mx, int mw) {
         List<Net.Seat> seats = data.council();
         int rh = seatHeight();
@@ -422,7 +458,10 @@ public class WarTableScreen extends Screen {
         g.drawString(this.font, "War Table", x0 + 8, y0 + 7, GOLD, false);
         HoldingInfo h = current();
         int mx = mainX(), mw = mainW();
-        if (tab == COUNCIL) {
+        if (tab == DECIDE && data.decision() != null) {
+            g.drawString(this.font, "Your word is needed", mx, y0 + 7, NAME, false);
+            g.drawString(this.font, fit("Choose one. Unanswered for two days, it goes the second way.", mw), mx, y0 + 18, DIM, false);
+        } else if (tab == COUNCIL) {
             g.drawString(this.font, "Your council", mx, y0 + 7, NAME, false);
             g.drawString(this.font, fit("Four officers who serve every place you hold. Hover a seat's button for the details.", mw), mx, y0 + 18, DIM, false);
         } else if (h != null) {
@@ -433,7 +472,8 @@ public class WarTableScreen extends Screen {
             g.drawString(this.font, fit(alert, mw), mx, y0 + 18, alert.equals("All quiet.") ? DIM : WARN, false);
         }
         g.fill(mx - 2, y0 + 50, mx + mw, y0 + 51, LINE);
-        if (tab == COUNCIL) drawCouncil(g, mx, mw);
+        if (tab == DECIDE && data.decision() != null) g.drawWordWrap(this.font, Component.literal(data.decision().text()), mx, contentTop(), mw, TEXT);
+        else if (tab == COUNCIL) drawCouncil(g, mx, mw);
         else if (h == null) {
             g.drawWordWrap(this.font, Component.literal("You hold no castles yet. Kill a castle's lord, raise a War Banner on its banner stand and "
                     + "hold it until the garrison yields. Your council can sit once you hold one."), mx, contentTop(), mw, TEXT);

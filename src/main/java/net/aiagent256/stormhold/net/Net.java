@@ -31,14 +31,14 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 public final class Net {
-    private static final String VERSION = "5";
+    private static final String VERSION = "6";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(Stormhold.id("main"),
             () -> VERSION, VERSION::equals, VERSION::equals);
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
             MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19,
             SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23, TREASURY = 24, VASSAL = 25, REVOKE = 26, COUNCIL = 27,
-            COUNCIL_APPOINT = 28, COUNCIL_DISMISS = 29;
+            COUNCIL_APPOINT = 28, COUNCIL_DISMISS = 29, MATTER_CHOOSE = 30, MARCH_ALL = 31;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -66,7 +66,12 @@ public final class Net {
     public record Seat(int ordinal, String title, String holder, int wage, String does, String brief) {
     }
 
-    public record WarTableData(List<HoldingInfo> holdings, boolean recruits, List<Seat> council, int treasury) {
+    /** A matter waiting on the lord's word: the story and its two answers. */
+    public record Decision(UUID id, String text, String first, String second) {
+    }
+
+    public record WarTableData(List<HoldingInfo> holdings, boolean recruits, List<Seat> council, int treasury,
+                               @org.jetbrains.annotations.Nullable Decision decision) {
         void write(FriendlyByteBuf b) {
             b.writeVarInt(holdings.size());
             for (HoldingInfo h : holdings) h.write(b);
@@ -81,6 +86,13 @@ public final class Net {
                 b.writeUtf(s.brief());
             }
             b.writeVarInt(treasury);
+            b.writeBoolean(decision != null);
+            if (decision != null) {
+                b.writeUUID(decision.id());
+                b.writeUtf(decision.text());
+                b.writeUtf(decision.first());
+                b.writeUtf(decision.second());
+            }
         }
 
         static WarTableData read(FriendlyByteBuf b) {
@@ -91,7 +103,9 @@ public final class Net {
             int k = b.readVarInt();
             List<Seat> c = new ArrayList<>(k);
             for (int i = 0; i < k; i++) c.add(new Seat(b.readVarInt(), b.readUtf(), b.readUtf(), b.readVarInt(), b.readUtf(), b.readUtf()));
-            return new WarTableData(l, recruits, c, b.readVarInt());
+            int treasury = b.readVarInt();
+            Decision d = b.readBoolean() ? new Decision(b.readUUID(), b.readUtf(), b.readUtf(), b.readUtf()) : null;
+            return new WarTableData(l, recruits, c, treasury, d);
         }
 
         void handle(Supplier<NetworkEvent.Context> ctx) {
@@ -180,7 +194,17 @@ public final class Net {
                 break;
             }
         }
-        return new WarTableData(out, RecruitsCompat.loaded(), council, treasury);
+        Decision decision = null;
+        for (ServerLevel level : player.server.getAllLevels()) {
+            HoldingManager m = HoldingManager.get(level);
+            var open = net.aiagent256.stormhold.holding.Events.open(m, player.getUUID());
+            if (open != null) {
+                var card = net.aiagent256.stormhold.holding.Events.card(m, open);
+                decision = new Decision(open.id, card.text(), card.first(), card.second());
+                break;
+            }
+        }
+        return new WarTableData(out, RecruitsCompat.loaded(), council, treasury, decision);
     }
 
     // ------------------------------------------------------------ client -> server
@@ -223,6 +247,12 @@ public final class Net {
             return;
         }
         if (a.action() == REFRESH && a.holding().equals(new UUID(0, 0))) {
+            openWarTable(player);
+            return;
+        }
+        if (a.action() == MATTER_CHOOSE) {
+            for (ServerLevel level : player.server.getAllLevels())
+                if (net.aiagent256.stormhold.holding.Events.choose(level, HoldingManager.get(level), player.getUUID(), a.holding(), a.amount() == 1 ? 1 : 2)) break;
             openWarTable(player);
             return;
         }
@@ -303,6 +333,24 @@ public final class Net {
                 case REPAIR -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.REPAIR, player);
                 case FORTIFY -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.FORTIFY, player);
                 case SCOUT -> net.aiagent256.stormhold.holding.Scouts.send(level, mgr, h, player, a.pos());
+                case MARCH_ALL -> {
+                    if (h.attackTarget == null) {
+                        player.sendSystemMessage(Component.literal("Set a target first."));
+                    } else {
+                        tellOdds(level, mgr, player, h);
+                        List<String> went = new ArrayList<>(), stayed = new ArrayList<>();
+                        for (Holding o : mgr.ownedBy(player.getUUID())) {
+                            if (net.aiagent256.stormhold.holding.Vassals.is(o) || o == mgr.atXZ(h.attackTarget, 16)) continue;
+                            if (Campaigns.launchParty(level, mgr, o, h.attackTarget) != null) went.add(o.name);
+                            else stayed.add(o.name);
+                        }
+                        player.sendSystemMessage(Component.literal(went.isEmpty() ? "No castle of yours has men to spare, or each has a war party out already."
+                                : went.size() + (went.size() == 1 ? " war party marches" : " war parties march") + " on the target: from "
+                                + String.join(", ", went) + ". They wait at the walls for each other and go in together."
+                                + (stayed.isEmpty() ? "" : " Staying home: " + String.join(", ", stayed) + "."))
+                                .withStyle(went.isEmpty() ? net.minecraft.ChatFormatting.RED : net.minecraft.ChatFormatting.GOLD));
+                    }
+                }
                 case VASSAL -> {
                     if (net.aiagent256.stormhold.holding.Vassals.is(h)) net.aiagent256.stormhold.holding.Vassals.gift(level, mgr, h, player);
                     else net.aiagent256.stormhold.holding.Vassals.grant(level, mgr, h, player);

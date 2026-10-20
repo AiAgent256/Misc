@@ -15,6 +15,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.levelgen.Heightmap;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
 import java.util.UUID;
 
 /** Raids against player castles and war parties sent out by them. */
@@ -154,6 +155,57 @@ public final class Campaigns {
         int pct = (int) Math.round(100.0 * win / (n * n));
         return pct >= 95 ? "they'll take it" : pct >= 60 ? "likely to take it (" + pct + "%)" : pct >= 30 ? "a gamble (" + pct + "%)"
                 : pct > 0 ? "likely to break (" + pct + "%)" : "they'll break against the walls";
+    }
+
+    /** Two war parties of one lord against one castle. */
+    static boolean together(Campaign o, Campaign c) {
+        return o.kind == Campaign.Kind.PARTY && c.target != null && o.side.equals(c.side) && c.target.equals(o.target);
+    }
+
+    /** Another party of ours still on the road to the castle this one stands before. */
+    static boolean othersMarching(HoldingManager mgr, Campaign c) {
+        for (Campaign o : mgr.campaigns) if (o != c && together(o, c) && o.stage == Campaign.Stage.MARCH) return true;
+        return false;
+    }
+
+    /**
+     * Every party of ours before these walls, nobody watching, goes in as one army: their strength summed, each in
+     * its own kit, against the garrison behind its walls. A win takes the castle (and sends them all home inside
+     * it); a loss leaves each a third of its men to fall back. True if the castle fell.
+     */
+    static boolean assault(ServerLevel level, HoldingManager mgr, Campaign c, Holding enemy, long now) {
+        List<Campaign> group = new java.util.ArrayList<>();
+        for (Campaign o : mgr.campaigns) if (together(o, c) && o.stage == Campaign.Stage.SIEGE && o.live.isEmpty()) group.add(o);
+        if (enemy.owner.equals(c.side)) {
+            for (Campaign o : group) o.siegeUntil = now;          // already ours: home
+            return false;
+        }
+        List<String> from = new java.util.ArrayList<>();
+        double att = 0;
+        for (Campaign o : group) {
+            att += o.strength() * kit(o.renown);
+            Holding oh = o.origin != null ? mgr.holdings.get(o.origin) : null;
+            if (oh != null) from.add(oh.name);
+        }
+        att *= 0.8 + level.random.nextDouble() * 0.4;
+        double def = enemy.strength() * 1.3 * (0.8 + level.random.nextDouble() * 0.4) * kit(Frontier.level(level, enemy));
+        Holding origin = c.origin != null ? mgr.holdings.get(c.origin) : null;
+        java.util.UUID lord = origin != null ? origin.ownerPlayer() : null;
+        if (att > def) {
+            if (group.size() > 1)
+                HoldingEvents.tell(level, lord, HoldingEvents.gold("Your war parties from " + String.join(", ", from) + " storm " + enemy.name + " together."));
+            enemy.lordAlive = false;
+            HoldingEvents.transfer(level, mgr, enemy, c.side);
+            for (Campaign o : group) o.stage = Campaign.Stage.DONE;
+            return true;
+        }
+        for (Campaign o : group) {
+            o.counts.replaceAll((r, n) -> n / 3);
+            o.siegeUntil = now;
+        }
+        HoldingEvents.tell(level, lord, Component.literal((group.size() > 1 ? "Your war parties from " + String.join(", ", from) + " broke"
+                : "Your war party broke") + " against the walls of " + enemy.name + ". The survivors fall back.").withStyle(ChatFormatting.RED));
+        return false;
     }
 
     public static Campaign launchParty(ServerLevel level, HoldingManager mgr, Holding h, BlockPos target) {
@@ -546,30 +598,28 @@ public final class Campaigns {
         } else if (c.live.isEmpty() && c.progress < 1) {
             c.progress += MARCH_SPEED / c.length();
         }
+        Holding enemy = c.target != null ? mgr.holdings.get(c.target) : null;
         if (c.stage == Campaign.Stage.MARCH && c.progress >= 0.98) {
             c.stage = Campaign.Stage.SIEGE;
             c.siegeUntil = now + 6000;
+            // the first of ours at these walls sets the hour: those who come after go in with them
+            for (Campaign o : mgr.campaigns)
+                if (o != c && together(o, c) && o.stage == Campaign.Stage.SIEGE) c.siegeUntil = Math.min(c.siegeUntil, o.siegeUntil);
             for (UUID id : c.live.keySet()) {
                 if (level.getEntity(id) instanceof GarrisonEntity g) {
                     g.setMarchTarget(null);
                     g.setPost(c.to);
                 }
             }
-            Holding enemy = c.target != null ? mgr.holdings.get(c.target) : null;
-            if (enemy != null && c.live.isEmpty()) {
-                double def = enemy.strength() * 1.3 * (0.8 + level.random.nextDouble() * 0.4) * kit(Frontier.level(level, enemy));
-                double att = c.strength() * (0.8 + level.random.nextDouble() * 0.4) * kit(c.renown);
-                if (att > def && !enemy.owner.equals(c.side)) {
-                    enemy.lordAlive = false;
-                    HoldingEvents.transfer(level, mgr, enemy, c.side);
-                    c.stage = Campaign.Stage.DONE;
-                    return;
-                }
-                c.counts.replaceAll((r, n) -> n / 3);
-                HoldingEvents.tell(level, origin.ownerPlayer(), Component.literal("Your war party broke against the walls of "
-                        + enemy.name + ". The survivors fall back.").withStyle(ChatFormatting.RED));
-                c.siegeUntil = now;
-            }
+            if (enemy != null && c.live.isEmpty() && othersMarching(mgr, c))
+                HoldingEvents.tell(level, origin.ownerPlayer(), Component.literal("The war party from " + origin.name + " stands before the walls of "
+                        + enemy.name + " and waits for the others before it goes in (" + Math.max(1, (c.siegeUntil - now) / 1200) + " minutes at most).")
+                        .withStyle(ChatFormatting.GOLD));
+        }
+        // fought out while nobody watches: every party of ours at these walls goes in together, once the last
+        // of them is there or the first has waited its five minutes
+        if (c.stage == Campaign.Stage.SIEGE && c.live.isEmpty() && enemy != null && (now >= c.siegeUntil || !othersMarching(mgr, c))) {
+            if (assault(level, mgr, c, enemy, now)) return;
         }
         if (c.stage == Campaign.Stage.SIEGE && now >= c.siegeUntil) {
             c.stage = Campaign.Stage.RETURN;
