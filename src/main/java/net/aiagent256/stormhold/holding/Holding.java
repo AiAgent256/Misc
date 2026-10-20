@@ -192,6 +192,10 @@ public class Holding {
      * across and down, and the map squares (MapRoom.CELL blocks) of the castle itself. Null until scouts come home.
      */
     @Nullable public int[] mapRoom;
+    /** The steward keeps the chests in order (Tidy). */
+    public boolean tidy;
+    /** Not saved: items the steward has moved between chests since the last dawn. */
+    public int tidied;
     /** Not saved: when the castle last looked for a map-room wall and found none. */
     public long mapRoomTriedAt;
     /** A ruin (see {@link Ruins}): brigand-held, a few men on the ground, until the Master Builder restores it. */
@@ -480,6 +484,7 @@ public class Holding {
         for (var m : pendingMaps) mapTags.add(m.save(new CompoundTag()));
         t.put("PendingMaps", mapTags);
         if (mapRoom != null) t.putIntArray("MapRoom", mapRoom);
+        t.putBoolean("Tidy", tidy);
         t.putString("BuilderName", builderName);
         if (builder != null) t.putUUID("Builder", builder);
         t.putString("FiefReport", fiefReport);
@@ -628,6 +633,7 @@ public class Holding {
         h.ruined = t.getBoolean("Ruined");
         h.loyalty = t.getInt("Loyalty");
         for (var m : t.getList("PendingMaps", 10)) h.pendingMaps.add(net.minecraft.world.item.ItemStack.of((CompoundTag) m));
+        h.tidy = t.getBoolean("Tidy");
         if (t.contains("MapRoom")) {
             int[] mr = t.getIntArray("MapRoom");
             if (mr.length == 9) h.mapRoom = mr;

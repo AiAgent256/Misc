@@ -125,6 +125,19 @@ public final class Chronicle {
             Component s = Steward.report(h);
             if (s != null) out.add(s);
         }
+        // the work: what the miners brought up, how the forge stands, what the builder is at, and who's really working
+        for (Holding h : mine) {
+            List<String> w = new ArrayList<>();
+            if (h.miners > 0 || h.smiths > 0) {
+                if (!h.labourReport.isEmpty()) w.add(h.labourReport);
+                boolean short_ = h.minersAt < h.miners || h.smithsAt < h.smiths;
+                w.add("Working: " + h.minersAt + " of " + h.miners + " miners, " + h.smithsAt + " of " + h.smiths + " smiths"
+                        + (short_ ? " (no more of the people to spare: more cottages, more hands)" : "") + ".");
+            }
+            if (!h.work.equals(Builder.NONE)) w.add("Master Builder " + h.builderName + " is " + Builder.doing(h)
+                    + (h.workQueue != null && !h.workQueue.isEmpty() ? ", " + h.workQueue.size() + " blocks to go" : "") + ".");
+            if (!w.isEmpty()) out.add(Component.literal(h.name + ": " + String.join(" ", w)).withStyle(ChatFormatting.GRAY));
+        }
         // what the day brought: the chronicle's lines since yesterday
         int shown = 0;
         for (int i = mgr.chronicle.size() - 1; i >= 0 && shown < 5; i--) {

@@ -837,6 +837,48 @@ public class StormholdGameTests {
         return (net.minecraft.world.Container) level.getBlockEntity(p);
     }
 
+    @GameTest(template = "arena")
+    public static void stewardKeepsTheChestsInOrder(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        Holding h = sample(g);
+        h.owner = Sides.player(player.getUUID());
+        h.tidy = true;
+        mgr.holdings.put(h.id, h);
+        var IRON = net.minecraft.world.item.Items.IRON_INGOT;
+        var BREAD = net.minecraft.world.item.Items.BREAD;
+        try {
+            g.setBlock(new BlockPos(3, 2, 3), net.minecraft.world.level.block.Blocks.CHEST);
+            g.setBlock(new BlockPos(6, 2, 3), net.minecraft.world.level.block.Blocks.CHEST);
+            var a = (net.minecraft.world.Container) level.getBlockEntity(g.absolutePos(new BlockPos(3, 2, 3)));
+            var b = (net.minecraft.world.Container) level.getBlockEntity(g.absolutePos(new BlockPos(6, 2, 3)));
+            a.setItem(5, new net.minecraft.world.item.ItemStack(IRON, 10));
+            a.setItem(9, new net.minecraft.world.item.ItemStack(BREAD, 5));
+            b.setItem(2, new net.minecraft.world.item.ItemStack(IRON, 12));
+            b.setItem(20, new net.minecraft.world.item.ItemStack(IRON, 8));
+            var spoils = signedChest(g, new BlockPos(9, 2, 3), "Spoils");
+            spoils.setItem(0, new net.minecraft.world.item.ItemStack(BREAD, 3));
+            spoils.setItem(1, new net.minecraft.world.item.ItemStack(IRON, 2));
+            var mine = signedChest(g, new BlockPos(12, 2, 3), "mine");
+            mine.setItem(4, new net.minecraft.world.item.ItemStack(IRON, 7));
+            int moved = net.aiagent256.stormhold.holding.Tidy.tick(level, mgr, h);
+            // iron home is B (20 there), bread's is A (5 there); the spoils go home too; the signed chest isn't touched
+            if (count(b, IRON) != 32 || count(a, IRON) != 0) throw new IllegalStateException("iron: A " + count(a, IRON) + ", B " + count(b, IRON));
+            if (count(a, BREAD) != 8 || count(b, BREAD) != 0) throw new IllegalStateException("bread: A " + count(a, BREAD) + ", B " + count(b, BREAD));
+            if (count(spoils, IRON) + count(spoils, BREAD) != 0) throw new IllegalStateException("the spoils chest still holds things");
+            if (count(mine, IRON) != 7 || !mine.getItem(4).is(IRON)) throw new IllegalStateException("the signed chest was touched");
+            // stacked and sorted: B's iron in one stack in the first slot
+            if (!b.getItem(0).is(IRON) || b.getItem(0).getCount() != 32 || !b.getItem(1).isEmpty())
+                throw new IllegalStateException("B not stacked: " + b.getItem(0) + ", " + b.getItem(1));
+            if (moved != 15) throw new IllegalStateException("moved " + moved + ", not 15");
+            if (net.aiagent256.stormhold.holding.Tidy.tick(level, mgr, h) != 0) throw new IllegalStateException("a second pass moved things");
+        } finally {
+            mgr.holdings.remove(h.id);
+        }
+        g.succeed();
+    }
+
     private static int count(net.minecraft.world.Container c, net.minecraft.world.item.Item item) {
         int n = 0;
         for (int i = 0; i < c.getContainerSize(); i++) if (c.getItem(i).is(item)) n += c.getItem(i).getCount();

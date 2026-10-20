@@ -215,7 +215,7 @@ public final class Steward {
 
     /** The chest or barrel the sign is on: behind a wall sign, under a standing one, else beside it. */
     @Nullable
-    static BlockPos containerPos(ServerLevel level, SignBlockEntity sign) {
+    public static BlockPos containerPos(ServerLevel level, SignBlockEntity sign) {
         BlockPos p = sign.getBlockPos();
         BlockState s = sign.getBlockState();
         List<BlockPos> tries = new ArrayList<>();
@@ -499,8 +499,10 @@ public final class Steward {
         if (h.stewardStocked > 0) parts.add("stocked " + h.stewardStocked + " from the stores");
         if (h.stewardBought > 0) parts.add("bought " + h.stewardBought + " for " + h.stewardSpent + " emeralds");
         if (h.spoilsTaken > 0) parts.add("put " + h.spoilsTaken + " things the garrison took off the dead in the spoils chest");
+        if (h.tidied > 0) parts.add("moved " + h.tidied + " things into their chests and sorted them");
         h.stewardSold = h.stewardEarned = h.stewardStored = h.stewardSent = h.stewardStocked = h.stewardBought = h.stewardSpent = 0;
         h.spoilsTaken = 0;
+        h.tidied = 0;
         if (parts.isEmpty()) return null;
         return Component.literal("Steward " + (h.stewardName.isEmpty() ? "" : h.stewardName + " ") + "of " + h.name + ": "
                 + String.join(", ", parts) + ".").withStyle(ChatFormatting.GRAY);

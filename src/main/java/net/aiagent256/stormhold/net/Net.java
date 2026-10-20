@@ -31,14 +31,14 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 public final class Net {
-    private static final String VERSION = "6";
+    private static final String VERSION = "7";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(Stormhold.id("main"),
             () -> VERSION, VERSION::equals, VERSION::equals);
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
             MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19,
             SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23, TREASURY = 24, VASSAL = 25, REVOKE = 26, COUNCIL = 27,
-            COUNCIL_APPOINT = 28, COUNCIL_DISMISS = 29, MATTER_CHOOSE = 30, MARCH_ALL = 31;
+            COUNCIL_APPOINT = 28, COUNCIL_DISMISS = 29, MATTER_CHOOSE = 30, MARCH_ALL = 31, TIDY = 32;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -173,7 +173,7 @@ public final class Net {
                         "No castle of another house stands at the target: a war party marches there and back.");
                 out.add(new HoldingInfo(h.id, h.name, h.isTown() ? 0 : h.tier, h.mode.name(), counts, cap, Economy.stockSummary(h), h.center(),
                         h.attackTarget, h.supplyTarget, status.toString(), fief, Economy.realmSummary(mgr, h, player.getUUID()),
-                        h.miners, h.smiths, labour, odds));
+                        h.miners, h.smiths, labour, odds, h.tidy));
             }
         }
         // the council is the lord's, not a castle's: who sits, what each seat does, and the emeralds that pay them
@@ -333,6 +333,14 @@ public final class Net {
                 case REPAIR -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.REPAIR, player);
                 case FORTIFY -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.FORTIFY, player);
                 case SCOUT -> net.aiagent256.stormhold.holding.Scouts.send(level, mgr, h, player, a.pos());
+                case TIDY -> {
+                    h.tidy = !h.tidy;
+                    player.sendSystemMessage(net.aiagent256.stormhold.holding.HoldingEvents.gold(h.tidy
+                            ? "The steward of " + h.name + " will keep its chests in order: the spoils chest emptied into them, each kind of "
+                            + "thing gathered into the chest with the most of it, every chest stacked and sorted. A chest with a sign on it he leaves alone."
+                            : "The steward of " + h.name + " leaves the chests as they are."));
+                    if (h.tidy) net.aiagent256.stormhold.holding.Tidy.tick(level, mgr, h);
+                }
                 case MARCH_ALL -> {
                     if (h.attackTarget == null) {
                         player.sendSystemMessage(Component.literal("Set a target first."));

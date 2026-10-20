@@ -369,6 +369,12 @@ public class WarTableScreen extends Screen {
             b.active = i == 2 || !busy;
             row.add(b);
         }
+        row.add(button(h.tidy() ? "Chests: in order" : "Chests: as they are", h.tidy()
+                ? "The steward keeps this castle's chests in order every half minute while you're near: the spoils chest emptied into them, "
+                + "each kind of thing gathered into the chest with the most of it, every chest stacked and sorted. Click to stop him."
+                : "Have the steward keep this castle's chests in order: the spoils chest emptied into your chests, each kind of thing gathered "
+                + "into the chest that holds the most of it, every chest stacked and sorted. Put a sign on any chest to keep him out of it.",
+                () -> Net.sendAction(h.id(), Net.TIDY, BlockPos.ZERO, 0)));
         peopleY = layDown(row, mx, contentTop() + 12, mw) + 6;
         this.addRenderableWidget(Button.builder(Component.literal("Expand fief"), b -> Net.sendAction(h.id(), Net.EXPAND_FIEF, BlockPos.ZERO, 0))
                 .tooltip(Tooltip.create(Component.literal("The people raise one more building (a pasture, a mine, a mill, then more cottages) for "
