@@ -3218,6 +3218,46 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** Men sent home ride to their castle on the clock and join its garrison; a lost home sends them to another of yours. */
+    @GameTest(template = "arena")
+    public static void theCompanyRidesHome(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        Holding home = sample(g), other = sample(g);
+        other.key = home.key + "/other";
+        other.name = "Otherhold";
+        home.owner = Sides.player(player.getUUID());
+        other.owner = home.owner;
+        mgr.holdings.put(home.id, home);
+        mgr.holdings.put(other.id, other);
+        try {
+            int k0 = home.count(Role.KNIGHT);
+            var men = new java.util.EnumMap<Role, Integer>(Role.class);
+            men.put(Role.KNIGHT, 3);
+            men.put(Role.ARCHER, 1);
+            BlockPos at = home.center().offset(200, 0, 0);
+            Campaign c = net.aiagent256.stormhold.holding.Columns.home(mgr, player, home, at, men);
+            int secs = (int) Math.ceil(c.length() / net.aiagent256.stormhold.holding.Columns.SPEED);
+            for (int i = 0; i < secs - 1; i++) Campaigns.tickOne(level, mgr, c);
+            if (c.stage == Campaign.Stage.DONE || home.count(Role.KNIGHT) != k0) throw new IllegalStateException("home before " + secs + " seconds");
+            Campaigns.tickOne(level, mgr, c);
+            Campaigns.tickOne(level, mgr, c);
+            if (c.stage != Campaign.Stage.DONE || home.count(Role.KNIGHT) != k0 + 3) throw new IllegalStateException("not home after " + secs + " seconds");
+            // home falls while they ride: they go to the other castle
+            int o0 = other.count(Role.KNIGHT);
+            Campaign d = net.aiagent256.stormhold.holding.Columns.home(mgr, player, home, at, men);
+            home.owner = Sides.house("testhouse");
+            for (int i = 0; i < 400 && d.stage != Campaign.Stage.DONE; i++) Campaigns.tickOne(level, mgr, d);
+            if (other.count(Role.KNIGHT) != o0 + 3) throw new IllegalStateException("with home lost they didn't go to the other castle");
+        } finally {
+            mgr.holdings.remove(home.id);
+            mgr.holdings.remove(other.id);
+            mgr.campaigns.removeIf(x -> home.id.equals(x.target) || other.id.equals(x.target));
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

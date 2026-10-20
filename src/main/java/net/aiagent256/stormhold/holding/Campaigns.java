@@ -387,6 +387,7 @@ public final class Campaigns {
         Garrisons.pruneMarching(level, c.live);
         if (c.kind == Campaign.Kind.RAID) tickRaid(level, mgr, c);
         else if (c.kind == Campaign.Kind.ILLAGERS) Warbands.tick(level, mgr, c);
+        else if (c.kind == Campaign.Kind.COLUMN) Columns.tick(level, mgr, c);
     }
 
     /** Where a place lies from its lord, if he's online in this world: "412 blocks south-west of you", else "". */

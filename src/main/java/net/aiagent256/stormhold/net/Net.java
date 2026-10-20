@@ -39,7 +39,7 @@ public final class Net {
             MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19,
             SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23, TREASURY = 24, VASSAL = 25, REVOKE = 26, COUNCIL = 27,
             COUNCIL_APPOINT = 28, COUNCIL_DISMISS = 29, MATTER_CHOOSE = 30, MARCH_ALL = 31, TIDY = 32, TARGET_ALL = 33,
-            SET_SEAT = 34, RUSH = 35, BUY_CLAIM = 36, TOURNEY = 37, TRUCE = 38;
+            SET_SEAT = 34, RUSH = 35, BUY_CLAIM = 36, TOURNEY = 37, TRUCE = 38, SEND_HOME = 39;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -145,6 +145,8 @@ public final class Net {
                                     * c.length() / net.aiagent256.stormhold.holding.Scouts.SPEED))).append(". ");
                     if (c.kind == Campaign.Kind.COLUMN && h.id.equals(c.origin)) status.append("Column of ").append(c.total())
                             .append(" riding to you, ").append(net.aiagent256.stormhold.holding.Columns.eta(c)).append(" out. ");
+                    if (c.kind == Campaign.Kind.COLUMN && c.origin == null && h.id.equals(c.target)) status.append(c.total())
+                            .append(" of your men riding home here, ").append(net.aiagent256.stormhold.holding.Columns.eta(c)).append(" out. ");
                 }
                 if (!h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE)) {
                     int left = h.workQueue == null ? -1 : h.workQueue.size();
@@ -280,6 +282,11 @@ public final class Net {
                         + " Press \"All castles march\" on the Orders tab to send them."));
                 break;
             }
+            openWarTable(player);
+            return;
+        }
+        if (a.action() == SEND_HOME) {
+            net.aiagent256.stormhold.holding.Company.sendHome(player.serverLevel(), HoldingManager.get(player.serverLevel()), player);
             openWarTable(player);
             return;
         }

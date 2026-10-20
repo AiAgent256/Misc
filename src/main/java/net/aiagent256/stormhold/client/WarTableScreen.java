@@ -352,6 +352,9 @@ public class WarTableScreen extends Screen {
                 + Company.CALL_RANGE + " blocks of it.", () -> Net.sendAction(h.id(), Net.DISMISS, BlockPos.ZERO, 0));
         dismiss.active = near;
         row.add(dismiss);
+        row.add(button("Send home", "From anywhere: every man of yours within " + Company.HOME_RANGE + " blocks rides back to the castle he came "
+                + "from (" + (int) Columns.SPEED + " blocks a second) and joins its garrison. Men with no home go to your seat. Their names and "
+                + "kit stay behind: the castle arms them as it arms the rest.", () -> Net.sendAction(h.id(), Net.SEND_HOME, BlockPos.ZERO, 0)));
         noteY = layDown(row, mx, y + 58, mw) + 3;
         // the armoury, along the bottom
         String[] kits = {"Iron kit", "Diamond kit", "Netherite kit"};

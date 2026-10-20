@@ -85,6 +85,59 @@ public final class Columns {
         return c;
     }
 
+    /** Men riding home from the player's side to their castle: {@code target} is the castle, no origin. */
+    public static Campaign home(HoldingManager mgr, Player player, Holding home, BlockPos at, EnumMap<Role, Integer> men) {
+        Campaign c = new Campaign();
+        c.kind = Campaign.Kind.COLUMN;
+        c.side = home.owner;
+        c.target = home.id;
+        c.player = player.getUUID();
+        c.tier = home.tier;
+        c.from = at;
+        c.to = Campaigns.gateOutside(home);
+        men.forEach(c::add);
+        mgr.campaigns.add(c);
+        mgr.setDirty();
+        return c;
+    }
+
+    /** Once a second for a column riding home: on the clock, then into the garrison. */
+    private static void tickHome(ServerLevel level, HoldingManager mgr, Campaign c) {
+        Holding home = mgr.holdings.get(c.target);
+        ServerPlayer player = c.player != null ? level.getServer().getPlayerList().getPlayer(c.player) : null;
+        if (home == null || !home.owner.equals(c.side)) {
+            // home's lost on the way: the seat, else any castle still his, else they're gone
+            Holding other = c.player == null ? null : mgr.seatOf(c.player);
+            if (other == null && c.player != null)
+                for (Holding h : mgr.ownedBy(c.player)) if (!Vassals.is(h)) other = h;
+            if (other == null) {
+                c.stage = Campaign.Stage.DONE;
+                return;
+            }
+            c.target = other.id;
+            c.side = other.owner;
+            c.from = c.position();
+            c.to = Campaigns.gateOutside(other);
+            c.progress = 0;
+            return;
+        }
+        if (c.total() <= 0) {
+            c.stage = Campaign.Stage.DONE;
+            return;
+        }
+        c.progress = Math.min(1, c.progress + SPEED / c.length());
+        if (c.progress < 1) return;
+        int n = 0;
+        for (var e : c.counts.entrySet()) {
+            home.add(e.getKey(), e.getValue());
+            n += e.getValue();
+        }
+        c.counts.clear();
+        c.stage = Campaign.Stage.DONE;
+        mgr.setDirty();
+        if (player != null) player.sendSystemMessage(HoldingEvents.gold(n + " of your men are home at " + home.name + "."));
+    }
+
     public static String eta(Campaign c) {
         double left = Math.max(0, (1 - c.progress) * c.length() / SPEED);
         int m = (int) (left / 60), s = (int) (left % 60);
@@ -93,6 +146,10 @@ public final class Columns {
 
     /** Once a second. */
     static void tick(ServerLevel level, HoldingManager mgr, Campaign c) {
+        if (c.target != null && c.origin == null) {
+            tickHome(level, mgr, c);
+            return;
+        }
         Holding origin = c.origin != null ? mgr.holdings.get(c.origin) : null;
         ServerPlayer player = c.player != null ? level.getServer().getPlayerList().getPlayer(c.player) : null;
         if (origin == null || !origin.owner.equals(c.side) || c.total() <= 0) {

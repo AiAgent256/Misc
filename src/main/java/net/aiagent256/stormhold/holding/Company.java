@@ -15,6 +15,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -101,6 +102,7 @@ public final class Company {
                 e.color(), null, false);
         e.setOwner(player.getUUID());
         e.setPost(null);
+        if (from != null) e.getPersistentData().putUUID(HOME, from.id);       // where Send home sends him
         // never two of a lord's men with one name
         java.util.Set<String> taken = new java.util.HashSet<>();
         for (net.minecraft.world.entity.Entity x : level.getAllEntities())
@@ -130,6 +132,71 @@ public final class Company {
         h.live.remove(e.getUUID());
         enlist(level, mgr, e, player, h);
         return e;
+    }
+
+    /** The castle a company man came from, on the man himself. */
+    public static final String HOME = "StormholdHome";
+    /** How far around the player "Send home" reaches. */
+    public static final int HOME_RANGE = 64;
+
+    /**
+     * Send the company home from wherever you are: every man of yours within HOME_RANGE leaves your side and rides
+     * back to the castle he came from, as a column at {@link Columns#SPEED} blocks a second, and joins its garrison
+     * there (a man with no home, or whose home is lost, rides to your seat or else your nearest castle). His name
+     * and kit stay behind: the castle arms him as it arms the rest. Returns how many went.
+     */
+    public static int sendHome(ServerLevel level, HoldingManager mgr, net.minecraft.server.level.ServerPlayer player) {
+        String me = Sides.player(player.getUUID());
+        java.util.Map<UUID, java.util.EnumMap<Role, Integer>> going = new java.util.LinkedHashMap<>();
+        java.util.Map<UUID, net.minecraft.world.phys.Vec3> from = new java.util.HashMap<>();
+        Holding fallback = mgr.seatOf(player.getUUID());
+        if (fallback == null) {
+            double best = Double.MAX_VALUE;
+            for (Holding h : mgr.ownedBy(player.getUUID())) {
+                if (Vassals.is(h)) continue;
+                double d = h.center().distSqr(player.blockPosition());
+                if (d < best) {
+                    best = d;
+                    fallback = h;
+                }
+            }
+        }
+        int sent = 0;
+        for (Entity e : level.getEntities(player, player.getBoundingBox().inflate(HOME_RANGE))) {
+            Role r;
+            Holding home = null;
+            if (e instanceof GarrisonEntity g) {
+                if (g.owner() == null || !g.owner().equals(player.getUUID())) continue;
+                r = g.role();
+                if (g.getPersistentData().hasUUID(HOME)) home = mgr.holdings.get(g.getPersistentData().getUUID(HOME));
+            } else {
+                String side = RecruitsCompat.sideOf(e);
+                if (side == null || !side.equals(me)) continue;
+                r = RecruitsCompat.roleOf(e);
+            }
+            if (r == null || r == Role.LORD || r == Role.COURIER) continue;
+            if (home == null || !me.equals(home.owner) || Vassals.is(home)) home = fallback;
+            if (home == null) continue;
+            going.computeIfAbsent(home.id, k -> new java.util.EnumMap<>(Role.class)).merge(r, 1, Integer::sum);
+            from.putIfAbsent(home.id, e.position());
+            e.discard();
+            sent++;
+        }
+        if (sent == 0) {
+            player.sendSystemMessage(Component.literal(fallback == null ? "You hold no castle to send them to."
+                    : "None of your men are within " + HOME_RANGE + " blocks.").withStyle(ChatFormatting.RED));
+            return 0;
+        }
+        List<String> parts = new java.util.ArrayList<>();
+        for (var e : going.entrySet()) {
+            Holding home = mgr.holdings.get(e.getKey());
+            Campaign c = Columns.home(mgr, player, home, BlockPos.containing(from.get(e.getKey())), e.getValue());
+            parts.add(c.total() + " to " + home.name + " (" + Columns.eta(c) + ")");
+        }
+        mgr.setDirty();
+        level.playSound(null, player.blockPosition(), SoundEvents.HORSE_GALLOP, SoundSource.PLAYERS, 1.0F, 0.9F);
+        player.sendSystemMessage(HoldingEvents.gold("Your company rides home: " + String.join(", ", parts) + "."));
+        return sent;
     }
 
     /** Send every soldier of the player's within DISMISS_RANGE into {@code h}'s garrison. Returns how many went. */
