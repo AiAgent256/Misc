@@ -2949,10 +2949,12 @@ public class StormholdGameTests {
                 throw new IllegalStateException("the heir brought " + c.counts.get(Role.KNIGHT) + " knights");
             // a truce bought: the raid turns back, the house isn't hostile, no raid while it holds
             h.addStock(emerald, 500);
+            int had = h.stock(emerald) + player.getInventory().countItem(net.minecraft.world.item.Items.EMERALD);
             if (!net.aiagent256.stormhold.holding.Truces.ask(level, mgr, player, "testhouse", false))
                 throw new IllegalStateException("truce refused: " + net.aiagent256.stormhold.holding.Truces.refusal(mgr, "testhouse", me));
             int price = net.aiagent256.stormhold.holding.Truces.price(mgr, "testhouse", me);
-            if (h.stock(emerald) != 500 - price) throw new IllegalStateException("the truce cost " + (500 - h.stock(emerald)) + ", not " + price);
+            int paid = had - h.stock(emerald) - player.getInventory().countItem(net.minecraft.world.item.Items.EMERALD);
+            if (paid != price) throw new IllegalStateException("the truce cost " + paid + ", not " + price);
             if (c.stage != Campaign.Stage.DONE) throw new IllegalStateException("the raid didn't turn back");
             if (net.aiagent256.stormhold.house.Standing.hostile(mgr, "testhouse", me)) throw new IllegalStateException("hostile in a truce");
             mgr.campaigns.remove(c);
