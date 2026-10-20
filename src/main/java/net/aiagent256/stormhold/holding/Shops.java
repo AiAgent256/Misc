@@ -386,7 +386,7 @@ public final class Shops {
                         dirty = true;
                     }
                 }
-                Villager v = keeperAt(level, h, post);
+                Villager v = keeperAt(level, h, post, t);
                 if (v != null) {
                     if (!v.getUUID().equals(h.shopkeepers.get(post))) {
                         h.shopkeepers.put(post.immutable(), v.getUUID());
@@ -403,6 +403,11 @@ public final class Shops {
                     continue;
                 }
                 if (h.shopkeepers.containsKey(post) && !newDay) continue;      // killed: his stall stands empty till morning
+                // only raise a keeper where we can see there's none: a stall at the edge of what's loaded has its
+                // keeper there but out of sight, and a new one each morning piled up till they crushed each other
+                if (!level.isPositionEntityTicking(post)) continue;
+                UUID was = h.shopkeepers.get(post);
+                if (was != null && !Garrisons.gone(level, was)) continue;
                 Villager k = spawnKeeper(level, h, t.id(), post);
                 if (k != null) {
                     h.shopkeepers.put(post.immutable(), k.getUUID());
@@ -434,16 +439,32 @@ public final class Shops {
         }
     }
 
-    /** The keeper standing at a post, if one is. */
+    /**
+     * The keeper standing at a post, if one is. A keeper another mod has turned into its own kind of villager keeps
+     * his name but not our mark, so he's known by his name too ("Osric the Fletcher"). Any doubles stacked on the
+     * post (raised while the stall was out of sight) are sent away: twenty-four in one block crush each other.
+     */
     @Nullable
-    private static Villager keeperAt(ServerLevel level, Holding h, BlockPos post) {
+    private static Villager keeperAt(ServerLevel level, Holding h, BlockPos post, Type t) {
         UUID id = h.shopkeepers.get(post);
-        if (id != null && level.getEntity(id) instanceof Villager v && v.isAlive()) return v;
-        for (Villager v : level.getEntitiesOfClass(Villager.class, new AABB(post).inflate(2.5),
-                x -> x.isAlive() && x.getPersistentData().contains(TAG))) {
-            return v;
+        Villager keep = id != null && level.getEntity(id) instanceof Villager v && v.isAlive() ? v : null;
+        List<Villager> here = level.getEntitiesOfClass(Villager.class, new AABB(post).inflate(2.5), x -> x.isAlive() && isKeeper(x, t));
+        if (keep == null && !here.isEmpty()) {
+            keep = here.get(0);
+            for (Villager x : here) if (x.distanceToSqr(post.getX() + 0.5, post.getY(), post.getZ() + 0.5)
+                    < keep.distanceToSqr(post.getX() + 0.5, post.getY(), post.getZ() + 0.5)) keep = x;
         }
-        return null;
+        if (keep == null) return null;
+        for (Villager x : here) {
+            if (x != keep && x.distanceToSqr(post.getX() + 0.5, post.getY(), post.getZ() + 0.5) < 2.25) x.discard();
+        }
+        Garrisons.seen(keep);
+        return keep;
+    }
+
+    private static boolean isKeeper(Villager x, Type t) {
+        if (x.getPersistentData().contains(TAG)) return true;
+        return x.hasCustomName() && x.getCustomName().getString().endsWith(" the " + t.keeper());
     }
 
     /**
