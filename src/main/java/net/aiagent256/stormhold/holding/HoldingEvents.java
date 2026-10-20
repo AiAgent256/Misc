@@ -203,7 +203,7 @@ public final class HoldingEvents {
 
     @Nullable
     private static String sideOf(Entity e, Holding h) {
-        if (e instanceof GarrisonEntity g) return g.role() == Role.COURIER || g.side().isEmpty() ? null : g.side();
+        if (e instanceof GarrisonEntity g) return g.role() == Role.COURIER || g.side().isEmpty() || Tourney.is(g) ? null : g.side();
         if (e instanceof Player p) {
             if (p.isSpectator()) return null;
             String s = Sides.player(p.getUUID());

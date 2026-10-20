@@ -110,8 +110,8 @@ public final class Campaigns {
         mgr.campaigns.add(c);
         h.lastRaidAt = level.getGameTime();
         String where = fromLord(level, h);
-        HoldingEvents.tell(level, h.ownerPlayer(), Component.literal((c.heir.isEmpty() ? mgr.house(h.houseId).title() + " marches on "
-                : c.heir + " comes to take back his father's castle, ") + h.name + " with " + c.total() + " men!" + (where.isEmpty() ? "" : " It lies " + where + ".")
+        HoldingEvents.tell(level, h.ownerPlayer(), Component.literal((c.heir.isEmpty() ? mgr.house(h.houseId).title() + " marches on " + h.name
+                : c.heir + " comes to take back his father's castle, " + h.name + ",") + " with " + c.total() + " men!" + (where.isEmpty() ? "" : " It lies " + where + ".")
                 + " They reach the walls in about " + (int) Math.ceil(c.length() / MARCH_SPEED) + " seconds.").withStyle(ChatFormatting.RED));
         alliedHelp(level, mgr, h);
         Vassals.help(level, mgr, h);
