@@ -45,10 +45,35 @@ import java.util.UUID;
 public final class Garrisons {
 
     public static void pruneLive(ServerLevel level, Map<UUID, Role> live) {
-        live.keySet().removeIf(id -> {
-            Entity e = level.getEntity(id);
-            return e == null || !e.isAlive();
-        });
+        live.keySet().removeIf(id -> gone(level, id));
+    }
+
+    /** Where each soldier (and Master Builder) was last seen, so one out of sight isn't taken for dead. */
+    private static final Map<UUID, BlockPos> LAST_SEEN = new java.util.HashMap<>();
+
+    /**
+     * Gone for good: dead, or missing where he was last seen though that ground is live. A man standing at the
+     * edge of what's loaded is there but out of sight (the game hands back nothing for him); he isn't gone, and
+     * raising another in his place was how a castle came to have two of its lord, then three, as you rode by.
+     */
+    public static boolean gone(ServerLevel level, UUID id) {
+        Entity e = level.getEntity(id);
+        if (e != null) {
+            if (e.isAlive()) {
+                LAST_SEEN.put(id, e.blockPosition());
+                return false;
+            }
+            LAST_SEEN.remove(id);
+            return true;
+        }
+        BlockPos at = LAST_SEEN.get(id);
+        if (at != null && !level.isPositionEntityTicking(at)) return false;
+        LAST_SEEN.remove(id);
+        return true;
+    }
+
+    public static void seen(Entity e) {
+        LAST_SEEN.put(e.getUUID(), e.blockPosition());
     }
 
     public static int liveCount(Map<UUID, Role> live, Role r) {
@@ -159,6 +184,7 @@ public final class Garrisons {
             return false;
         }
         h.live.put(g.getUUID(), r);
+        seen(g);
         if (g.post() != null) h.usedPosts.add(g.post());
         return true;
     }
@@ -227,6 +253,7 @@ public final class Garrisons {
         if (r == Role.CAPTAIN) e.setCustomName(Component.literal("Ser " + NameGen.first(level.random)));
         e.setPersistenceRequired();
         level.addFreshEntity(e);
+        seen(e);
         if (h != null) h.live.put(e.getUUID(), r);
         return e;
     }
@@ -250,6 +277,7 @@ public final class Garrisons {
                 if (poof) level.sendParticles(ParticleTypes.POOF, e.getX(), e.getY() + 1, e.getZ(), 8, 0.3, 0.6, 0.3, 0.02);
                 e.discard();
             }
+            LAST_SEEN.remove(id);
         }
         live.clear();
     }

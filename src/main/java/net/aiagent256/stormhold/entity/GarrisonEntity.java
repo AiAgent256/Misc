@@ -771,6 +771,12 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
     @Override
     protected void customServerAiStep() {
         super.customServerAiStep();
+        // one of a castle's men who finds his place taken (a second lord, a man over the count) stands down
+        if (this.tickCount % 40 == 7 && this.level() instanceof net.minecraft.server.level.ServerLevel sl
+                && !net.aiagent256.stormhold.holding.Garrisons.belongs(sl, this)) {
+            this.discard();
+            return;
+        }
         // a dragon's carcass is still "alive" to the game; the men stop hacking at it once it's down
         if (this.tickCount % 20 == 0 && net.aiagent256.stormhold.holding.Dragons.isCarcass(this.getTarget())) this.setTarget(null);
         if (alarmTicks > 0) alarmTicks--;

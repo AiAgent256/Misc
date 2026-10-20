@@ -802,6 +802,27 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    @GameTest(template = "arena", timeoutTicks = 200, batch = "dupes")
+    public static void aSecondLordStandsDown(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = sample(g);
+        h.lordAlive = true;
+        mgr.holdings.put(h.id, h);
+        var first = net.aiagent256.stormhold.holding.Garrisons.spawn(level, mgr, h, Role.LORD, h.lordPos, h.owner, true);
+        var second = net.aiagent256.stormhold.holding.Garrisons.spawn(level, mgr, h, Role.LORD, h.lordPos.east(3), h.owner, true);
+        if (first == null || second == null) throw new IllegalStateException("no lords");
+        h.live.remove(second.getUUID());          // a lord nobody counts: the double a castle used to raise as you rode by
+        // and the counted one out of sight is not gone: nobody raises a third for him
+        if (net.aiagent256.stormhold.holding.Garrisons.gone(level, first.getUUID())) throw new IllegalStateException("a live lord taken for gone");
+        g.succeedWhen(() -> {
+            if (!second.isRemoved()) throw new net.minecraft.gametest.framework.GameTestAssertException("the uncounted lord still stands");
+            if (first.isRemoved()) throw new net.minecraft.gametest.framework.GameTestAssertException("the counted lord stood down too");
+            first.discard();
+            mgr.holdings.remove(h.id);
+        });
+    }
+
     /** A chest at {@code at} with a standing sign on it reading {@code lines}. */
     private static net.minecraft.world.Container signedChest(GameTestHelper g, BlockPos at, String... lines) {
         ServerLevel level = g.getLevel();

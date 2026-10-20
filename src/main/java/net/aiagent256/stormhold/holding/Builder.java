@@ -69,7 +69,7 @@ public final class Builder {
 
     public static void ensureBuilder(ServerLevel level, Holding h) {
         if (!h.isPlayerOwned() || h.warTablePos.equals(BlockPos.ZERO) || !level.isLoaded(h.warTablePos)) return;
-        if (h.builder != null && level.getEntity(h.builder) != null) return;
+        if (h.builder != null && !Garrisons.gone(level, h.builder)) return;      // out of sight isn't gone
         if (h.builderName.isEmpty()) h.builderName = NameGen.first(level.random);
         BlockPos at = Garrisons.standable(level, h.warTablePos.east());
         if (at == null) at = Garrisons.standable(level, h.warTablePos);
@@ -84,6 +84,7 @@ public final class Builder {
         v.setCustomNameVisible(true);
         v.setPersistenceRequired();
         level.addFreshEntity(v);
+        Garrisons.seen(v);
         h.builder = v.getUUID();
     }
 
