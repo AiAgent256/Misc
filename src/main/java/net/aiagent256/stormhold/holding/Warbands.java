@@ -161,8 +161,9 @@ public final class Warbands {
         c.to = Campaigns.gateOutside(h);
         mgr.campaigns.add(c);
         Vassals.help(level, mgr, h);
+        String where = Campaigns.fromLord(level, h);
         HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("An illager warband of " + c.total() + " marches on " + h.name
-                + " from the " + Guide.way(center, c.from).replaceAll("^\\d+ blocks ", "") + "!").withStyle(ChatFormatting.RED));
+                + " from the " + Guide.way(center, c.from).replaceAll("^\\d+ blocks ", "") + "!" + (where.isEmpty() ? "" : " It lies " + where + ".")).withStyle(ChatFormatting.RED));
         Chronicle.log(level, mgr, Chronicle.WAR, "Illagers march on " + h.name + ", " + c.total() + " strong.", h.ownerPlayer());
         mgr.setDirty();
         return c;
@@ -182,16 +183,21 @@ public final class Warbands {
             broken(level, mgr, h, c, c.spoils, true);
             return;
         }
-        boolean near = Campaigns.playerNear(level, h.center(), 160);
+        boolean near = Campaigns.playerNear(level, h.center(), c.engaged ? Campaigns.UNWATCH : Campaigns.WATCH);
         if (!near) {
+            c.engaged = false;
+            Campaigns.clearBar(c);
             discardLive(level, c);
             if (c.progress < 1) {
                 c.progress = Math.min(1, c.progress + MARCH_SPEED / c.length());
                 return;
             }
+            if (Campaigns.waitForLord(level, h, c, "An illager warband of " + c.total())) return;
             if (Config.ABSTRACT_RAIDS.get()) resolve(level, mgr, h, c);
             return;
         }
+        c.engaged = true;
+        Campaigns.bar(level, h, c, "Illagers at " + h.name);
         if (c.bandLive.size() < c.total()) {
             boolean first = c.bandLive.isEmpty();
             materialize(level, c);

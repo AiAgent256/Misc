@@ -20,6 +20,12 @@ import java.util.UUID;
 /** Raids against player castles and war parties sent out by them. */
 public final class Campaigns {
     private static final double MARCH_SPEED = 3.0; // blocks per second while unseen
+    /** How near a player must come for a raid on a castle to be fought for real. */
+    public static final int WATCH = 160;
+    /** Once it's real, how far he must go before it turns back into numbers. */
+    public static final int UNWATCH = 320;
+    /** Seconds an attack waits before the walls for the lord, while he's online, before it's fought out without him. */
+    public static final int WAIT = 300;
 
     // ------------------------------------------------------------ scheduling
 
@@ -90,8 +96,10 @@ public final class Campaigns {
         c.spoils = c.total();
         mgr.campaigns.add(c);
         h.lastRaidAt = level.getGameTime();
+        String where = fromLord(level, h);
         HoldingEvents.tell(level, h.ownerPlayer(), Component.literal(mgr.house(h.houseId).title() + " marches on "
-                + h.name + " with " + c.total() + " men!").withStyle(ChatFormatting.RED));
+                + h.name + " with " + c.total() + " men!" + (where.isEmpty() ? "" : " It lies " + where + ".")
+                + " They reach the walls in about " + (int) Math.ceil(c.length() / MARCH_SPEED) + " seconds.").withStyle(ChatFormatting.RED));
         alliedHelp(level, mgr, h);
         Vassals.help(level, mgr, h);
         mgr.setDirty();
@@ -246,6 +254,7 @@ public final class Campaigns {
             else if (c.kind == Campaign.Kind.SCOUT) Scouts.tick(level, mgr, c);
             else tickParty(level, mgr, c, now);
         }
+        for (Campaign c : mgr.campaigns) if (c.stage == Campaign.Stage.DONE) clearBar(c);
         if (mgr.campaigns.removeIf(c -> c.stage == Campaign.Stage.DONE)) mgr.setDirty();
     }
 
@@ -255,6 +264,64 @@ public final class Campaigns {
         Garrisons.pruneLive(level, c.live);
         if (c.kind == Campaign.Kind.RAID) tickRaid(level, mgr, c);
         else if (c.kind == Campaign.Kind.ILLAGERS) Warbands.tick(level, mgr, c);
+    }
+
+    /** Where a place lies from its lord, if he's online in this world: "412 blocks south-west of you", else "". */
+    static String fromLord(ServerLevel level, Holding h) {
+        UUID p = h.ownerPlayer();
+        ServerPlayer sp = p == null ? null : level.getServer().getPlayerList().getPlayer(p);
+        if (sp == null || sp.level() != level) return "";
+        String w = Guide.way(sp.blockPosition(), h.center());
+        return w.equals("right here") ? "where you stand" : w + " of you";
+    }
+
+    static boolean lordOnline(ServerLevel level, Holding h) {
+        UUID p = h.ownerPlayer();
+        return p != null && level.getServer().getPlayerList().getPlayer(p) != null;
+    }
+
+    /**
+     * An attack has reached the walls with nobody there. While the lord is online it waits {@link #WAIT} seconds
+     * for him to come (a word at the start and a minute before the end); then, or at once if he's away, the garrison
+     * fights it out. True while it's still waiting.
+     */
+    static boolean waitForLord(ServerLevel level, Holding h, Campaign c, String who) {
+        if (!lordOnline(level, h) || c.waitSeconds >= WAIT) return false;
+        if (c.waitSeconds == 0) {
+            String where = fromLord(level, h);
+            HoldingEvents.tell(level, h.ownerPlayer(), Component.literal(who + " stand before the walls of " + h.name
+                    + (where.isEmpty() ? "" : ", " + where) + ". The garrison holds them " + WAIT / 60 + " minutes: come within " + WATCH
+                    + " blocks to fight it yourself, or it's fought out without you.").withStyle(ChatFormatting.RED));
+        } else if (c.waitSeconds == WAIT - 60) {
+            HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("A minute before " + h.name + " fights its attackers out without you.")
+                    .withStyle(ChatFormatting.RED));
+        }
+        c.waitSeconds++;
+        return true;
+    }
+
+    /** The bar over a fight, for every player within reach of the castle: how many attackers are left. */
+    static void bar(ServerLevel level, Holding h, Campaign c, String title) {
+        if (c.bar == null) {
+            c.barMax = Math.max(1, c.total());
+            c.bar = new net.minecraft.server.level.ServerBossEvent(Component.literal(title),
+                    net.minecraft.world.BossEvent.BossBarColor.RED, net.minecraft.world.BossEvent.BossBarOverlay.NOTCHED_10);
+        }
+        c.bar.setName(Component.literal(title + ": " + c.total() + " of " + c.barMax + " left"));
+        c.bar.setProgress(Math.max(0f, Math.min(1f, c.total() / (float) c.barMax)));
+        BlockPos at = h.center();
+        for (ServerPlayer sp : level.players()) {
+            boolean in = sp.blockPosition().distSqr(new BlockPos(at.getX(), sp.getBlockY(), at.getZ())) < (double) UNWATCH * UNWATCH;
+            if (in) c.bar.addPlayer(sp);
+            else c.bar.removePlayer(sp);
+        }
+    }
+
+    static void clearBar(Campaign c) {
+        if (c.bar != null) {
+            c.bar.removeAllPlayers();
+            c.bar = null;
+        }
     }
 
     static boolean playerNear(ServerLevel level, BlockPos p, int radius) {
@@ -337,8 +404,10 @@ public final class Campaigns {
             c.stage = Campaign.Stage.DONE;
             return;
         }
-        boolean near = playerNear(level, h.center(), 160);
+        boolean near = playerNear(level, h.center(), c.engaged ? UNWATCH : WATCH);
         if (near) {
+            c.engaged = true;
+            bar(level, h, c, "Raid on " + h.name);
             if (c.live.size() < c.total()) {
                 boolean first = c.live.isEmpty();
                 materialize(level, mgr, c, c.to);
@@ -362,11 +431,14 @@ public final class Campaigns {
             }
             return;
         }
+        c.engaged = false;
+        clearBar(c);
         if (!c.live.isEmpty()) return;
         if (c.progress < 1) {
             c.progress += MARCH_SPEED / c.length();
             return;
         }
+        if (waitForLord(level, h, c, HoldingEvents.ownerName(level, mgr, c.side) + "'s " + c.total() + " men")) return;
         if (!Config.ABSTRACT_RAIDS.get()) return;
         // fought out while the lord is away
         double def = h.strength() * (h.mode == Holding.Mode.DEFEND ? 1.6 : 1.2) * (0.8 + level.random.nextDouble() * 0.4)

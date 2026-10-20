@@ -46,6 +46,13 @@ public class Campaign {
     /** Not saved: how the warband's siege is going. */
     public int siegeSeconds, sackSeconds;
     public boolean rammedOpen, laddered, sapped;
+    /** A raid or warband before the walls with nobody there: how long it has waited for the lord to come and fight it. */
+    public int waitSeconds;
+    /** Not saved: a player came, so it's fought for real, and stays so until he's well away again. */
+    public boolean engaged;
+    /** Not saved: the bar over the fight for the players at it, and the size it started at. */
+    @Nullable public net.minecraft.server.level.ServerBossEvent bar;
+    public int barMax;
 
     public int total() {
         int n = 0;
@@ -99,6 +106,7 @@ public class Campaign {
         band.forEach(b::putInt);
         t.put("Band", b);
         t.putInt("Spoils", spoils);
+        t.putInt("Wait", waitSeconds);
         return t;
     }
 
@@ -118,6 +126,7 @@ public class Campaign {
         c.tier = t.getInt("Tier");
         if (t.contains("Renown")) c.renown = t.getInt("Renown");
         c.color = t.getInt("Color");
+        c.waitSeconds = t.getInt("Wait");
         CompoundTag cc = t.getCompound("Counts");
         for (String k : cc.getAllKeys()) {
             try {
