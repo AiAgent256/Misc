@@ -45,13 +45,13 @@ public final class Gates {
         HoldingManager mgr = HoldingManager.get(level);
         Holding h = mgr.at(pos, 2);
         if (h == null) return;
-        h.gateBrokenAt = level.getGameTime();
+        h.gateBrokenAt = Math.max(1, level.getGameTime());        // 0 means whole
         mgr.setDirty();
     }
 
     /** Whether the castle's gate is still in its ten minutes down. */
     public static boolean down(ServerLevel level, Holding h) {
-        return h.gateBrokenAt > 0 && level.getGameTime() - h.gateBrokenAt < DOWN_TICKS;
+        return h.gateBrokenAt != 0 && level.getGameTime() - h.gateBrokenAt < DOWN_TICKS;
     }
 
     public static final class Plane {
@@ -67,7 +67,7 @@ public final class Gates {
         // an inner gate whose chunks weren't loaded at the last look is looked for again in a while
         if (h.gates != null && h.gatesRescanAt > 0 && level.getGameTime() >= h.gatesRescanAt) h.gates = null;
         // ten minutes after a gate was broken it's put back (the scan restores it)
-        if (h.gateBrokenAt > 0 && !down(level, h)) {
+        if (h.gateBrokenAt != 0 && !down(level, h)) {
             h.gateBrokenAt = 0;
             h.gates = null;
             mgr.setDirty();
