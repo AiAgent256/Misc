@@ -115,6 +115,7 @@ public final class Campaigns {
                 + " They reach the walls in about " + (int) Math.ceil(c.length() / MARCH_SPEED) + " seconds.").withStyle(ChatFormatting.RED));
         alliedHelp(level, mgr, h);
         Vassals.help(level, mgr, h);
+        Relief.send(level, mgr, h);
         mgr.setDirty();
         return c;
     }
@@ -312,6 +313,19 @@ public final class Campaigns {
         return c;
     }
 
+    static boolean insideXZ(Holding h, BlockPos p, int margin) {
+        var b = h.box.inflatedBy(margin);
+        return p.getX() >= b.minX() && p.getX() <= b.maxX() && p.getZ() >= b.minZ() && p.getZ() <= b.maxZ();
+    }
+
+    /** Where a raid's men come up when you arrive: outside the gate if it still stands. For the tests. */
+    public static BlockPos raidArrival(HoldingManager mgr, Campaign c) {
+        BlockPos at = c.position();
+        Holding h = c.target == null ? null : mgr.holdings.get(c.target);
+        if (c.kind == Campaign.Kind.RAID && !c.rammed && h != null && insideXZ(h, at, 4)) at = gateOutside(h);
+        return at;
+    }
+
     /** A spot a few blocks outside a castle's gate, where marching men file in and out. */
     static BlockPos gateOutside(Holding h) {
         if (h.gatePos.equals(BlockPos.ZERO)) return h.center();
@@ -359,6 +373,10 @@ public final class Campaigns {
             if (c.stage != Campaign.Stage.DONE) continue;
             clearBar(c);
             SiegeWorks.clear(level, c);          // a ram left standing when it ended some other way
+            if ((c.kind == Campaign.Kind.RAID || c.kind == Campaign.Kind.ILLAGERS) && c.target != null) {
+                Holding t = mgr.holdings.get(c.target);
+                if (t != null && t.isPlayerOwned()) Relief.over(level, mgr, t);    // the men who came to hold it go home
+            }
         }
         if (mgr.campaigns.removeIf(c -> c.stage == Campaign.Stage.DONE)) mgr.setDirty();
     }
@@ -441,6 +459,12 @@ public final class Campaigns {
     /** Spawn the missing members of a campaign at its current position, if that ground is loaded. */
     private static void materialize(ServerLevel level, HoldingManager mgr, Campaign c, BlockPos marchTo) {
         BlockPos at = c.position();
+        if (c.kind == Campaign.Kind.RAID && !c.rammed && c.target != null) {
+            // an attack that waited at the walls while nobody watched is at the walls, not in the yard: the march's
+            // reckoning runs on to the banner, but they come up outside the gate and have to break in
+            Holding h = mgr.holdings.get(c.target);
+            if (h != null && insideXZ(h, at, 4)) at = gateOutside(h);
+        }
         double dx = c.to.getX() - at.getX(), dz = c.to.getZ() - at.getZ();
         double len = Math.max(1, Math.sqrt(dx * dx + dz * dz));
         for (int k = 0; k < 8 && !level.isLoaded(at); k++) {

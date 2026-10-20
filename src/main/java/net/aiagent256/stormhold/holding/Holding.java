@@ -215,6 +215,10 @@ public class Holding {
     public int heirBeaten;
     /** When a tournament was last held here (see {@link Tourney}). */
     public long lastTourney;
+    /** Men your other castles sent to hold this one while it's attacked, by castle: {knights, archers} (see {@link Relief}). */
+    public final Map<UUID, int[]> relief = new HashMap<>();
+    /** The garrison's knights and archers once they'd come, to tell how many came through. */
+    public int[] reliefAfter = {0, 0};
 
     public int fiefLevel() {
         int cottages = 0;
@@ -499,6 +503,7 @@ public class Holding {
             t.putInt("HeirBeaten", heirBeaten);
         }
         t.putLong("LastTourney", lastTourney);
+        if (!relief.isEmpty()) t.put("Relief", Relief.save(this));
         t.putString("BuilderName", builderName);
         if (builder != null) t.putUUID("Builder", builder);
         t.putString("FiefReport", fiefReport);
@@ -652,6 +657,7 @@ public class Holding {
         h.heirFather = t.getString("HeirFather");
         h.heirBeaten = t.getInt("HeirBeaten");
         h.lastTourney = t.getLong("LastTourney");
+        if (t.contains("Relief")) Relief.load(h, t.getCompound("Relief"));
         if (t.contains("MapRoom")) {
             int[] mr = t.getIntArray("MapRoom");
             if (mr.length == 9) h.mapRoom = mr;

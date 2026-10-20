@@ -354,6 +354,7 @@ public final class HoldingEvents {
         }
         Garrisons.discardLive(level, h.live, true);
         h.usedPosts.clear();
+        h.relief.clear();                                   // the men sent to hold it fell with it
         clearContest(h);
         h.vassal = null;
         h.owner = newSide;

@@ -162,6 +162,7 @@ public final class Warbands {
         c.to = Campaigns.gateOutside(h);
         mgr.campaigns.add(c);
         Vassals.help(level, mgr, h);
+        Relief.send(level, mgr, h);
         String where = Campaigns.fromLord(level, h);
         HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("An illager warband of " + c.total() + " marches on " + h.name
                 + " from the " + Guide.way(center, c.from).replaceAll("^\\d+ blocks ", "") + "!" + (where.isEmpty() ? "" : " It lies " + where + ".")).withStyle(ChatFormatting.RED));

@@ -3096,6 +3096,128 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** Doubles stacked on a stall's post, under today's title or an old one, are sent away; one keeper stays. */
+    @GameTest(template = "arena")
+    public static void stackedShopkeepersAreSentAway(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        Holding h = sample(g);
+        BlockPos bake = g.absolutePos(new BlockPos(4, 2, 4)), store = g.absolutePos(new BlockPos(10, 2, 10));
+        h.extras.put("shop_baker", new ArrayList<>(List.of(bake)));
+        h.extras.put("shop_general", new ArrayList<>(List.of(store)));
+        List<net.minecraft.world.entity.npc.Villager> made = new ArrayList<>();
+        String[][] names = {{"Mabel the Baker", "Rob the Baker", "Osric the Provisioner"}, {"Tilda the Shopkeeper", "Maud the Shopkeeper"}};
+        BlockPos[] posts = {bake, store};
+        try {
+            for (int i = 0; i < 2; i++) {
+                for (String n : names[i]) {
+                    var v = net.minecraft.world.entity.EntityType.VILLAGER.create(level);
+                    if (v == null) throw new IllegalStateException("no villager");
+                    v.setCustomName(net.minecraft.network.chat.Component.literal(n));
+                    v.moveTo(posts[i].getX() + 0.5, posts[i].getY(), posts[i].getZ() + 0.5, 0, 0);
+                    v.setNoAi(true);
+                    level.addFreshEntity(v);
+                    made.add(v);
+                }
+            }
+            // a villager who isn't a keeper stands by the stall and stays
+            var passer = net.minecraft.world.entity.EntityType.VILLAGER.create(level);
+            passer.setCustomName(net.minecraft.network.chat.Component.literal("Maud Glover"));
+            passer.moveTo(bake.getX() + 0.5, bake.getY(), bake.getZ() + 1.0, 0, 0);
+            passer.setNoAi(true);
+            level.addFreshEntity(passer);
+            made.add(passer);
+            int sent = net.aiagent256.stormhold.holding.Shops.sweep(level, h);
+            if (sent != 3) throw new IllegalStateException(sent + " sent away, not 3");
+            for (BlockPos p : posts) {
+                int left = level.getEntitiesOfClass(net.minecraft.world.entity.npc.Villager.class, new net.minecraft.world.phys.AABB(p).inflate(1.5),
+                        x -> x.isAlive() && x != passer).size();
+                if (left != 1) throw new IllegalStateException(left + " keepers left at " + p);
+            }
+            if (!passer.isAlive()) throw new IllegalStateException("a passer-by was sent away");
+            if (net.aiagent256.stormhold.holding.Shops.sweep(level, h) != 0) throw new IllegalStateException("a second sweep sent more away");
+        } finally {
+            for (var v : made) v.discard();
+        }
+        g.succeed();
+    }
+
+    /** A raid that waited at the walls comes up outside the gate when you arrive, not by the banner. */
+    @GameTest(template = "arena")
+    public static void aWaitingRaidComesUpOutsideTheGate(GameTestHelper g) {
+        HoldingManager mgr = HoldingManager.get(g.getLevel());
+        Holding h = sample(g);
+        h.owner = Sides.player(UUID.randomUUID());
+        mgr.holdings.put(h.id, h);
+        try {
+            Campaign c = new Campaign();
+            c.kind = Campaign.Kind.RAID;
+            c.target = h.id;
+            c.to = h.bannerPos;
+            c.from = h.bannerPos.offset(110, 0, 0);
+            c.progress = 1.0;
+            BlockPos at = Campaigns.raidArrival(mgr, c);
+            var box = h.box;
+            if (at.getX() >= box.minX() && at.getX() <= box.maxX() && at.getZ() >= box.minZ() && at.getZ() <= box.maxZ())
+                throw new IllegalStateException("the raid comes up inside the walls at " + at);
+            c.rammed = true;
+            if (!Campaigns.raidArrival(mgr, c).equals(c.position())) throw new IllegalStateException("through a broken gate they should come on");
+            c.rammed = false;
+            c.progress = 0.3;
+            if (!Campaigns.raidArrival(mgr, c).equals(c.position())) throw new IllegalStateException("a raid on the road was moved");
+        } finally {
+            mgr.holdings.remove(h.id);
+        }
+        g.succeed();
+    }
+
+    /** Your other castles send men to one under attack, and the ones still standing go home after. */
+    @GameTest(template = "arena")
+    public static void castlesSendMenToOneUnderAttack(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        UUID me = UUID.randomUUID();
+        Holding target = sample(g), near = sample(g), far = sample(g);
+        near.key = target.key + "/near";
+        far.key = target.key + "/far";
+        near.name = "Nearhold";
+        far.name = "Farhold";
+        // the arena's garrisons stand where the test does: the others are put far off on the map by their boxes
+        BlockPos c = target.center();
+        near.box = new BoundingBox(c.getX() + 600, c.getY(), c.getZ(), c.getX() + 615, c.getY() + 7, c.getZ() + 15);
+        far.box = new BoundingBox(c.getX() + 5000, c.getY(), c.getZ(), c.getX() + 5015, c.getY() + 7, c.getZ() + 15);
+        for (Holding x : List.of(target, near, far)) {
+            x.owner = Sides.player(me);
+            x.live.clear();
+            mgr.holdings.put(x.id, x);
+        }
+        near.garrison.put(Role.KNIGHT, 6);
+        near.garrison.put(Role.ARCHER, 4);
+        far.garrison.put(Role.KNIGHT, 6);
+        int k0 = target.count(Role.KNIGHT), a0 = target.count(Role.ARCHER);
+        int k = Math.min(1 + near.tier, 6 - net.aiagent256.stormhold.holding.Relief.KEEP), a = Math.min((1 + near.tier) / 2, 4 - net.aiagent256.stormhold.holding.Relief.KEEP);
+        try {
+            net.aiagent256.stormhold.holding.Relief.send(level, mgr, target);
+            if (near.count(Role.KNIGHT) != 6 - k || near.count(Role.ARCHER) != 4 - a)
+                throw new IllegalStateException("Nearhold sent " + (6 - near.count(Role.KNIGHT)) + " knights and " + (4 - near.count(Role.ARCHER)) + " archers, not " + k + " and " + a);
+            if (far.count(Role.KNIGHT) != 6) throw new IllegalStateException("a castle 5000 blocks off sent men");
+            if (target.count(Role.KNIGHT) != k0 + k || target.count(Role.ARCHER) != a0 + a) throw new IllegalStateException("the men didn't arrive");
+            // the attack's over; the garrison lost half its knights: half of those sent go home
+            int after = target.count(Role.KNIGHT);
+            target.add(Role.KNIGHT, -(after - after / 2));
+            net.aiagent256.stormhold.holding.Relief.over(level, mgr, target);
+            int back = (int) Math.floor(k * ((after / 2) / (double) after));
+            if (near.count(Role.KNIGHT) != 6 - k + back) throw new IllegalStateException(near.count(Role.KNIGHT) - (6 - k) + " knights came home, not " + back);
+            if (near.count(Role.ARCHER) != 4) throw new IllegalStateException("the archers didn't come home");
+            if (!target.relief.isEmpty()) throw new IllegalStateException("the relief is still on the roll");
+        } finally {
+            for (Holding x : List.of(target, near, far)) {
+                for (UUID id : x.live.keySet()) if (level.getEntity(id) instanceof GarrisonEntity ge) ge.discard();
+                mgr.holdings.remove(x.id);
+            }
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

@@ -360,6 +360,7 @@ public final class Shops {
     public static void tick(ServerLevel level, HoldingManager mgr, Holding h) {
         if (!hasShops(h)) return;
         refreshFromPlans(mgr, h);
+        sweep(level, h);
         long day = level.getDayTime() / 24000L;
         boolean newDay = day != h.shopsDay;
         boolean dirty = false;
@@ -462,9 +463,69 @@ public final class Shops {
         return keep;
     }
 
+    /**
+     * A keeper of this trade: our mark, or (once another mod has made him its own kind of villager, which keeps the
+     * name and not the mark) his name, under the trade's title or the title of a trade folded into it since
+     * ("Osric the Baker" keeps the Food &amp; Provisions stall).
+     */
     private static boolean isKeeper(Villager x, Type t) {
         if (x.getPersistentData().contains(TAG)) return true;
-        return x.hasCustomName() && x.getCustomName().getString().endsWith(" the " + t.keeper());
+        if (!x.hasCustomName()) return false;
+        String n = x.getCustomName().getString();
+        if (n.endsWith(" the " + t.keeper())) return true;
+        for (var e : OLD_TITLES.entrySet()) if (canonical(e.getKey()).equals(t.id()) && n.endsWith(" the " + e.getValue())) return true;
+        return false;
+    }
+
+    /** The keepers' titles of the first plans' trades, by trade. */
+    private static final Map<String, String> OLD_TITLES = Map.of("baker", "Baker", "butcher", "Butcher", "fish", "Fishmonger",
+            "farmer", "Farmer", "cloth", "Draper", "tanner", "Saddler", "apothecary", "Apothecary", "chandler", "Chandler");
+
+    /** A keeper of any trade, by mark or by name. */
+    private static boolean anyKeeper(Villager x) {
+        if (x.getPersistentData().contains(TAG)) return true;
+        if (!x.hasCustomName()) return false;
+        String n = x.getCustomName().getString();
+        int i = n.lastIndexOf(" the ");
+        if (i < 0) return false;
+        String title = n.substring(i + 5);
+        if (OLD_TITLES.containsValue(title)) return true;
+        for (Type t : types().values()) if (t.keeper().equals(title)) return true;
+        return false;
+    }
+
+    /**
+     * One keeper to a stall. Doubles raised in the days before keepers were known by name (another mod gives them
+     * new bodies without our mark) stand stacked a dozen deep on some posts, past the cap of stalls staffed and
+     * under titles since folded together; every stall's post is cleared of all but one, whatever its trade.
+     * How many were sent away.
+     */
+    public static int sweep(ServerLevel level, Holding h) {
+        int sent = 0;
+        for (var e : h.extras.entrySet()) {
+            if (!e.getKey().startsWith("shop_")) continue;
+            for (BlockPos post : e.getValue()) {
+                if (!level.isLoaded(post) || !level.areEntitiesLoaded(ChunkPos.asLong(post))) continue;
+                double cx = post.getX() + 0.5, cz = post.getZ() + 0.5;
+                List<Villager> here = level.getEntitiesOfClass(Villager.class, new AABB(post).inflate(1.5, 1.0, 1.5),
+                        x -> x.isAlive() && anyKeeper(x));
+                if (here.size() < 2) continue;
+                UUID known = h.shopkeepers.get(post);
+                Villager keep = null;
+                for (Villager x : here) if (x.getUUID().equals(known)) keep = x;
+                if (keep == null) {
+                    for (Villager x : here)
+                        if (keep == null || x.distanceToSqr(cx, x.getY(), cz) < keep.distanceToSqr(cx, keep.getY(), cz)) keep = x;
+                }
+                for (Villager x : here) {
+                    if (x == keep) continue;
+                    x.discard();
+                    sent++;
+                }
+            }
+        }
+        if (sent > 0) net.aiagent256.stormhold.Stormhold.LOGGER.info("Stormhold: {} doubled shopkeepers sent away at {}", sent, h.name);
+        return sent;
     }
 
     /**
