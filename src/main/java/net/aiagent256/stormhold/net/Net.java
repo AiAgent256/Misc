@@ -445,9 +445,11 @@ public final class Net {
                 case KEEP_WITH_ME -> {
                     h.reinforceKeep = Math.max(0, Math.min(80, a.amount()));
                     h.nextColumn = 0;
+                    int back = h.reinforceKeep > 0 ? 0 : net.aiagent256.stormhold.holding.Columns.recallSupply(mgr, h);
                     player.sendSystemMessage(h.reinforceKeep > 0
                             ? HoldingEvents.gold(h.name + " will keep " + h.reinforceKeep + " men with you, sending a column whenever you run short.")
-                            : Component.literal("Supply line from " + h.name + " cancelled."));
+                            : Component.literal("Supply line from " + h.name + " cancelled." + (back > 0 ? " The column it sent turns back: "
+                            + back + " men home to " + h.name + "." : "")));
                 }
                 case ARM -> {
                     var kit = net.aiagent256.stormhold.holding.Armoury.Kit.byTier(a.amount());

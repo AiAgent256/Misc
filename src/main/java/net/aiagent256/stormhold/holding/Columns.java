@@ -219,6 +219,22 @@ public final class Columns {
 
     // ------------------------------------------------------------ supply line
 
+    /** The supply line is cancelled: a column it sent that hasn't reached you turns back. How many men. */
+    public static int recallSupply(HoldingManager mgr, Holding h) {
+        int n = 0;
+        for (Campaign c : mgr.campaigns) {
+            if (c.kind != Campaign.Kind.COLUMN || c.stage == Campaign.Stage.DONE || !c.supply || !h.id.equals(c.origin)) continue;
+            for (var e : c.counts.entrySet()) {
+                h.add(e.getKey(), e.getValue());
+                n += e.getValue();
+            }
+            c.counts.clear();
+            c.stage = Campaign.Stage.DONE;
+        }
+        if (n > 0) mgr.setDirty();
+        return n;
+    }
+
     public static boolean active(HoldingManager mgr, Holding h) {
         for (Campaign c : mgr.campaigns) {
             if (c.kind == Campaign.Kind.COLUMN && c.stage != Campaign.Stage.DONE && h.id.equals(c.origin)) return true;
@@ -242,6 +258,7 @@ public final class Columns {
         want.put(Role.ARCHER, archers);
         want.put(Role.CROSSBOWMAN, Math.max(0, short_ - knights - archers));
         Campaign c = send(level, mgr, player, h, want);
+        if (c != null) c.supply = true;
         if (c == null) {
             player.sendSystemMessage(Component.literal("The supply line from " + h.name + " has run dry; its garrison can't spare anyone.")
                     .withStyle(ChatFormatting.RED));

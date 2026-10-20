@@ -62,6 +62,8 @@ public class Campaign {
     public boolean ramDone;
     /** The heir who leads this attack to take back his father's castle (see {@link Heirs}); empty for an ordinary raid. */
     public String heir = "";
+    /** A column a supply line sent (cancel the line and it turns back), not one you asked for. */
+    public boolean supply;
 
     public int total() {
         int n = 0;
@@ -123,6 +125,7 @@ public class Campaign {
         }
         t.putBoolean("RamDone", ramDone);
         if (!heir.isEmpty()) t.putString("Heir", heir);
+        if (supply) t.putBoolean("Supply", true);
         return t;
     }
 
@@ -150,6 +153,7 @@ public class Campaign {
         }
         c.ramDone = t.getBoolean("RamDone");
         c.heir = t.getString("Heir");
+        c.supply = t.getBoolean("Supply");
         CompoundTag cc = t.getCompound("Counts");
         for (String k : cc.getAllKeys()) {
             try {

@@ -345,9 +345,10 @@ public class WarTableScreen extends Screen {
         send.active = n > 0;
         row.add(send);
         boolean supply = h.status().contains("Supply line");
-        row.add(button(supply ? "Stop resupply" : "Keep me supplied", supply ? "Cancel the standing order."
+        row.add(button(supply ? "Stop resupply" : "Keep me supplied", supply ? "Cancel the standing order. A column it has on the road turns back."
                 : "Standing order: keep " + Math.max(1, n) + " men (the counts above) with you. Whenever you run short, " + h.name()
-                + " sends a column, at most one every five minutes.", () -> Net.sendAction(h.id(), Net.KEEP_WITH_ME, BlockPos.ZERO, supply ? 0 : Math.max(1, n))));
+                + " sends a column, at most one every five minutes; if you're short now, the first rides at once.",
+                () -> Net.sendAction(h.id(), Net.KEEP_WITH_ME, BlockPos.ZERO, supply ? 0 : Math.max(1, n))));
         Button dismiss = button("Dismiss here", "Every man of yours within 24 blocks joins " + h.name() + "'s garrison. You must be within "
                 + Company.CALL_RANGE + " blocks of it.", () -> Net.sendAction(h.id(), Net.DISMISS, BlockPos.ZERO, 0));
         dismiss.active = near;
