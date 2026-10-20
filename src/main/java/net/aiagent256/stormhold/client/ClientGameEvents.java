@@ -16,6 +16,18 @@ public final class ClientGameEvents {
         if (Minecraft.getInstance().screen instanceof WarTableScreen s) s.notice(e.getMessage());
     }
 
+    /** K (or whatever it's bound to): the Realm map, with your castles on it, from anywhere. */
+    @SubscribeEvent
+    public static void tick(net.minecraftforge.event.TickEvent.ClientTickEvent e) {
+        if (e.phase != net.minecraftforge.event.TickEvent.Phase.END) return;
+        Minecraft mc = Minecraft.getInstance();
+        while (Keys.REALM.consumeClick()) {
+            if (mc.player != null && mc.screen == null)
+                net.aiagent256.stormhold.net.Net.sendAction(new java.util.UUID(0, 0), net.aiagent256.stormhold.net.Net.OPEN_REALM,
+                        net.minecraft.core.BlockPos.ZERO, 0);
+        }
+    }
+
     private ClientGameEvents() {
     }
 }

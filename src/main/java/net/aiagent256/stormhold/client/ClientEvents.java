@@ -24,6 +24,11 @@ public final class ClientEvents {
     }
 
     @SubscribeEvent
+    public static void keys(net.minecraftforge.client.event.RegisterKeyMappingsEvent e) {
+        e.register(Keys.REALM);
+    }
+
+    @SubscribeEvent
     public static void setup(net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent e) {
         e.enqueueWork(() -> net.minecraft.client.gui.screens.MenuScreens.register(
                 net.aiagent256.stormhold.registry.ModMenus.SOLDIER.get(), SoldierScreen::new));

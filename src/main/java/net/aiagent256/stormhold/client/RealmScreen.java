@@ -27,6 +27,13 @@ public class RealmScreen extends Screen {
     // map transform
     private double scale;
     private int ox, oz;              // world coords at the map's top-left
+    /** Fit to your own castles (true) or to every castle you know. Kept across reopenings. */
+    private static boolean mine = true;
+    /** A castle picked from the list, ringed on the map for a few seconds. */
+    @org.jetbrains.annotations.Nullable private java.util.UUID picked;
+    private long pickedAt;
+    /** Where the holdings list drew each castle's name, for clicks: id, top, bottom. */
+    private final List<Object[]> rows = new ArrayList<>();
 
     public RealmScreen(RealmData data) {
         super(Component.literal("Realm"));
@@ -66,16 +73,27 @@ public class RealmScreen extends Screen {
                 .bounds(x0 + W - 66, y0 + 4, 60, 14).build());
         this.addRenderableWidget(Button.builder(Component.literal("Refresh"), b -> Net.sendAction(new java.util.UUID(0, 0), Net.OPEN_REALM, BlockPos.ZERO, 0))
                 .bounds(x0 + W - 130, y0 + 4, 60, 14).build());
+        Button fit = Button.builder(Component.literal(mine ? "Show all" : "My castles"), b -> {
+            mine = !mine;
+            rebuildWidgets();
+        }).tooltip(net.minecraft.client.gui.components.Tooltip.create(Component.literal(mine
+                ? "Fit the map to every castle you know of."
+                : "Fit the map to the castles you hold. Click one of yours to open it on the War Table.")))
+                .bounds(x0 + W - 204, y0 + 4, 70, 14).build();
+        fit.active = !data.own().isEmpty() || !mine;
+        this.addRenderableWidget(fit);
         fitMap();
     }
 
     private void fitMap() {
         int minX = data.px(), maxX = data.px(), minZ = data.pz(), maxZ = data.pz();
+        boolean own = mine && data.castles().stream().anyMatch(c -> c.attitude() == 0);
         for (RealmData.Castle c : data.castles()) {
+            if (own && c.attitude() != 0) continue;
             minX = Math.min(minX, c.x()); maxX = Math.max(maxX, c.x());
             minZ = Math.min(minZ, c.z()); maxZ = Math.max(maxZ, c.z());
         }
-        int pad = 160;
+        int pad = own ? 240 : 160;
         minX -= pad; maxX += pad; minZ -= pad; maxZ += pad;
         double sx = (MAP_W - 8) / (double) Math.max(1, maxX - minX);
         double sz = (H - 48) / (double) Math.max(1, maxZ - minZ);
@@ -130,7 +148,16 @@ public class RealmScreen extends Screen {
             if (c.seat()) g.fill(px - 1, pz - r - 4, px + 2, pz - r - 1, 0xFFFFD700);       // a crown over the seat
             if (c.underAttack()) g.fill(px + r + 2, pz - r - 3, px + r + 5, pz - r, 0xFFFF2020);
             if (!c.lordAlive() && c.attitude() != 0) g.fill(px - 1, pz - 1, px + 2, pz + 2, 0xFF000000);
-            if (c.tier() >= 3) g.drawString(this.font, c.name(), px + r + 3, pz - 4, 0xFFE8D0A0, false);
+            if (c.id().equals(picked) && System.currentTimeMillis() - pickedAt < 4000) {
+                int q = r + 4;
+                g.fill(px - q - 1, pz - q - 1, px + q + 2, pz - q, 0xFFFFD700);
+                g.fill(px - q - 1, pz + q + 1, px + q + 2, pz + q + 2, 0xFFFFD700);
+                g.fill(px - q - 1, pz - q, px - q, pz + q + 1, 0xFFFFD700);
+                g.fill(px + q + 1, pz - q, px + q + 2, pz + q + 1, 0xFFFFD700);
+            }
+            // your own always carry their names; the great ones too, and every one once you zoom in
+            if (c.attitude() == 0) g.drawString(this.font, c.name(), px + r + 3, pz - 4, 0xFFFFFFFF, true);
+            else if (c.tier() >= 3 || scale >= 0.35) g.drawString(this.font, c.name(), px + r + 3, pz - 4, 0xFFE8D0A0, false);
             if (mouseX >= px - r - 2 && mouseX <= px + r + 3 && mouseY >= pz - r - 2 && mouseY <= pz + r + 3) hover = c;
         }
         // dragons: a red diamond, dim once dead, with the bounty beside it
@@ -150,7 +177,8 @@ public class RealmScreen extends Screen {
         g.fill(ppx - 1, ppz - 3, ppx + 2, ppz + 4, 0xFFFFFFFF);
         g.fill(ppx - 3, ppz - 1, ppx + 4, ppz + 2, 0xFFFFFFFF);
         g.disableScissor();
-        g.drawString(this.font, "N up. 1 grid = 512 blocks. " + data.castles().size() + " castles known.", mx0 + 2, my1 + 4, 0x9C8C6C, false);
+        g.drawString(this.font, "N up. 1 grid = 512 blocks. Scroll to zoom, drag to move" + (data.own().isEmpty() ? "." : ", click yours to command it."),
+                mx0 + 2, my1 + 4, 0x9C8C6C, false);
         // ---- the panel
         int rx = x0 + MAP_W + 8;
         g.fill(x0 + MAP_W + 2, y0 + 18, x0 + MAP_W + 3, y0 + H - 6, LINE);
@@ -175,7 +203,8 @@ public class RealmScreen extends Screen {
             if (!hover.lordAlive() && hover.attitude() != 0) tip.add(Component.literal("Its lord is dead."));
             if (hover.underAttack()) tip.add(Component.literal("Under attack."));
             int dx = hover.x() - data.px(), dz = hover.z() - data.pz();
-            tip.add(Component.literal((int) Math.sqrt(dx * dx + dz * dz) + " blocks away, at " + hover.x() + ", " + hover.z()));
+            tip.add(Component.literal((int) Math.sqrt(dx * dx + dz * dz) + " blocks " + way(dx, dz) + ", at " + hover.x() + ", " + hover.z()));
+            if (hover.attitude() == 0) tip.add(Component.literal("Click to open it on the War Table.").withStyle(net.minecraft.ChatFormatting.GRAY));
             g.renderComponentTooltip(this.font, tip, mouseX, mouseY);
         } else if (beast != null) {
             List<Component> tip = new ArrayList<>();
@@ -199,8 +228,16 @@ public class RealmScreen extends Screen {
             g.drawString(this.font, "You hold no castle yet.", rx, y, 0xC0B090, false);
             return y + 12;
         }
+        rows.clear();
         for (RealmData.Own o : data.own()) {
+            int top = y;
             g.drawString(this.font, o.name(), rx, y, o.underAttack() ? 0xFF6060 : 0xFFE8B0, false);
+            RealmData.Castle at = castle(o.id());
+            if (at != null) {
+                int dx = at.x() - data.px(), dz = at.z() - data.pz();
+                String where = (int) Math.sqrt(dx * dx + dz * dz) + " " + way(dx, dz);
+                g.drawString(this.font, where, rx + rw - this.font.width(where), y, 0x9C8C6C, false);
+            }
             y += 10;
             g.drawString(this.font, tierWord(o.tier()) + ", " + o.mode() + ". " + o.troops() + "/" + o.capacity() + " men, " + o.fiefPop() + " folk.", rx, y, 0xC0B090, false);
             y += 10;
@@ -212,6 +249,7 @@ public class RealmScreen extends Screen {
                 g.drawString(this.font, l, rx, y, 0x9C8C6C, false);
                 y += 9;
             }
+            rows.add(new Object[]{o.id(), top, y});
             y += 5;
         }
         return y;
@@ -287,6 +325,56 @@ public class RealmScreen extends Screen {
             if (e2 >= dy) { err += dy; x0 += sx; }
             if (e2 <= dx) { err += dx; y0 += sy; }
         }
+    }
+
+    @org.jetbrains.annotations.Nullable
+    private RealmData.Castle castle(java.util.UUID id) {
+        for (RealmData.Castle c : data.castles()) if (c.id().equals(id)) return c;
+        return null;
+    }
+
+    /** "north-east" and the like, from you to there. North is -z. */
+    private static String way(int dx, int dz) {
+        if (dx * dx + dz * dz < 64) return "here";
+        String[] w = {"north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"};
+        double ang = Math.toDegrees(Math.atan2(dx, -dz));
+        return w[(int) Math.floor(((ang + 360 + 22.5) % 360) / 45)];
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (super.mouseClicked(mouseX, mouseY, button)) return true;
+        if (button != 0) return false;
+        int x0 = left(), y0 = top();
+        // one of your castles on the map: command it
+        if (mouseX < x0 + MAP_W && mouseY > y0 + 20 && mouseY < y0 + H - 28) {
+            for (RealmData.Castle c : data.castles()) {
+                if (c.attitude() != 0) continue;
+                int px = mx(c.x()), pz = mz(c.z()), r = 5;
+                if (mouseX >= px - r - 2 && mouseX <= px + r + 3 && mouseY >= pz - r - 2 && mouseY <= pz + r + 3) {
+                    WarTableScreen.select(c.id());
+                    Net.sendAction(new java.util.UUID(0, 0), Net.REFRESH, BlockPos.ZERO, 0);
+                    return true;
+                }
+            }
+            return false;
+        }
+        // a castle in the holdings list: find it on the map
+        if (tab == 0 && mouseX >= x0 + MAP_W + 8) {
+            for (Object[] row : rows) {
+                if (mouseY >= (int) row[1] && mouseY < (int) row[2]) {
+                    RealmData.Castle c = castle((java.util.UUID) row[0]);
+                    if (c == null) return false;
+                    scale = Math.max(scale, 0.4);
+                    ox = c.x() - (int) ((MAP_W - 8) / 2 / scale);
+                    oz = c.z() - (int) ((H - 48) / 2 / scale);
+                    picked = c.id();
+                    pickedAt = System.currentTimeMillis();
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Override

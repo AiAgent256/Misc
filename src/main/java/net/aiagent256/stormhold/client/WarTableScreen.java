@@ -53,15 +53,38 @@ public class WarTableScreen extends Screen {
     private int textBottom, stanceTextY, targetY, oddsY, noteY, armouryY, peopleY, stepY, labourY, courierY;
     private int overviewHeight;
 
+    /** A castle to open on, picked on the Realm map before the table's data came back. */
+    @Nullable private static java.util.UUID toSelect;
+    private boolean pageToSelected;
+
+    public static void select(java.util.UUID id) {
+        toSelect = id;
+    }
+
     public WarTableScreen(Net.WarTableData data) {
         super(Component.literal("War Table"));
         this.data = data;
+        pick();
     }
 
     public void update(Net.WarTableData d) {
         this.data = d;
         if (selected >= d.holdings().size()) selected = Math.max(0, d.holdings().size() - 1);
+        pick();
         this.rebuildWidgets();
+    }
+
+    private void pick() {
+        if (toSelect == null) return;
+        List<HoldingInfo> l = data.holdings();
+        for (int i = 0; i < l.size(); i++) {
+            if (l.get(i).id().equals(toSelect)) {
+                selected = i;
+                tab = OVERVIEW;
+                pageToSelected = true;
+            }
+        }
+        toSelect = null;
     }
 
     /** Something the server said while the table is open: it shows along the bottom for a while. */
@@ -139,6 +162,10 @@ public class WarTableScreen extends Screen {
         List<HoldingInfo> l = data.holdings();
         int listTop = y0 + 20, listBottom = y0 + H - (l.size() > 1 ? 46 : 28);
         int perPage = Math.max(1, (listBottom - listTop) / 18);
+        if (pageToSelected) {
+            page = selected / perPage;
+            pageToSelected = false;
+        }
         page = Math.min(page, Math.max(0, (l.size() - 1) / perPage));
         int start = page * perPage;
         for (int i = start; i < Math.min(l.size(), start + perPage); i++) {
