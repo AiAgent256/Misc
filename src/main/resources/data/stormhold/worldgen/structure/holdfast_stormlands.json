@@ -7,56 +7,56 @@
  "theme": "stormlands",
  "layouts": [
   {
-   "name": "holdfast_a_r2",
+   "name": "holdfast_a_r3",
    "size_x": 80,
    "size_z": 80,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "holdfast_b_r2",
+   "name": "holdfast_b_r3",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "holdfast_c_r2",
+   "name": "holdfast_c_r3",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "holdfast_a2_r2",
+   "name": "holdfast_a2_r3",
    "size_x": 80,
    "size_z": 80,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "holdfast_b2_r2",
+   "name": "holdfast_b2_r3",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "holdfast_c2_r2",
+   "name": "holdfast_c2_r3",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "holdfast_b_moat_r2",
+   "name": "holdfast_b_moat_r3",
    "size_x": 92,
    "size_z": 92,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "holdfast_c_moat_r2",
+   "name": "holdfast_c_moat_r3",
    "size_x": 92,
    "size_z": 92,
    "ground": 5,

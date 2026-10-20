@@ -71,6 +71,7 @@ public final class HoldingEvents {
         HoldingManager mgr = HoldingManager.get(level);
         Holding h = mgr.holdings.get(g.holdingId());
         if (h == null) return;
+        h.foughtAt = level.getGameTime();
         for (UUID id : h.live.keySet()) {
             Entity e = level.getEntity(id);
             if (e instanceof GarrisonEntity other && other != g && other.distanceToSqr(g) < 48 * 48) other.alarm(attacker);
@@ -397,6 +398,8 @@ public final class HoldingEvents {
         if (p != null) {
             tell(level, p, Component.literal("The garrison swears to you. Use the War Table in the hall to give orders.")
                     .withStyle(ChatFormatting.GREEN));
+            // the field: what your fallen and theirs dropped, gathered in
+            Spoils.gather(level, mgr, h, 32, true);
             if (Sides.isHouse(oldSide)) Rewards.seized(level, mgr, h, p, peaceful);
             Titles.check(level, mgr, p, rankBefore);
             House house = mgr.houseOf(oldSide);

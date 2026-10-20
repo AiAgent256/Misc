@@ -121,7 +121,7 @@ public final class Readiness {
     @Nullable
     public static String tableLine(ServerLevel level, HoldingManager mgr, Holding from, @Nullable BlockPos target) {
         if (target == null) return null;
-        Holding enemy = mgr.at(target, 16);
+        Holding enemy = mgr.atXZ(target, 16);
         if (enemy == null || enemy.owner.equals(from.owner)) return null;
         int total = HoldingEvents.defendersInAll(enemy);
         int theirs = tier(Frontier.level(level, enemy)), ours = tier(Frontier.level(level, from));

@@ -146,6 +146,10 @@ public class Holding {
     public boolean warbandWarned;
     /** When the castle last took damage (a dragon, a blast, a broken gate); the masons come once it's quiet. 0 if none. */
     public long damagedAt;
+    /** When a portcullis of this castle was last broken: it stays down {@link Gates#DOWN_TICKS} from then. 0 if whole. */
+    public long gateBrokenAt;
+    /** Not saved: when one of the garrison was last hurt by anyone. The masons wait for the fighting to stop too. */
+    public long foughtAt;
     public boolean villagersSpawned;
     public boolean bannersDirty = true;
     public boolean surroundingsDone;
@@ -429,6 +433,7 @@ public class Holding {
         t.putLong("NextWarband", nextWarband);
         t.putBoolean("WarbandWarned", warbandWarned);
         t.putLong("DamagedAt", damagedAt);
+        t.putLong("GateBrokenAt", gateBrokenAt);
         t.putBoolean("Villagers", villagersSpawned);
         t.putBoolean("BannersDirty", bannersDirty);
         t.putBoolean("Surroundings", surroundingsDone);
@@ -581,6 +586,7 @@ public class Holding {
         h.nextWarband = t.getLong("NextWarband");
         h.warbandWarned = t.getBoolean("WarbandWarned");
         h.damagedAt = t.getLong("DamagedAt");
+        h.gateBrokenAt = t.getLong("GateBrokenAt");
         h.villagersSpawned = t.getBoolean("Villagers");
         h.bannersDirty = t.getBoolean("BannersDirty");
         h.surroundingsDone = t.getBoolean("Surroundings");

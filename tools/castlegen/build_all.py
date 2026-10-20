@@ -147,6 +147,18 @@ for _fn, _name, _style, _shift in builds():
         REVISIONS[_name] = REVISIONS.get(_name, 1) + 1
 
 
+# The gate and keep rebuild: machicolations over the gate mouths, a second portcullis behind the first, keeps
+# entered a floor up through a forebuilding with the hall moved up to it. A revision for each plan whose blocks
+# changed, so castles already standing keep theirs.
+GATES_AND_KEEPS = ("great_castle_a", "great_castle_a2", "great_castle_a_moat", "great_castle_b", "great_castle_b2",
+                   "great_castle_c", "great_castle_c2", "great_castle_c_moat", "great_castle_d", "great_castle_d2",
+                   "holdfast_a", "holdfast_a2", "holdfast_b", "holdfast_b2", "holdfast_b_moat", "holdfast_c", "holdfast_c2",
+                   "holdfast_c_moat", "lake_castle", "lake_castle2", "watchtower_a", "watchtower_a2", "fortified_manor",
+                   "fortified_manor2", "town_walled", "great_city", "canal_city")
+for _name in GATES_AND_KEEPS:
+    REVISIONS[_name] = REVISIONS.get(_name, 1) + 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default=None)

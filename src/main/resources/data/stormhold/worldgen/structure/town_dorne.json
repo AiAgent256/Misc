@@ -7,7 +7,7 @@
  "theme": "dorne",
  "layouts": [
   {
-   "name": "town_walled_r4",
+   "name": "town_walled_r5",
    "size_x": 100,
    "size_z": 100,
    "ground": 5,

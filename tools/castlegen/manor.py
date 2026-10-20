@@ -143,6 +143,7 @@ def fortified_manor(seed=41):
     g.fill(gx0, GL - 1, z1 - 5, gx1, GL - 1, W - 1, ROAD)
     pointed_arch(g, gx0, gx1, GL, 5, z1 - 5, z1)
     portcullis_plane(g, gx0, gx1, GL, 5, z1)
+    portcullis_plane(g, gx0, gx1, GL, 5, z1 - 4)  # a second at the inner end: break the first and you're in a box under the walls
     g.mark("gate", (gx0 + gx1) // 2, GL, W - 1)
 
     # ---- towers: round ones at three corners and either side of the gate, the great tower at the north-east ----

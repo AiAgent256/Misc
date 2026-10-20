@@ -894,6 +894,18 @@ def great_city(seed=77):
         g.fill(sp_x - 2, gtop - 1, cz_mid + 3, sp_x + 2, gtop - 1, cz_mid + 7, AIR)
         for z in (cz_mid - 6, cz_mid, cz_mid + 6):
             g.mark("crossbowman", (bx0 + bx1) // 2, gtop, z)
+        from parts import gate_face_posts, murder_holes
+        gate_face_posts(g, "x", (bx0, bx1), cz_mid, gtop)          # over the gate's mouth, front and back
+        murder_holes(g, "x", bx0 + 3, bx1 - 3, cz_mid, GL + 11, GL + 12)  # the arch is open to GL + 10
+        # a land gate stands on the plan's edge, where the machicolation pass cuts no holes (the walk behind a
+        # crenel there runs off the grid): two men in the crenels over the gate lean out of them to see its mouth
+        ring = bx0 - 1 if sgn < 0 else bx1 + 1
+        if ring in (0, X - 1):
+            g.lips = getattr(g, "lips", {})
+            for z in (cz_mid - 2, cz_mid + 2):
+                zc = z if z % 4 >= 2 else z + 2
+                g.mark("crossbowman", ring, gtop, zc)
+                g.lips[(ring, gtop, zc)] = (sgn, 0)
         outside = 0 if sgn < 0 else X - 1
         g.fill(min(outside, bx0), GL - 1, cz_mid - 3, max(outside, bx1), GL - 1, cz_mid + 3, ROAD)
         g.mark(label, outside, GL, cz_mid)
@@ -920,6 +932,9 @@ def great_city(seed=77):
     g.fill(118, gtop - 1, bz - 6, 122, gtop - 1, bz - 2, AIR)
     for x in (121, 127, 134):
         g.mark("crossbowman", x, gtop, bz)
+    from parts import gate_face_posts, murder_holes
+    gate_face_posts(g, "z", (bz + 1, bz - 8), 127, gtop)
+    murder_holes(g, "z", bz - 5, bz - 2, 127, GL + 11, GL + 12, side=1)
     g.wall_banner(121, GL + 16, bz + 2, "south"); g.wall_banner(134, GL + 16, bz + 2, "south")
     g.mark("captain", 127, GL, bz - 14)
     # the quay road runs along the foot of the wall and through vaulted ways under the river-gate towers

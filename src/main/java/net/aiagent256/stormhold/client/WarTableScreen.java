@@ -286,7 +286,7 @@ public class WarTableScreen extends Screen {
         for (int i = 0; i < 3; i++) {
             final int tier = i + 1;
             arm.add(button(kits[i], "Full " + kits[i].toLowerCase().replace(" kit", "") + " armour and a weapon for every man of yours within "
-                    + "24 blocks who wears worse. Paid from your pack, then " + h.name() + "'s stores when you're within " + Company.CALL_RANGE
+                    + "24 blocks who wears worse. Paid from your pack, then the stores and " + h.name() + "'s chests when you're within " + Company.CALL_RANGE
                     + " blocks. Old kit comes back to you.", () -> Net.sendAction(h.id(), Net.ARM, new BlockPos(enchant ? 1 : 0, 0, 0), tier)));
         }
         arm.add(button(enchant ? "Enchant: on" : "Enchant: off", "Protection and Sharpness or Power II to IV by metal, Unbreaking III; fire "
@@ -303,23 +303,23 @@ public class WarTableScreen extends Screen {
         int[] cost = Builder.fortifyCost(stage);
         List<Button> row = new ArrayList<>();
         Button repair = button("Repair", "Put back every block of the castle's plans that's missing: walls, gate, portcullis, roofs. A stone "
-                + "from the stores per block keeps the pace; without stone it's slow. Your own additions are left alone.",
+                + "from the stores (or any chest in the castle) per block keeps the pace; without stone it's slow. Your own additions are left alone.",
                 () -> Net.sendAction(h.id(), Net.REPAIR, BlockPos.ZERO, 0));
         repair.active = !busy;
         row.add(repair);
         Button fort = button(fortifyStage(h) >= 3 ? "Fortified" : "Fortify " + "I".repeat(stage), "Stage " + stage + ": " + Builder.stageName(stage)
-                + ". " + cost[0] + " stone and " + cost[1] + " iron from the stores. Each stage lets the castle hold 15% more men.",
+                + ". " + cost[0] + " stone and " + cost[1] + " iron from the stores or the castle's chests. Each stage lets the castle hold 15% more men.",
                 () -> Net.sendAction(h.id(), Net.FORTIFY, BlockPos.ZERO, 0));
         fort.active = !busy && fortifyStage(h) < 3;
         row.add(fort);
         String[] names = {"Light it", "Clear trees", "Lay a road"};
         String[] tips = {
                 "The builder walks every floor inside the walls and sets a torch wherever a monster could spawn, on the walls where he can. "
-                        + "A coal or charcoal from the stores makes " + Builder.TORCHES_PER_COAL + ". Crypts and cellars stay dark.",
+                        + "A coal or charcoal from the stores or the castle's chests makes " + Builder.TORCHES_PER_COAL + ". Crypts and cellars stay dark.",
                 "Woodcutters fell every wild tree within " + Builder.CLEAR_REACH + " blocks of the walls, so nothing comes at the gate unseen. "
                         + "The logs go to the stores. Orchards, fief buildings and anything inside a town are left alone.",
                 "A road from the gate to the nearest place you hold that hasn't one yet (up to " + Builder.ROAD_MAX + " blocks), lamps along it. "
-                        + "A stone from the stores per " + Builder.ROAD_PER_STONE + " blocks. It goes down as the land it crosses loads."};
+                        + "A stone from the stores or the castle's chests per " + Builder.ROAD_PER_STONE + " blocks. It goes down as the land it crosses loads."};
         for (int i = 0; i < 3; i++) {
             final int p = i;
             Button b = button(names[i], tips[i], () -> Net.sendAction(h.id(), Net.PROJECT, BlockPos.ZERO, p));
@@ -329,7 +329,7 @@ public class WarTableScreen extends Screen {
         peopleY = layDown(row, mx, contentTop() + 12, mw) + 6;
         this.addRenderableWidget(Button.builder(Component.literal("Expand fief"), b -> Net.sendAction(h.id(), Net.EXPAND_FIEF, BlockPos.ZERO, 0))
                 .tooltip(Tooltip.create(Component.literal("The people raise one more building (a pasture, a mine, a mill, then more cottages) for "
-                        + "32 bread and 8 iron from the stores. More folk, more produce."))).bounds(mx + mw - 70, peopleY - 4, 70, 16).build());
+                        + "32 bread and 8 iron from the stores or the castle's chests. More folk, more produce."))).bounds(mx + mw - 70, peopleY - 4, 70, 16).build());
         stepY = peopleY + 16;
         stepper(mx + 34, stepY, h.miners(), Labour.MAX, v -> Net.sendAction(h.id(), Net.SET_MINERS, BlockPos.ZERO, v),
                 "person at the mine. Each brings up a day's ore, smelted, into the stores: coal, iron, copper, gold, now and then redstone, "

@@ -15,7 +15,13 @@ public final class NameGen {
             "spire", "rock", "wall", "haven", "ford", "burn", "march", "hall", "moot", "reach", "mount", "garth"};
     private static final String[] FIRST = {"Aldric", "Bertram", "Cedric", "Doran", "Edmund", "Garrick", "Harlan",
             "Ivor", "Lucan", "Merrick", "Osric", "Percival", "Roderick", "Severin", "Tybalt", "Ulric", "Wendel",
-            "Alaric", "Godwin", "Hadric", "Leowin", "Marten", "Orrin", "Quentyn", "Rowan", "Torvald", "Willem"};
+            "Alaric", "Godwin", "Hadric", "Leowin", "Marten", "Orrin", "Quentyn", "Rowan", "Torvald", "Willem",
+            "Anselm", "Baldric", "Bennet", "Caspar", "Conrad", "Dunstan", "Eadric", "Emeric", "Fulk", "Gareth", "Gerard",
+            "Giles", "Hamon", "Hugh", "Jocelin", "Kenric", "Lambert", "Lionel", "Mauger", "Odo", "Ralf", "Reynard", "Simon",
+            "Stephen", "Theobald", "Tristram", "Walter", "Warin", "Wystan", "Godric", "Edric", "Humfrey", "Oswin"};
+    /** For when every first name is already in use among one lord's men. */
+    private static final String[] BYNAME = {"the Younger", "the Elder", "Redhand", "Greycloak", "of the Marches", "Oakheart",
+            "the Bold", "Ironside", "the Fair", "Longstride", "Halfhelm", "the Quiet"};
 
     public static String house(RandomSource r) {
         return HOUSE_A[r.nextInt(HOUSE_A.length)] + HOUSE_B[r.nextInt(HOUSE_B.length)];
@@ -52,6 +58,21 @@ public final class NameGen {
 
     public static String first(RandomSource r) {
         return FIRST[r.nextInt(FIRST.length)];
+    }
+
+    /**
+     * A first name that, with {@code prefix} before it ("Ser "), is none of {@code taken}: two of a lord's men
+     * with the same name look like one man twice. Past sixty, a byname tells them apart.
+     */
+    public static String firstUnlike(RandomSource r, java.util.Set<String> taken, String prefix) {
+        java.util.List<String> free = new java.util.ArrayList<>();
+        for (String f : FIRST) if (!taken.contains(prefix + f)) free.add(f);
+        if (!free.isEmpty()) return free.get(r.nextInt(free.size()));
+        for (int i = 0; i < 200; i++) {
+            String n = FIRST[r.nextInt(FIRST.length)] + " " + BYNAME[r.nextInt(BYNAME.length)];
+            if (!taken.contains(prefix + n)) return n;
+        }
+        return FIRST[r.nextInt(FIRST.length)] + " " + (taken.size() + 1);
     }
 
     private NameGen() {

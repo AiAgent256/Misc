@@ -239,19 +239,19 @@ public final class Labour {
             target = Frontier.level(level, h) + 1;
             if (target > Frontier.MAX) return "Smiths " + n + ": the garrison's kit is the best there is.";
             int[] c = cost(target);
-            int ingots = Stores.realmStock(mgr, h, owner, NETHERITE);
-            int fromScrap = Math.min(Stores.realmStock(mgr, h, owner, SCRAP) / 4, Stores.realmStock(mgr, h, owner, GOLD) / 4);
-            boolean have = Stores.realmStock(mgr, h, owner, IRON) >= c[0] && Stores.realmStock(mgr, h, owner, DIAMOND) >= c[1]
+            int ingots = Stores.stockWithChests(mgr, h, owner, NETHERITE);
+            int fromScrap = Math.min(Stores.stockWithChests(mgr, h, owner, SCRAP) / 4, Stores.stockWithChests(mgr, h, owner, GOLD) / 4);
+            boolean have = Stores.stockWithChests(mgr, h, owner, IRON) >= c[0] && Stores.stockWithChests(mgr, h, owner, DIAMOND) >= c[1]
                     && ingots + fromScrap >= c[2];
             if (!have) return "Smiths " + n + " wait on metal for " + kitName(target) + " kit (level " + target + "): " + costText(c)
                     + (c[2] > 0 ? " (4 netherite scrap and 4 gold make an ingot)" : "") + ".";
-            Stores.take(mgr, h, owner, IRON, c[0]);
-            Stores.take(mgr, h, owner, DIAMOND, c[1]);
+            Stores.takeWithChests(mgr, h, owner, IRON, c[0]);
+            Stores.takeWithChests(mgr, h, owner, DIAMOND, c[1]);
             int fromIngots = Math.min(ingots, c[2]);
-            Stores.take(mgr, h, owner, NETHERITE, fromIngots);
+            Stores.takeWithChests(mgr, h, owner, NETHERITE, fromIngots);
             int smelt = c[2] - fromIngots;
-            Stores.take(mgr, h, owner, SCRAP, 4 * smelt);
-            Stores.take(mgr, h, owner, GOLD, 4 * smelt);
+            Stores.takeWithChests(mgr, h, owner, SCRAP, 4 * smelt);
+            Stores.takeWithChests(mgr, h, owner, GOLD, 4 * smelt);
             h.forgePaid = true;
             h.forgeTarget = target;
             h.forgeWork = 0;

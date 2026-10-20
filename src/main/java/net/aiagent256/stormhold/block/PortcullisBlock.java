@@ -1,7 +1,9 @@
 package net.aiagent256.stormhold.block;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
@@ -42,6 +44,14 @@ public class PortcullisBlock extends Block {
     @Override
     public boolean isPathfindable(BlockState state, BlockGetter level, BlockPos pos, PathComputationType type) {
         return state.getValue(OPEN) && type != PathComputationType.WATER;
+    }
+
+    /** Broken, not raised: the castle's gate is down, and stays down a while (see Gates.DOWN_TICKS). */
+    @Override
+    @SuppressWarnings("deprecation")
+    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moving) {
+        if (!newState.is(this) && level instanceof ServerLevel sl) net.aiagent256.stormhold.holding.Gates.broken(sl, pos);
+        super.onRemove(state, level, pos, newState, moving);
     }
 
     @Override

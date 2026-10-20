@@ -305,6 +305,7 @@ def town_curtain(g, x0, z0, x1, z1, GL, gate_x0, gate_x1, rng):
     pointed_arch(g, gate_x0, gate_x1, GL, 6, z1 - 4, z1 + 1)
     g.fill(gate_x0, GL - 1, z1 - 4, gate_x1, GL - 1, z1 + 1, ROAD)
     portcullis_plane(g, gate_x0, gate_x1, GL, 6, z1)
+    portcullis_plane(g, gate_x0, gate_x1, GL, 6, z1 - 3)  # a second at the inner end: break the first and you're in a box under the walls
     # machicolation over the gate: the parapet stands out on corbels so the gate is under the walk's eye
     for x in range(gate_x0 - 1, gate_x1 + 2):
         g.stair(x, walk - 2, z1 + 1, STONE_STAIR, "north", half="top")

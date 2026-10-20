@@ -37,6 +37,22 @@ public final class Gates {
     private static final double HOLD_RANGE = 7.0;
     /** How far around the gate markers to look for portcullis blocks. */
     private static final int SCAN = 16;
+    /** A broken gate stays down this long (ten minutes) before anyone puts it back. */
+    public static final long DOWN_TICKS = 12000;
+
+    /** A portcullis block at {@code pos} is gone: if it's a castle's, its gate is down from now. */
+    public static void broken(ServerLevel level, BlockPos pos) {
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = mgr.at(pos, 2);
+        if (h == null) return;
+        h.gateBrokenAt = level.getGameTime();
+        mgr.setDirty();
+    }
+
+    /** Whether the castle's gate is still in its ten minutes down. */
+    public static boolean down(ServerLevel level, Holding h) {
+        return h.gateBrokenAt > 0 && level.getGameTime() - h.gateBrokenAt < DOWN_TICKS;
+    }
 
     public static final class Plane {
         public final List<BlockPos> blocks = new ArrayList<>();
@@ -50,6 +66,12 @@ public final class Gates {
     public static void tick(ServerLevel level, HoldingManager mgr, Holding h) {
         // an inner gate whose chunks weren't loaded at the last look is looked for again in a while
         if (h.gates != null && h.gatesRescanAt > 0 && level.getGameTime() >= h.gatesRescanAt) h.gates = null;
+        // ten minutes after a gate was broken it's put back (the scan restores it)
+        if (h.gateBrokenAt > 0 && !down(level, h)) {
+            h.gateBrokenAt = 0;
+            h.gates = null;
+            mgr.setDirty();
+        }
         if (h.gates == null) {
             if (!scan(level, mgr, h)) return;
         }
@@ -75,6 +97,7 @@ public final class Gates {
         for (Campaign c : mgr.campaigns) {
             if (c.stage != Campaign.Stage.DONE && h.id.equals(c.target)) return 0;     // not mid-siege
         }
+        if (down(level, h)) return 0;                                                   // broken lately: it stays down
         BlockPos o = new BlockPos(h.box.minX(), h.box.minY(), h.box.minZ());
         BlockState gate = ModBlocks.PORTCULLIS.get().defaultBlockState();
         int placed = 0;
@@ -91,7 +114,8 @@ public final class Gates {
             if (standing) continue;
             for (BlockPos q : BlockPos.betweenClosed(a, z)) {
                 BlockState s = level.getBlockState(q);
-                if (s.isAir() || (s.canBeReplaced() && s.getFluidState().isEmpty())) {
+                if ((s.isAir() || (s.canBeReplaced() && s.getFluidState().isEmpty()))
+                        && level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class, new AABB(q)).isEmpty()) {
                     level.setBlock(q.immutable(), gate, 3);
                     placed++;
                 }

@@ -523,6 +523,7 @@ def great_castle_d(seed=41):
     pointed_arch(g, c - 3, c + 2, GL, 8, b - 4, b + 4)
     g.fill(c - 3, GL - 1, b - 6, c + 2, GL - 1, W - 1, ROAD)
     _portcullis(g, c - 3, c + 2, GL, 8, b + 3)
+    _portcullis(g, c - 3, c + 2, GL, 8, b - 3)  # a second at the inner end: break the first and you're in a box under the walls
     g.fill(c - 3, GL - 1, b + 5, c + 2, GL - 1, W - 1, "minecraft:spruce_planks")
     for x in (c - 4, c + 3):
         g.fill(x, GL - 1, b + 5, x, GL - 1, W - 1, "minecraft:dark_oak_log[axis=z]")

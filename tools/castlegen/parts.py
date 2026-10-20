@@ -396,6 +396,87 @@ def square_tower(g, x0, z0, x1, z1, top, GL, floors=(), spiral_at=None, t=3, con
     return sp
 
 
+def murder_holes(g, axis, u0, u1, v, vault, floor, side=-1, role="crossbowman"):
+    """Holes through a gate passage's vault (from `vault`, the first course over the arch, up through the gate
+    hall's `floor`), every other block from u0 to u1 along the passage's axis on its centre line v, and a man at
+    the lip of each in the hall above, on the `side` of the line, so the passage between the portcullises is a
+    killing ground."""
+    g.lips = getattr(g, "lips", {})
+    for u in range(u0, u1 + 1, 2):
+        x, z = (u, v) if axis == "x" else (v, u)
+        y = floor
+        while y >= vault - 4 and g.get(x, y, z) not in ("minecraft:air", "stormhold:portcullis"):
+            g.set(x, y, z, "minecraft:air")           # down through the floor and the vault until the passage
+            y -= 1
+        px, pz = (u, v + side) if axis == "x" else (v + side, u)
+        g.mark(role, px, floor + 1, pz)
+        g.lips[(px, floor + 1, pz)] = (0, -side) if axis == "x" else (-side, 0)
+
+
+def forebuilding(g, x0, x1, face_z, out, GL, F, side=1):
+    """A keep's entrance raised a floor, the Norman way: a stone forebuilding against the keep's face (x0..x1 along
+    it, six deep from face_z, `out` = +1 or -1 for the face's outward z), a vestibule inside it at the first floor
+    (standing level F) with a door through into the keep, a door on its `side` (+1 east, -1 west) and a straight
+    stair three wide down from there along the keep's face to the yard, under the forebuilding's corbelled
+    battlements (the machicolation pass cuts their holes; men posted up there shoot down on the stair).
+    A ladder from the vestibule through the roof. Returns (x, z): the yard at the stair's foot."""
+    zs = [face_z + out * k for k in range(1, 7)]
+    za, zb = min(zs), max(zs)
+    va, vb = min(zs[0], zs[4]), max(zs[0], zs[4])                     # the vestibule, against the keep's face
+    sa, sb = min(zs[1], zs[3]), max(zs[1], zs[3])                     # the side door and the stair
+    roof = F + 4
+    cx = (x0 + x1) // 2
+    sx = x1 if side > 0 else x0
+    n = F - GL
+    f = "west" if side > 0 else "east"                                # the treads rise toward the door
+    with g.private_rng(x0 * 131 + face_z * 17 + F):
+        g.fill(x0, 0, za, x1, roof, zb, STONE)
+        g.fill(x0, GL + 3, za, x1, GL + 3, zb, DARK)                       # the keep's string course carried round
+        g.fill(x0 + 1, F, va, x1 - 1, roof - 1, vb, "minecraft:air")
+        # through the keep's wall into its first floor, three wide
+        z = face_z
+        while g.is_solid(cx, F, z) and abs(z - face_z) < 6:
+            g.fill(cx - 1, F, z, cx + 1, F + 2, z, "minecraft:air")
+            z -= out
+        g.fill(sx, F, sa, sx, F + 2, sb, "minecraft:air")
+        g.fill(sx + side, 0, sa, sx + side, F - 1, sb, STONE)                 # a landing outside the door
+        g.fill(sx + side, F, sa, sx + side, F + 3, sb, "minecraft:air")
+        for k in range(n):
+            x = sx + side * (2 + k)
+            y = F - 1 - k
+            g.fill(x, 0, sa, x, y - 1, sb, STONE)
+            for zz in range(sa, sb + 1):
+                g.stair(x, y, zz, STONE_STAIR, f)
+            g.fill(x, y + 1, sa, x, y + 4, sb, "minecraft:air")
+        # its battlements: carried out on corbels, so they take machicolations. None along the keep's side: no
+        # crenels looking at its wall (or, on a round keep, cut into it). The vestibule and the landing are
+        # passages: nobody's furniture or ceiling beams in them
+        g.protected_xz = getattr(g, "protected_xz", set()) | {(x, zs[0]) for x in range(x0, x1 + 1)} | \
+            {(x, z) for x in range(x0 + 1, x1) for z in range(va, vb + 1)} | {(sx + side, z) for z in range(sa, sb + 1)}
+        from castle2 import corbel_parapet_rect
+        corbel_parapet_rect(g, x0, za, x1, zb, roof + 1)
+    # up to the battlements from the vestibule, in its corner by the outer wall
+    lx, lz = (x0 + 1, zs[4]) if side > 0 else (x1 - 1, zs[4])
+    for y in range(F, roof + 1):
+        g.set(lx, y, lz, f"minecraft:ladder[facing={'east' if side > 0 else 'west'}]")
+    g.lantern(cx + side, roof - 1, (va + vb) // 2)
+    g.mark("archer", cx, roof + 1, zs[4])                                 # over the yard in front
+    g.mark("crossbowman", sx - side, roof + 1, zs[2])                    # over the door and the stair
+    return sx + side * (n + 3), zs[2]
+
+
+def gate_face_posts(g, axis, lines, center, y, role="crossbowman", half=2):
+    """Men along the crenels over a gate's mouth, front and back (the faces at `lines`, planes of constant x for
+    axis 'x', of constant z for 'z'): the embrasure pass puts each on the nearest sill, and the machicolation
+    beside it gives him the mouth below."""
+    for line in lines:
+        for k in range(-half, half + 1, 4):
+            if axis == "x":
+                g.mark(role, line, y, center + k)
+            else:
+                g.mark(role, center + k, y, line)
+
+
 def roof_ladder(g, room, y0, top, a, b):
     """The way from a tower room (standing level y0) up through a hatch in the roof slab (top - 1) onto the roof.
     One ladder when it's five rungs or fewer; past that a half floor three over the room (`room`, a 2-D mask of

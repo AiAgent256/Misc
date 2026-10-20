@@ -5,7 +5,7 @@ from grid import Grid, Mix, disk, ring, rect, rect_ring, spiral_stair, dogleg_st
 from parts import (SILL, STONE, DARK, FOUND, PAVE, ROAD, FLOOR_STONE, ROOF, ROOF_STAIR, STONE_STAIR,
                    DARK_STAIR, SLAB_CAP, RAIL, PLANK, DARK_PLANK, PORTCULLIS, GLASS,
                    curtain, posts_on_walk, round_tower, square_tower, straight_wall,
-                   pointed_arch, building, lamp_post, tree_weirwood, side_grids, wall_stair, roof_ladder, tower_room)
+                   pointed_arch, building, lamp_post, tree_weirwood, side_grids, wall_stair, roof_ladder, tower_room, forebuilding)
 
 LOOT = "stormhold:chests/"
 
@@ -163,17 +163,24 @@ def great_castle_a(seed=7):
     spiral_stair(g, 60, b - 3, GL + 12, gtop - 1, STONE_STAIR, STONE, landings=(walk,))
     g.fill(57, gtop - 1, b - 7, 71, gtop - 1, b + 7, STONE)
     g.fill(58, gtop - 1, b - 5, 62, gtop - 1, b - 1, "minecraft:air")
-    # gatehouse top parapet
-    for x in range(56, 73):
-        for z in (b - 8, b + 8):
-            g.set(x, gtop - 1, z, STONE); g.set(x, gtop, z, STONE)
-            if x % 4 < 2:
-                g.set(x, gtop + 1, z, STONE); g.set(x, gtop + 2, z, SLAB_CAP)
-    for z in range(b - 8, b + 9):
-        for x in (56, 72):
-            g.set(x, gtop - 1, z, STONE); g.set(x, gtop, z, STONE)
-            if z % 4 < 2:
-                g.set(x, gtop + 1, z, STONE); g.set(x, gtop + 2, z, SLAB_CAP)
+    # gatehouse top parapet, carried out on corbels with half-block sills in its crenels: the machicolation pass
+    # opens holes in them, so the men up here see straight down on the gate's mouth, front and back
+    with g.private_rng(b * 31 + 7):
+        for x in range(56, 73):
+            for z in (b - 8, b + 8):
+                g.set(x, gtop - 1, z, STONE)
+                g.set(x, gtop, z, STONE if x % 4 < 2 else SILL)
+                if x % 4 < 2:
+                    g.set(x, gtop + 1, z, STONE); g.set(x, gtop + 2, z, SLAB_CAP)
+                if x % 2 == 0 and g.get(x, gtop - 2, z) == "minecraft:air":
+                    g.stair(x, gtop - 2, z, STONE_STAIR, "north" if z > b else "south", half="top")
+        for z in range(b - 8, b + 9):
+            for x in (56, 72):
+                g.set(x, gtop - 1, z, STONE); g.set(x, gtop, z, STONE)
+                if z % 4 < 2:
+                    g.set(x, gtop + 1, z, STONE); g.set(x, gtop + 2, z, SLAB_CAP)
+    for _ in range(sum(2 + (x % 4 < 2) for x in range(56, 73) for z in (0, 1)) + sum(2 + (z % 4 < 2) for z in range(b - 8, b + 9) for x in (0, 1))):
+        g._ids_for(STONE, 1)                     # the draws the old parapet made, so the rest of the plan comes out as it did
     g.fill(57, gtop, b - 7, 71, gtop + 4, b + 7, "minecraft:air")
     for x in (59, 63, 65, 69):
         for z in (b - 5, b + 5):
@@ -612,6 +619,7 @@ def holdfast_a(seed=11):
     pointed_arch(g, c - 3, c + 2, GL, 7, b - 4, b + 4)
     g.fill(c - 3, GL - 1, b - 4, c + 2, GL - 1, W - 1, ROAD)
     portcullis_plane(g, c - 3, c + 2, GL, 7, b + 3)
+    portcullis_plane(g, c - 3, c + 2, GL, 7, b - 3)  # a second at the inner end: break the first and you're in a box under the walls
     g.fill(c - 3, GL - 1, b + 5, c + 2, GL - 1, W - 1, "minecraft:spruce_planks")
     for x in range(gx0 - 1, gx1 + 2):
         for z in (b - 5, b + 5):
@@ -673,31 +681,33 @@ def holdfast_a(seed=11):
         for x in (kx0, kx1):
             g.fill(x, GL + 3, z, x, GL + 6, z, GLASS)
             g.fill(x, F2 + 4, z, x, F2 + 5, z, GLASS)
-    g.fill(c - 2, GL, kz1, c + 1, GL + 4, kz1, "minecraft:air")
-    g.fill(c - 2, GL, kz1 - 1, c + 1, GL + 4, kz1 - 1, "minecraft:air")
     dogleg_stair(g, kx0 + 2, kz0 + 2, GL, kroof - 1, STONE_STAIR, STONE, DARK_PLANK, levels=(F2 + 1, kroof), back="north")
-    # hall
-    g.fill(c - 3, GL, kz0 + 3, c + 2, GL, kz0 + 4, "minecraft:polished_deepslate")
-    g.stair(c - 1, GL + 1, kz0 + 3, "minecraft:dark_oak_stairs", "south")
-    g.stair(c, GL + 1, kz0 + 3, "minecraft:dark_oak_stairs", "south")
-    g.wall_banner(c - 1, GL + 5, kz0 + 2, "south"); g.wall_banner(c, GL + 5, kz0 + 2, "south")
-    g.fill(c - 2, GL, kz0 + 6, c + 1, GL, kz1 - 2, "minecraft:red_carpet")
-    g.mark("lord", c - 1, GL, kz0 + 5)
-    g.mark("war_table", c - 4, GL, kz0 + 4)
+    # the door is a floor up, in a forebuilding with its stair along the keep's face: whoever takes the yard
+    # still has to climb under the forebuilding's battlements and come through two doors to reach the hall
+    foot = forebuilding(g, c - 4, c + 2, kz1, 1, GL, F2 + 1, side=1)
+    # the hall, on that floor
+    FL = F2 + 1
+    g.fill(c - 3, FL, kz0 + 3, c + 2, FL, kz0 + 4, "minecraft:polished_deepslate")
+    g.stair(c - 1, FL + 1, kz0 + 3, "minecraft:dark_oak_stairs", "south")
+    g.stair(c, FL + 1, kz0 + 3, "minecraft:dark_oak_stairs", "south")
+    g.wall_banner(c - 1, FL + 5, kz0 + 2, "south"); g.wall_banner(c, FL + 5, kz0 + 2, "south")
+    g.fill(c - 2, FL, kz0 + 6, c + 1, FL, kz1 - 3, "minecraft:red_carpet")
+    g.mark("lord", c - 1, FL, kz0 + 5)
+    g.mark("war_table", c + 3, FL, kz0 + 4)                     # the stair's landing rail is where it stood below
     for (x, z) in ((kx0 + 4, 23), (kx1 - 4, 18), (kx0 + 4, 29), (kx1 - 4, 29)):
-        g.mark("knight", x, GL, z)
+        g.mark("knight", x, FL, z)
         g.lantern(x, F2 - 1, z)
         g.lantern(x, kroof - 2, z)
-    g.mark("captain", c - 1, GL, kz1 + 3)
-    # upper floor: treasury
+    g.mark("captain", foot[0], GL, foot[1])
+    # the ground floor under it: the strongroom and the household's beds
     for z in range(kz0 + 4, kz1 - 2, 2):
-        g.chest(kx1 - 3, F2 + 1, z, "west", LOOT + "holdfast_treasury")
+        g.chest(kx1 - 3, GL, z, "west", LOOT + "holdfast_treasury")
     for z in range(kz0 + 10, kz1 - 2, 3):
-        g.bed(kx0 + 3, F2 + 1, z, "west", "gray")
+        g.bed(kx0 + 3, GL, z, "west", "gray")
     g.mark("banner_stand", kx1 - 5, kroof, kz1 - 4)
     for (x, z) in ((kx0 + 11, kz0 + 3), (kx1 - 3, kz0 + 3), (kx0 + 5, kz1 - 3), (kx1 - 3, kz1 - 3)):
         g.mark("archer", x, kroof, z)
-    g.mark("rally", c - 1, GL, kz1 + 4)
+    g.mark("rally", c - 1, GL, kz1 + 10)
     g.wall_banner(kx0 - 1, F2 + 3, 22, "west"); g.wall_banner(kx1 + 1, F2 + 3, 22, "east")
     # the yard: barracks and a second lodging along the west wall, stable and smithy along the east, a well between
     building(g, 10, 48, 21, 64, GL, 6, "z", door_cells=((21, 56),), chimney=(14, 52))
@@ -773,6 +783,7 @@ def watchtower_a(seed=5):
     for x in (c - 3, c, c + 3):
         g.fill(x, GL + 9, c + Ro, x, GL + 10, c + Ro, STONE)
     portcullis_plane(g, c - 2, c + 2, GL, 6, c + Ro)
+    portcullis_plane(g, c - 2, c + 2, GL, 6, c + R - 2)  # a second at the inner end: break the first and you're in a box under the walls
     g.mark("gate", c, GL, W - 1)
     for k in range(16):
         ang = (k + 0.5) * np.pi / 8

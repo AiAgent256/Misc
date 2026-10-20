@@ -101,7 +101,12 @@ public final class Company {
                 e.color(), null, false);
         e.setOwner(player.getUUID());
         e.setPost(null);
-        String name = e.hasCustomName() ? e.getCustomName().getString() : "Ser " + NameGen.first(level.random);
+        // never two of a lord's men with one name
+        java.util.Set<String> taken = new java.util.HashSet<>();
+        for (net.minecraft.world.entity.Entity x : level.getAllEntities())
+            if (x != e && x instanceof GarrisonEntity g && g.isAlive() && player.getUUID().equals(g.owner())) taken.add(g.baseName());
+        String name = e.hasCustomName() ? e.getCustomName().getString() : null;
+        if (name == null || taken.contains(name)) name = "Ser " + NameGen.firstUnlike(level.random, taken, "Ser ");
         e.setBaseName(name);
         var bread = new net.minecraft.resources.ResourceLocation("minecraft", "bread");
         int have = Stores.realmStock(mgr, from, player.getUUID(), bread);

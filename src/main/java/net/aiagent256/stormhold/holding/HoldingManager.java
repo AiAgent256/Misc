@@ -104,6 +104,16 @@ public class HoldingManager extends SavedData {
         return null;
     }
 
+    /** The place standing over x, z, whatever the height: a target set on the War Table carries no y. */
+    @Nullable
+    public Holding atXZ(BlockPos pos, int margin) {
+        for (Holding h : holdings.values()) {
+            var b = h.box.inflatedBy(margin);
+            if (pos.getX() >= b.minX() && pos.getX() <= b.maxX() && pos.getZ() >= b.minZ() && pos.getZ() <= b.maxZ()) return h;
+        }
+        return null;
+    }
+
     @Nullable
     public Holding byName(String name) {
         for (Holding h : holdings.values()) if (h.name.equalsIgnoreCase(name)) return h;

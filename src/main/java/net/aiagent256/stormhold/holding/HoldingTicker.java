@@ -88,6 +88,7 @@ public final class HoldingTicker {
             Scouts.hangPending(level, mgr, h);
             Spoils.unload(level, mgr, h);
         }
+        if (now % 600 == 460 && h.isPlayerOwned()) Spoils.gather(level, mgr, h, 16, false);
         if (now % 100 == 40) {
             Market.tick(level, mgr, h);
             Shops.tick(level, mgr, h);

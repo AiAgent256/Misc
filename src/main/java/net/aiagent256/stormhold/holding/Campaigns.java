@@ -156,7 +156,7 @@ public final class Campaigns {
         c.origin = h.id;
         c.tier = h.tier;
         c.renown = Frontier.level(level, h);           // the men ride out in the kit their castle arms them with
-        Holding enemy = mgr.at(target, 16);
+        Holding enemy = mgr.atXZ(target, 16);
         c.target = enemy != null && !enemy.owner.equals(h.owner) ? enemy.id : null;
         if (enemy != null && enemy.isHouseOwned() && c.target != null) {
             net.aiagent256.stormhold.house.Standing.change(level, mgr, enemy.houseId, h.ownerPlayer(),

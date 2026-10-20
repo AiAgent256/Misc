@@ -35,9 +35,20 @@ public final class Spoils {
     /** How far from a place's walls its men still bring the takings home. */
     public static final int REACH = 160;
 
+    /** How long a fallen soldier's kit lies on the ground (vanilla: five minutes): an hour. */
+    public static final int KIT_LIFESPAN = 72000;
+    /** On an item dropped by a soldier: the garrison of whoever holds the ground gathers it in. */
+    public static final String KIT = "stormhold_kit";
+
     public static void onDrops(LivingDropsEvent e) {
         LivingEntity dead = e.getEntity();
         if (!(dead.level() instanceof ServerLevel level) || dead instanceof Player || e.getDrops().isEmpty()) return;
+        if (dead instanceof GarrisonEntity) {
+            for (ItemEntity ie : e.getDrops()) {
+                ie.lifespan = Math.max(ie.lifespan, KIT_LIFESPAN);
+                ie.getPersistentData().putBoolean(KIT, true);
+            }
+        }
         Entity killer = e.getSource().getEntity();
         if (!(killer instanceof GarrisonEntity g)) return;
         UUID lord = Sides.playerId(g.side());
@@ -138,6 +149,30 @@ public final class Spoils {
             }
         }
         if (chest != null) chest.setChanged();
+        return moved;
+    }
+
+    /**
+     * The garrison gathers the kit of the fallen, anyone's soldiers, lying in the place and {@code reach} blocks
+     * round it, into the spoils chest (the stores take what won't fit). On taking a castle, and every half minute
+     * at a place you hold. Returns how many items were picked up.
+     */
+    public static int gather(ServerLevel level, HoldingManager mgr, Holding h, int reach, boolean tell) {
+        if (!h.isPlayerOwned()) return 0;
+        java.util.List<ItemEntity> kit = level.getEntitiesOfClass(ItemEntity.class,
+                net.minecraft.world.phys.AABB.of(h.box.inflatedBy(reach)), ie -> ie.isAlive() && ie.getPersistentData().getBoolean(KIT));
+        if (kit.isEmpty()) return 0;
+        int moved = take(level, mgr, h, new java.util.ArrayList<>(kit).iterator(), s -> true, false);
+        if (moved > 0) {
+            h.spoilsTaken += moved;
+            mgr.setDirty();
+            if (tell) {
+                BlockPos at = Steward.spoilsChest(level, h);
+                HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("Your men go over the field at " + h.name + " and bring in "
+                        + moved + (moved == 1 ? " thing" : " things") + " the fallen dropped" + (at == null ? ", into the stores."
+                        : ", to the spoils chest (" + at.getX() + ", " + at.getY() + ", " + at.getZ() + ").")).withStyle(ChatFormatting.GOLD));
+            }
+        }
         return moved;
     }
 

@@ -284,13 +284,13 @@ public final class Net {
                     if (h.fiefPlan == null) net.aiagent256.stormhold.holding.Fief.plan(level, h);
                     if (h.fiefPlan.size() >= 3) {
                         player.sendSystemMessage(Component.literal("The builders at " + h.name + " already have their hands full."));
-                    } else if (net.aiagent256.stormhold.holding.Stores.realmStock(mgr, h, player.getUUID(), bread) < 32
-                            || net.aiagent256.stormhold.holding.Stores.realmStock(mgr, h, player.getUUID(), iron) < 8) {
-                        player.sendSystemMessage(Component.literal("Raising a building takes 32 bread and 8 iron from the realm's stores.")
+                    } else if (net.aiagent256.stormhold.holding.Stores.stockWithChests(mgr, h, player.getUUID(), bread) < 32
+                            || net.aiagent256.stormhold.holding.Stores.stockWithChests(mgr, h, player.getUUID(), iron) < 8) {
+                        player.sendSystemMessage(Component.literal("Raising a building takes 32 bread and 8 iron from the realm's stores or this castle's chests.")
                                 .withStyle(net.minecraft.ChatFormatting.RED));
                     } else {
-                        net.aiagent256.stormhold.holding.Stores.take(mgr, h, player.getUUID(), bread, 32);
-                        net.aiagent256.stormhold.holding.Stores.take(mgr, h, player.getUUID(), iron, 8);
+                        net.aiagent256.stormhold.holding.Stores.takeWithChests(mgr, h, player.getUUID(), bread, 32);
+                        net.aiagent256.stormhold.holding.Stores.takeWithChests(mgr, h, player.getUUID(), iron, 8);
                         String next = net.aiagent256.stormhold.holding.Fief.nextExtra(h);
                         h.fiefPlan.add(next);
                         player.sendSystemMessage(HoldingEvents.gold("The people of " + h.name + " will raise a " + next.replace('_', ' ') + "."));

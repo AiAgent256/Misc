@@ -7,84 +7,84 @@
  "theme": "riverlands",
  "layouts": [
   {
-   "name": "great_castle_a_r2",
+   "name": "great_castle_a_r3",
    "size_x": 128,
    "size_z": 128,
    "ground": 6,
    "weight": 1
   },
   {
-   "name": "great_castle_b_r2",
+   "name": "great_castle_b_r3",
    "size_x": 128,
    "size_z": 128,
    "ground": 6,
    "weight": 1
   },
   {
-   "name": "great_castle_c_r2",
+   "name": "great_castle_c_r3",
    "size_x": 160,
    "size_z": 112,
    "ground": 6,
    "weight": 1
   },
   {
-   "name": "great_castle_a2_r2",
+   "name": "great_castle_a2_r3",
    "size_x": 128,
    "size_z": 128,
    "ground": 6,
    "weight": 1
   },
   {
-   "name": "great_castle_b2_r2",
+   "name": "great_castle_b2_r3",
    "size_x": 128,
    "size_z": 128,
    "ground": 6,
    "weight": 1
   },
   {
-   "name": "great_castle_c2_r2",
+   "name": "great_castle_c2_r3",
    "size_x": 160,
    "size_z": 112,
    "ground": 6,
    "weight": 1
   },
   {
-   "name": "great_castle_a_moat_r2",
+   "name": "great_castle_a_moat_r3",
    "size_x": 148,
    "size_z": 148,
    "ground": 6,
    "weight": 1
   },
   {
-   "name": "great_castle_c_moat_r2",
+   "name": "great_castle_c_moat_r3",
    "size_x": 180,
    "size_z": 132,
    "ground": 6,
    "weight": 1
   },
   {
-   "name": "great_castle_d_r2",
+   "name": "great_castle_d_r3",
    "size_x": 128,
    "size_z": 128,
    "ground": 6,
    "weight": 1
   },
   {
-   "name": "great_castle_d2_r2",
+   "name": "great_castle_d2_r3",
    "size_x": 128,
    "size_z": 128,
    "ground": 6,
    "weight": 1
   },
   {
-   "name": "lake_castle_r2",
+   "name": "lake_castle_r3",
    "size_x": 168,
    "size_z": 168,
    "ground": 10,
    "weight": 1
   },
   {
-   "name": "lake_castle2_r2",
+   "name": "lake_castle2_r3",
    "size_x": 168,
    "size_z": 168,
    "ground": 10,

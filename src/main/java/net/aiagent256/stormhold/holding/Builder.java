@@ -113,16 +113,17 @@ public final class Builder {
             int[] cost = fortifyCost(h.fortify + 1);
             if (Council.has(h.ownerPlayer(), Council.Seat.WORKS)) cost = new int[]{cost[0] * 3 / 4, cost[1] * 3 / 4};
             java.util.UUID owner = h.ownerPlayer();
-            int haveStone = stone(mgr, h), haveIron = owner == null ? h.stock(IRON) : Stores.realmStock(mgr, h, owner, IRON);
+            int haveStone = stone(mgr, h), haveIron = owner == null ? Stores.stockWithChests(mgr, h, IRON) : Stores.stockWithChests(mgr, h, owner, IRON);
             if (haveStone < cost[0] || haveIron < cost[1]) {
                 player.sendSystemMessage(Component.literal("Stage " + (h.fortify + 1) + " needs " + cost[0] + " stone and " + cost[1]
-                        + " iron in the realm's stores; you have " + haveStone + " and " + haveIron + ".").withStyle(ChatFormatting.RED));
+                        + " iron in the realm's stores or this castle's chests; you have " + haveStone + " and " + haveIron + ".").withStyle(ChatFormatting.RED));
                 return;
             }
             takeStone(mgr, h, cost[0]);
-            if (owner != null) Stores.take(mgr, h, owner, IRON, cost[1]);
-            else h.addStock(IRON, -cost[1]);
+            if (owner != null) Stores.takeWithChests(mgr, h, owner, IRON, cost[1]);
+            else Stores.takeWithChests(mgr, h, IRON, cost[1]);
         }
+        if (work.equals(REPAIR)) h.gateBrokenAt = 0;              // your own builder's repair puts your gate back now
         h.work = work;
         h.workQueue = null;
         h.workDone = 0;
@@ -150,17 +151,17 @@ public final class Builder {
     public static int coal(HoldingManager mgr, Holding h) {
         java.util.UUID owner = h.ownerPlayer();
         int n = 0;
-        for (ResourceLocation c : new ResourceLocation[]{COAL, CHARCOAL}) n += owner == null ? h.stock(c) : Stores.realmStock(mgr, h, owner, c);
+        for (ResourceLocation c : new ResourceLocation[]{COAL, CHARCOAL}) n += owner == null ? Stores.stockWithChests(mgr, h, c) : Stores.stockWithChests(mgr, h, owner, c);
         return n;
     }
 
     private static boolean takeCoal(HoldingManager mgr, Holding h) {
         java.util.UUID owner = h.ownerPlayer();
         for (ResourceLocation c : new ResourceLocation[]{COAL, CHARCOAL}) {
-            int have = owner == null ? h.stock(c) : Stores.realmStock(mgr, h, owner, c);
+            int have = owner == null ? Stores.stockWithChests(mgr, h, c) : Stores.stockWithChests(mgr, h, owner, c);
             if (have <= 0) continue;
-            if (owner == null) h.addStock(c, -1);
-            else Stores.take(mgr, h, owner, c, 1);
+            if (owner == null) Stores.takeWithChests(mgr, h, c, 1);
+            else Stores.takeWithChests(mgr, h, owner, c, 1);
             return true;
         }
         return false;
@@ -179,18 +180,18 @@ public final class Builder {
     public static int stone(HoldingManager mgr, Holding h) {
         java.util.UUID owner = h.ownerPlayer();
         int n = 0;
-        for (ResourceLocation s : STONE) n += owner == null ? h.stock(s) : Stores.realmStock(mgr, h, owner, s);
+        for (ResourceLocation s : STONE) n += owner == null ? Stores.stockWithChests(mgr, h, s) : Stores.stockWithChests(mgr, h, owner, s);
         return n;
     }
 
     private static void takeStone(HoldingManager mgr, Holding h, int n) {
         java.util.UUID owner = h.ownerPlayer();
         for (ResourceLocation s : STONE) {
-            int have = owner == null ? h.stock(s) : Stores.realmStock(mgr, h, owner, s);
+            int have = owner == null ? Stores.stockWithChests(mgr, h, s) : Stores.stockWithChests(mgr, h, owner, s);
             int take = Math.min(n, have);
             if (take > 0) {
-                if (owner == null) h.addStock(s, -take);
-                else Stores.take(mgr, h, owner, s, take);
+                if (owner == null) Stores.takeWithChests(mgr, h, s, take);
+                else Stores.takeWithChests(mgr, h, owner, s, take);
             }
             n -= take;
             if (n <= 0) return;
@@ -199,7 +200,7 @@ public final class Builder {
 
     // ------------------------------------------------------------ the work, once a second
 
-    /** How long a house's castle must be quiet after damage before its masons start. */
+    /** How long a house's castle must be quiet after damage, and after the last blow struck at its men, before its masons start. */
     public static final int QUIET = 1200;
 
     /** The house's masons start on the walls: the survey runs on the next tick. */
@@ -217,7 +218,7 @@ public final class Builder {
             // a house's own masons: once the castle has been quiet for a minute after taking damage, they put it back
             if (h.work.equals(NONE)) {
                 long now = level.getGameTime();
-                if (h.damagedAt <= 0 || now - h.damagedAt < QUIET || h.dragonAt != 0 || h.plans() == null) return;
+                if (h.damagedAt <= 0 || now - h.damagedAt < QUIET || now - h.foughtAt < QUIET || h.dragonAt != 0 || h.plans() == null) return;
                 summonMasons(mgr, h);
             } else if (!h.work.equals(REPAIR)) {
                 h.work = NONE;
@@ -357,6 +358,7 @@ public final class Builder {
         BlockPos origin = new BlockPos(h.box.minX(), h.box.minY(), h.box.minZ());
         int nx = (l.sizeX + 31) / 32, nz = (l.sizeZ + 31) / 32;
         List<Job> jobs = new ArrayList<>();
+        boolean gateDown = Gates.down(level, h);
         int tiles = 0, scanned = 0, differ = 0;
         for (int tx = 0; tx < nx; tx++) {
             for (int tz = 0; tz < nz; tz++) {
@@ -384,6 +386,7 @@ public final class Builder {
                     differ++;
                     if (!(have.isAir() || have.is(CommonEvents.SIEGE_PLACEABLE) || !have.getFluidState().isEmpty() || have.is(Blocks.FIRE)
                             || have.canBeReplaced() || have.is(BlockTags.LEAVES))) continue;
+                    if (gateDown && want.is(net.aiagent256.stormhold.registry.ModBlocks.PORTCULLIS.get())) continue;   // broken lately: it stays down
                     jobs.add(new Job(pos, want, true));
                 }
             }
@@ -763,7 +766,7 @@ public final class Builder {
         int have = stone(mgr, h);
         if (have < stone) {
             player.sendSystemMessage(Component.literal("A road to " + best.name + " (" + (int) bestD + " blocks) takes " + stone
-                    + " stone from the realm's stores; you have " + have + ".").withStyle(ChatFormatting.RED));
+                    + " stone from the realm's stores or this castle's chests; you have " + have + ".").withStyle(ChatFormatting.RED));
             return;
         }
         takeStone(mgr, h, stone);
