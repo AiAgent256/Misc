@@ -237,11 +237,10 @@ public class WarTableScreen extends Screen {
                 () -> Net.sendAction(h.id(), Net.VASSAL, BlockPos.ZERO, 0)));
         if (vassal) row.add(button("Revoke", "Take " + h.name() + " back into your own hands. He returns to the ranks as a knight.",
                 () -> Net.sendAction(h.id(), Net.REVOKE, BlockPos.ZERO, 0)));
-        Button seat = button(h.seat() ? "Your seat" : "Make this my seat", h.seat()
-                ? h.name() + " is your seat: while you're away, rents, dues and tolls are paid into its stores; your roads start from its gate; "
-                + "the Realm map crowns it."
-                : "Rule from " + h.name() + ": while you're away, rents, dues and tolls are paid into its stores (while you're on they come to "
-                + "your purse), your roads start from its gate, and the Realm map crowns it.", () -> Net.sendAction(h.id(), Net.SET_SEAT, BlockPos.ZERO, 0));
+        String seatDoes = "tribute, envoys' purses and anything paid to you while you're away go into its stores, and wages come out of them "
+                + "first; rents still come to your purse at dawn. Your roads start from its gate, and the Realm map crowns it.";
+        Button seat = button(h.seat() ? "Your seat" : "Make this my seat", (h.seat() ? h.name() + " is your seat: " : "Rule from " + h.name() + ": ")
+                + seatDoes, () -> Net.sendAction(h.id(), Net.SET_SEAT, BlockPos.ZERO, 0));
         seat.active = !h.seat() && !vassal;
         row.add(seat);
         Button tourney = button("Hold a tournament", h.tourney().isEmpty()

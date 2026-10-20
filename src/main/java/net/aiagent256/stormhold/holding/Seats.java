@@ -6,9 +6,10 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 
 /**
- * A lord's seat: the castle his realm is run from. While he's away, rents, dues, tolls and offers paid to him land
- * in its stores (while he's on they come to his purse, as ever); the realm's roads start from its gate; the Realm
- * map crowns it. His first castle is his seat until he names another on the War Table.
+ * A lord's seat: the castle his realm is run from. Rents and dues come to his purse at dawn as ever; what's paid
+ * to him while he's away (a house's tribute, an envoy's purse, spoils with nowhere else to go) lands in its stores,
+ * and the council's wages come out of them first. The realm's roads start from its gate; the Realm map crowns it.
+ * His first castle is his seat until he names another on the War Table.
  */
 public final class Seats {
     public static boolean set(ServerLevel level, HoldingManager mgr, Holding h, Player player) {
@@ -26,8 +27,8 @@ public final class Seats {
         mgr.seats.put(player.getUUID(), h.id);
         mgr.setDirty();
         player.sendSystemMessage(HoldingEvents.gold(h.name + " is your seat" + (was != null ? " (it was " + was.name + ")" : "")
-                + ". While you're away, rents, dues and tolls are paid into its stores; while you're on they come to your purse. "
-                + "Your roads start from its gate, and the Realm map crowns it."));
+                + ". Tribute, envoys' purses and anything paid to you while you're away go into its stores, and wages come out of them "
+                + "first. Rents still come to your purse at dawn. Your roads start from its gate, and the Realm map crowns it."));
         Chronicle.log(level, mgr, Chronicle.GROWTH, "The lord's seat is now " + h.name + ".", player.getUUID());
         return true;
     }
