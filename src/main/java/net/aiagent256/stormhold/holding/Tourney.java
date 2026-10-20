@@ -308,7 +308,8 @@ public final class Tourney {
                 g.setNoAi(true);
                 b.yielded = 1;
                 g.level().playSound(null, g.blockPosition(), SoundEvents.ARMOR_EQUIP_IRON, SoundSource.HOSTILE, 1.5F, 0.6F);
-                if (g.level() instanceof ServerLevel sl && sl.getServer().getPlayerList().getPlayer(b.player) instanceof ServerPlayer p)
+                ServerPlayer p = g.level() instanceof ServerLevel sl ? sl.getServer().getPlayerList().getPlayer(b.player) : null;
+                if (p != null)
                     p.sendSystemMessage(Component.literal(g.baseName() + " yields! (bout " + (b.round + 1) + " of " + ROUNDS + ")").withStyle(ChatFormatting.GREEN));
             }
             return;
