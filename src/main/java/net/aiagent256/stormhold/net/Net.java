@@ -31,7 +31,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 public final class Net {
-    private static final String VERSION = "9";
+    private static final String VERSION = "10";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(Stormhold.id("main"),
             () -> VERSION, VERSION::equals, VERSION::equals);
 
@@ -39,7 +39,8 @@ public final class Net {
             MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19,
             SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23, TREASURY = 24, VASSAL = 25, REVOKE = 26, COUNCIL = 27,
             COUNCIL_APPOINT = 28, COUNCIL_DISMISS = 29, MATTER_CHOOSE = 30, MARCH_ALL = 31, TIDY = 32, TARGET_ALL = 33,
-            SET_SEAT = 34, RUSH = 35, BUY_CLAIM = 36, TOURNEY = 37, TRUCE = 38, SEND_HOME = 39, ATTACK_ALL = 40;
+            SET_SEAT = 34, RUSH = 35, BUY_CLAIM = 36, TOURNEY = 37, TRUCE = 38, SEND_HOME = 39, ATTACK_ALL = 40,
+            BANNERS = 41, SURPLUS = 42;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -72,7 +73,8 @@ public final class Net {
     }
 
     public record WarTableData(List<HoldingInfo> holdings, boolean recruits, List<Seat> council, int treasury,
-                               @org.jetbrains.annotations.Nullable Decision decision, List<net.aiagent256.stormhold.holding.WarPlan.Target> targets) {
+                               @org.jetbrains.annotations.Nullable Decision decision, List<net.aiagent256.stormhold.holding.WarPlan.Target> targets,
+                               boolean sellSurplus) {
         void write(FriendlyByteBuf b) {
             b.writeVarInt(holdings.size());
             for (HoldingInfo h : holdings) h.write(b);
@@ -96,6 +98,7 @@ public final class Net {
             }
             b.writeVarInt(targets.size());
             for (var t : targets) t.write(b);
+            b.writeBoolean(sellSurplus);
         }
 
         static WarTableData read(FriendlyByteBuf b) {
@@ -111,7 +114,7 @@ public final class Net {
             int nt = b.readVarInt();
             List<net.aiagent256.stormhold.holding.WarPlan.Target> targets = new ArrayList<>(nt);
             for (int i = 0; i < nt; i++) targets.add(net.aiagent256.stormhold.holding.WarPlan.Target.read(b));
-            return new WarTableData(l, recruits, c, treasury, d, targets);
+            return new WarTableData(l, recruits, c, treasury, d, targets, b.readBoolean());
         }
 
         void handle(Supplier<NetworkEvent.Context> ctx) {
@@ -125,14 +128,18 @@ public final class Net {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), build(player));
     }
 
-    /** Every castle of the player's (vassals aside) sends its war party at the target; what went, in chat. */
+    /** Every castle of the player's, a loyal vassal's too, sends its war party at the target; what went, in chat. */
     private static void marchAll(ServerLevel level, HoldingManager mgr, ServerPlayer player, BlockPos target) {
         Holding enemy = mgr.atXZ(target, 16);
         var plan = enemy != null ? net.aiagent256.stormhold.holding.WarPlan.plan(level, mgr, player.getUUID(), enemy) : null;
         List<String> went = new ArrayList<>(), stayed = new ArrayList<>();
         int[] men = new int[4];
         for (Holding o : mgr.ownedBy(player.getUUID())) {
-            if (net.aiagent256.stormhold.holding.Vassals.is(o) || o == enemy) continue;
+            if (o == enemy) continue;
+            if (!net.aiagent256.stormhold.holding.Vassals.answers(o)) {
+                stayed.add(o.name + " (" + o.lordName + ", loyalty " + o.loyalty + ")");
+                continue;
+            }
             Campaign c = Campaigns.launchParty(level, mgr, o, target);
             if (c != null) {
                 went.add(o.name);
@@ -161,6 +168,7 @@ public final class Net {
         List<HoldingInfo> out = new ArrayList<>();
         for (ServerLevel level : player.server.getAllLevels()) {
             HoldingManager mgr = HoldingManager.get(level);
+            net.aiagent256.stormhold.holding.Seats.ensure(level, mgr, player.getUUID());
             for (Holding h : mgr.ownedBy(player.getUUID())) {
                 int[] counts = {h.count(Role.CAPTAIN), h.count(Role.KNIGHT), h.count(Role.ARCHER), h.count(Role.CROSSBOWMAN)};
                 int[] cap = {h.capacity(Role.CAPTAIN), h.capacity(Role.KNIGHT), h.capacity(Role.ARCHER), h.capacity(Role.CROSSBOWMAN)};
@@ -250,7 +258,8 @@ public final class Net {
         }
         // the castles you know near your own, with what you'd send at each and the chance: in the world you stand in
         var targets = net.aiagent256.stormhold.holding.WarPlan.targets(player.serverLevel(), HoldingManager.get(player.serverLevel()), player.getUUID());
-        return new WarTableData(out, RecruitsCompat.loaded(), council, treasury, decision, targets);
+        return new WarTableData(out, RecruitsCompat.loaded(), council, treasury, decision, targets,
+                net.aiagent256.stormhold.holding.Surplus.selling(player.server, player.getUUID()));
     }
 
     // ------------------------------------------------------------ client -> server
@@ -297,7 +306,7 @@ public final class Net {
             return;
         }
         if (a.action() == TARGET_ALL) {
-            // picked on the Realm map: every castle of yours (vassals aside) takes it for its target
+            // picked on the Realm map: every castle of yours (a vassal too, while his loyalty holds) takes it for its target
             for (ServerLevel level : player.server.getAllLevels()) {
                 HoldingManager mgr = HoldingManager.get(level);
                 Holding enemy = mgr.atXZ(a.pos(), 16);
@@ -305,7 +314,7 @@ public final class Net {
                 if (mine.isEmpty() || enemy == null) continue;
                 int n = 0;
                 for (Holding h : mine) {
-                    if (net.aiagent256.stormhold.holding.Vassals.is(h) || h == enemy) continue;
+                    if (!net.aiagent256.stormhold.holding.Vassals.answers(h) || h == enemy) continue;
                     h.attackTarget = enemy.center();
                     n++;
                 }
@@ -324,10 +333,20 @@ public final class Net {
             HoldingManager mgr = HoldingManager.get(level);
             Holding enemy = mgr.atXZ(a.pos(), 16);
             if (enemy != null && !enemy.owner.equals(Sides.player(player.getUUID()))) {
-                for (Holding o : mgr.ownedBy(player.getUUID())) if (!net.aiagent256.stormhold.holding.Vassals.is(o)) o.attackTarget = enemy.center();
+                for (Holding o : mgr.ownedBy(player.getUUID())) if (net.aiagent256.stormhold.holding.Vassals.answers(o)) o.attackTarget = enemy.center();
                 mgr.setDirty();
                 marchAll(level, mgr, player, enemy.center());
             }
+            openWarTable(player);
+            return;
+        }
+        if (a.action() == BANNERS) {
+            net.aiagent256.stormhold.holding.Banners.call(player);
+            openWarTable(player);
+            return;
+        }
+        if (a.action() == SURPLUS) {
+            net.aiagent256.stormhold.holding.Surplus.toggle(player);
             openWarTable(player);
             return;
         }

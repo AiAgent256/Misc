@@ -371,6 +371,10 @@ public class WarTableScreen extends Screen {
         row.add(button("Send home", "From anywhere: every man of yours within " + Company.HOME_RANGE + " blocks rides back to the castle he came "
                 + "from (" + (int) Columns.SPEED + " blocks a second) and joins its garrison. Men with no home go to your seat. Their names and "
                 + "kit stay behind: the castle arms them as it arms the rest.", () -> Net.sendAction(h.id(), Net.SEND_HOME, BlockPos.ZERO, 0)));
+        row.add(button("Call the banners", "Every castle you hold, your vassals' too, sends its war party to you as a column ("
+                + (int) Columns.SPEED + " blocks a second), keeping 3 knights, an archer and a crossbowman at home. They fall in as your "
+                + "company when they reach you: lead them with the baton, and Send home when it's done. A castle under attack keeps its men, "
+                + "and so does a vassal whose loyalty is under 25.", () -> Net.sendAction(h.id(), Net.BANNERS, BlockPos.ZERO, 0)));
         noteY = layDown(row, mx, y + 58, mw) + 3;
         // the armoury, along the bottom
         String[] kits = {"Iron kit", "Diamond kit", "Netherite kit"};
@@ -426,6 +430,13 @@ public class WarTableScreen extends Screen {
                 : "Have the steward keep this castle's chests in order: the spoils chest emptied into your chests, each kind of thing gathered "
                 + "into the chest that holds the most of it, every chest stacked and sorted. Put a sign on any chest to keep him out of it.",
                 () -> Net.sendAction(h.id(), Net.TIDY, BlockPos.ZERO, 0)));
+        row.add(button(data.sellSurplus() ? "Market: selling" : "Market: keeping", data.sellSurplus()
+                ? "At dawn every castle's stores sell what nothing in the realm uses (crops, wool, hides, meat, fish, paper, copper) past the "
+                + "last " + net.aiagent256.stormhold.holding.Surplus.KEEP + " of each, at the shops' price, into the stores. Bread, iron, gold, "
+                + "diamonds, coal, stone, arrows and logs are never sold. Click to keep everything."
+                : "Your stores keep everything. Click to sell the surplus at dawn: crops, wool, hides, meat, fish, paper and copper past the last "
+                + net.aiagent256.stormhold.holding.Surplus.KEEP + " of each, at the shops' price.",
+                () -> Net.sendAction(h.id(), Net.SURPLUS, BlockPos.ZERO, 0)));
         peopleY = layDown(row, mx, contentTop() + 12, mw) + 6;
         this.addRenderableWidget(Button.builder(Component.literal("Expand fief"), b -> Net.sendAction(h.id(), Net.EXPAND_FIEF, BlockPos.ZERO, 0))
                 .tooltip(Tooltip.create(Component.literal("The people raise one more building (a pasture, a mine, a mill, then more cottages) for "
@@ -490,15 +501,26 @@ public class WarTableScreen extends Screen {
         if (targetSel >= targetScroll + tRows) targetScroll = targetSel - tRows + 1;
         int[] all = new int[4];
         for (var p : t.parts()) for (int i = 0; i < 4; i++) all[i] += p.men()[i];
-        Button go = Button.builder(Component.literal(fit("Attack " + t.name() + " with everything", mw - 8)), b ->
+        int half = (mw - 4) / 2;
+        Button go = Button.builder(Component.literal(fit("Attack " + t.name() + " with everything", half - 8)), b ->
                         Net.sendAction(new UUID(0, 0), Net.ATTACK_ALL, new BlockPos(t.x(), 64, t.z()), 0))
                 .tooltip(Tooltip.create(Component.literal(t.parts().isEmpty() ? "None of your castles has three men to spare, or each has a war party out already."
                         : "Every castle listed above sends its war party at " + t.name() + " (" + net.aiagent256.stormhold.holding.WarPlan.men(all)
                         + "). They wait at the walls for each other, up to five minutes from the first, and go in together. Fought out of "
-                        + "sight it's " + t.pct() + "%; ride with them and you can do better." + (t.note().isEmpty() ? "" : " " + t.note()))))
-                .bounds(mx, contentBottom() - BH, mw, BH).build();
+                        + "sight it's " + t.pct() + "%; be there when they arrive and it's fought in front of you instead."
+                        + (t.note().isEmpty() ? "" : " " + t.note()))))
+                .bounds(mx, contentBottom() - BH, half, BH).build();
         go.active = !t.parts().isEmpty();
         this.addRenderableWidget(go);
+        Button lead = Button.builder(Component.literal(fit("Lead it yourself", half - 8)), b ->
+                        Net.sendAction(new UUID(0, 0), Net.BANNERS, BlockPos.ZERO, 0))
+                .tooltip(Tooltip.create(Component.literal("Call the banners: the same " + t.men() + " men ride to you instead, as columns ("
+                        + (int) Columns.SPEED + " blocks a second), and fall in as your company. Then you take them to " + t.name()
+                        + " and lead them in with the baton: the gate, the walls and the waves of defenders (about " + t.defenders()
+                        + " in all) are fought in front of you, not by the odds above. Send home (Company tab) when it's done.")))
+                .bounds(mx + mw - half, contentBottom() - BH, half, BH).build();
+        lead.active = !t.parts().isEmpty();
+        this.addRenderableWidget(lead);
     }
 
     private void drawTargets(GuiGraphics g, int mx, int mw, int mouseX, int mouseY) {

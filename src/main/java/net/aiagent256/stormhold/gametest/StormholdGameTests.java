@@ -3398,6 +3398,117 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** Vassals answer the call: their war parties count on the Attack page, the banners ride to you, a disloyal one stays home. */
+    @GameTest(template = "arena")
+    public static void vassalsAnswerTheCallAndTheBannersRideToYou(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var me = net.minecraftforge.common.util.FakePlayerFactory.get(level, new com.mojang.authlib.GameProfile(UUID.randomUUID(), "banners_test"));
+        Holding a = sample(g), b = sample(g), c = sample(g), enemy = sample(g);
+        b.key = a.key + "/b";
+        c.key = a.key + "/c";
+        enemy.key = a.key + "/e";
+        b.name = "Vassalhold";
+        c.name = "Faithless";
+        enemy.name = "Foehold";
+        BlockPos o = a.center();
+        enemy.box = new BoundingBox(o.getX() + 300, o.getY(), o.getZ(), o.getX() + 315, o.getY() + 7, o.getZ() + 15);
+        enemy.bannerPos = enemy.box.getCenter();
+        for (Holding x : List.of(a, b, c)) x.owner = Sides.player(me.getUUID());
+        b.vassal = "Hugh";
+        b.lordName = "Castellan Hugh";
+        b.loyalty = 90;
+        c.vassal = "Wat";
+        c.lordName = "Castellan Wat";
+        c.loyalty = 10;
+        for (Holding x : List.of(a, b, c, enemy)) mgr.holdings.put(x.id, x);
+        try {
+            var t = net.aiagent256.stormhold.holding.WarPlan.plan(level, mgr, me.getUUID(), enemy);
+            if (t.parts().size() != 2) throw new IllegalStateException(t.parts().size() + " war parties, not 2 (the loyal vassal marches)");
+            if (t.parts().stream().noneMatch(p -> p.castle().contains("(Hugh)"))) throw new IllegalStateException("the vassal's party isn't named");
+            if (!t.note().contains("Castellan Wat")) throw new IllegalStateException("the disloyal vassal isn't named: " + t.note());
+            // the banners: a and b ride to you, c stays home
+            int ak = a.count(Role.KNIGHT), bk = b.count(Role.KNIGHT), ck = c.count(Role.KNIGHT);
+            int sendA = Campaigns.sends(a, Role.KNIGHT), sendB = Campaigns.sends(b, Role.KNIGHT);
+            int n = net.aiagent256.stormhold.holding.Banners.call(me);
+            if (n <= 0) throw new IllegalStateException("nobody rode");
+            if (a.count(Role.KNIGHT) != ak - sendA || b.count(Role.KNIGHT) != bk - sendB) throw new IllegalStateException("knights left: "
+                    + a.count(Role.KNIGHT) + " of " + ak + " (sends " + sendA + "), " + b.count(Role.KNIGHT) + " of " + bk + " (sends " + sendB + ")");
+            if (c.count(Role.KNIGHT) != ck) throw new IllegalStateException("the faithless vassal sent men");
+            int columns = 0;
+            for (Campaign x : mgr.campaigns) {
+                if (x.kind != Campaign.Kind.COLUMN || !me.getUUID().equals(x.player)) continue;
+                if (!x.muster) throw new IllegalStateException("a banner column isn't marked as a host");
+                columns++;
+            }
+            if (columns != 2) throw new IllegalStateException(columns + " columns, not 2");
+        } finally {
+            for (Holding x : List.of(a, b, c, enemy)) mgr.holdings.remove(x.id);
+            mgr.campaigns.removeIf(x -> me.getUUID().equals(x.player));
+        }
+        g.succeed();
+    }
+
+    /** The realm's diamonds go to the worst-armed castle first; a lord with no seat gets his largest; the market sells the surplus. */
+    @GameTest(template = "arena")
+    public static void theForgeServesTheWorstArmedFirstAndTheMarketSells(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        UUID me = UUID.randomUUID();
+        Holding low = sample(g), high = sample(g), vassal = sample(g);
+        high.key = low.key + "/high";
+        vassal.key = low.key + "/vassal";
+        low.name = "Lowkit";
+        high.name = "Highkit";
+        for (Holding x : List.of(low, high, vassal)) {
+            x.owner = Sides.player(me);
+            x.smiths = x.smithsAt = 8;
+        }
+        vassal.vassal = "Hugh";
+        vassal.add(Role.KNIGHT, 40);                 // the biggest, but not his to sit in
+        low.renown = 3;
+        high.forged = 5;
+        high.add(Role.KNIGHT, 5);
+        var diamond = new net.minecraft.resources.ResourceLocation("minecraft", "diamond");
+        var iron = new net.minecraft.resources.ResourceLocation("minecraft", "iron_ingot");
+        var wheat = new net.minecraft.resources.ResourceLocation("minecraft", "wheat");
+        var bread = new net.minecraft.resources.ResourceLocation("minecraft", "bread");
+        high.addStock(diamond, 12);
+        high.addStock(iron, 16);
+        for (Holding x : List.of(low, high, vassal)) mgr.holdings.put(x.id, x);
+        try {
+            // the seat
+            if (!net.aiagent256.stormhold.holding.Seats.ensure(level, mgr, me)) throw new IllegalStateException("no seat named");
+            if (mgr.seatOf(me) != high) throw new IllegalStateException("seat is " + (mgr.seatOf(me) == null ? "none" : mgr.seatOf(me).name));
+            if (net.aiagent256.stormhold.holding.Seats.ensure(level, mgr, me)) throw new IllegalStateException("named a second seat");
+            // the forge
+            int lowLevel = net.aiagent256.stormhold.holding.Frontier.level(level, low);
+            if (lowLevel == 3) {
+                net.aiagent256.stormhold.holding.Labour.forge(level, mgr, high, 8);
+                if (high.forgePaid || high.stock(diamond) != 12) throw new IllegalStateException("the better-armed castle took the diamonds");
+                net.aiagent256.stormhold.holding.Labour.forge(level, mgr, low, 1);   // one smith-day: paid, not yet done
+                if (!low.forgePaid || low.forgeTarget != 4) throw new IllegalStateException("the worst-armed castle didn't get them");
+                if (high.stock(diamond) != 0) throw new IllegalStateException(high.stock(diamond) + " diamonds left");
+            } else {
+                Stormhold.LOGGER.info("Forge order test skipped: the test castle stands in zone level {}", lowLevel);
+            }
+            // market day: wheat past the last 64 sells at 20 a emerald, bread and iron never
+            high.addStock(wheat, 3999);
+            high.addStock(bread, 1103);
+            int ironBefore = high.stock(iron), em = high.stock(net.aiagent256.stormhold.holding.Rewards.EMERALD);
+            var sold = new java.util.LinkedHashMap<String, Integer>();
+            int got = net.aiagent256.stormhold.holding.Surplus.sell(high, sold);
+            if (got != (3999 - 64) / 20) throw new IllegalStateException("sold for " + got + ", not " + (3999 - 64) / 20);
+            if (high.stock(wheat) != 3999 - got * 20 || high.stock(wheat) < 64) throw new IllegalStateException("wheat left " + high.stock(wheat));
+            if (high.stock(bread) != 1103 || high.stock(iron) != ironBefore) throw new IllegalStateException("sold bread or iron");
+            if (high.stock(net.aiagent256.stormhold.holding.Rewards.EMERALD) != em + got) throw new IllegalStateException("the emeralds didn't reach the stores");
+        } finally {
+            for (Holding x : List.of(low, high, vassal)) mgr.holdings.remove(x.id);
+            mgr.seats.remove(me);
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

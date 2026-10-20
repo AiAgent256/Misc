@@ -43,6 +43,12 @@ public final class Columns {
     /** Send up to the asked numbers from {@code h} to the player. Returns the column, or null if nothing could go. */
     @Nullable
     public static Campaign send(ServerLevel level, HoldingManager mgr, ServerPlayer player, Holding h, EnumMap<Role, Integer> want) {
+        return send(level, mgr, player, h, want, false);
+    }
+
+    /** The same; {@code quiet} for one of several sent at once (the banners), which say so together. */
+    @Nullable
+    public static Campaign send(ServerLevel level, HoldingManager mgr, ServerPlayer player, Holding h, EnumMap<Role, Integer> want, boolean quiet) {
         Campaign c = new Campaign();
         c.kind = Campaign.Kind.COLUMN;
         c.side = h.owner;
@@ -60,7 +66,7 @@ public final class Columns {
             }
         }
         if (c.total() <= 0) {
-            player.sendSystemMessage(Component.literal(h.name + " has no one to spare.").withStyle(ChatFormatting.RED));
+            if (!quiet) player.sendSystemMessage(Component.literal(h.name + " has no one to spare.").withStyle(ChatFormatting.RED));
             return null;
         }
         // men standing in the castle leave with it
@@ -79,6 +85,7 @@ public final class Columns {
         }
         mgr.campaigns.add(c);
         mgr.setDirty();
+        if (quiet) return c;
         level.playSound(null, player.blockPosition(), SoundEvents.GOAT_HORN_SOUND_VARIANTS.get(0).value(), SoundSource.PLAYERS, 0.8F, 0.9F);
         player.sendSystemMessage(HoldingEvents.gold("A column of " + c.total() + " rides out from " + h.name + ". "
                 + eta(c) + " to reach you."));
@@ -191,7 +198,7 @@ public final class Columns {
 
     /** A castle of a house that hates the player, close to the column's route, hits it once. */
     private static void ambush(ServerLevel level, HoldingManager mgr, Campaign c, @Nullable ServerPlayer player) {
-        if (c.player == null) return;
+        if (c.player == null || c.muster) return;
         BlockPos at = c.position();
         for (Holding h : mgr.holdings.values()) {
             if (!h.isHouseOwned() || !h.lordAlive) continue;

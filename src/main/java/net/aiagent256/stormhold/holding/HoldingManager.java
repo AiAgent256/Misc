@@ -50,6 +50,8 @@ public class HoldingManager extends SavedData {
     public final Map<UUID, UUID> seats = new HashMap<>();
     /** Each lord's direwolf, kept in the overworld's record (see {@link Direwolves}). */
     public final Map<UUID, Direwolves.Record> direwolves = new HashMap<>();
+    /** Lords who keep their surplus rather than sell it at dawn (see {@link Surplus}); kept in the overworld's record. */
+    public final java.util.Set<UUID> keepSurplus = new java.util.HashSet<>();
     /** When each lord's places were last attacked (see {@link Campaigns#GAP}). */
     public final Map<UUID, Long> lastAttack = new HashMap<>();
     /** Truces bought from the houses: house id -> player -> the truce (see {@link Truces}). */
@@ -174,6 +176,9 @@ public class HoldingManager extends SavedData {
         tag.put("Seats", seatTag);
         tag.put("Truces", Truces.save(truces));
         if (!direwolves.isEmpty()) tag.put("Direwolves", Direwolves.save(direwolves));
+        ListTag keep = new ListTag();
+        for (UUID p : keepSurplus) keep.add(net.minecraft.nbt.StringTag.valueOf(p.toString()));
+        if (!keep.isEmpty()) tag.put("KeepSurplus", keep);
         CompoundTag la = new CompoundTag();
         lastAttack.forEach((p, t) -> la.putLong(p.toString(), t));
         tag.put("LastAttack", la);
@@ -228,6 +233,12 @@ public class HoldingManager extends SavedData {
         }
         Truces.load(tag.getList("Truces", Tag.TAG_COMPOUND), m.truces);
         Direwolves.load(tag.getCompound("Direwolves"), m.direwolves);
+        for (Tag k : tag.getList("KeepSurplus", Tag.TAG_STRING)) {
+            try {
+                m.keepSurplus.add(UUID.fromString(k.getAsString()));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
         CompoundTag la = tag.getCompound("LastAttack");
         for (String k : la.getAllKeys()) {
             try {

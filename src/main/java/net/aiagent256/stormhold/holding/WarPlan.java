@@ -11,9 +11,10 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Who'd march, in what kit, and the chance: every castle the lord holds (vassals aside, and any with a war party
- * out already) sends its war party against a castle, they wait for each other and go in together, fought out of
- * sight. The War Table's Attack page lists the castles you know near your own this way, nearest first.
+ * Who'd march, in what kit, and the chance: every castle the lord holds, his vassals' too (they're sworn to him), sends
+ * its war party against a castle, save one with a party out already or a vassal whose loyalty has run low. They wait
+ * for each other and go in together, fought out of sight. The War Table's Attack page lists the castles you know near
+ * your own this way, nearest first.
  */
 public final class WarPlan {
     /** How far from your nearest castle a castle is still worth listing. */
@@ -79,7 +80,7 @@ public final class WarPlan {
 
     /** What {@code from} would send against {@code enemy}, or null if it can't send a war party now. */
     public static Part part(ServerLevel level, HoldingManager mgr, Holding from, Holding enemy) {
-        if (Vassals.is(from) || from == enemy || Campaigns.active(mgr, from.id, Campaign.Kind.PARTY)) return null;
+        if (from == enemy || !Vassals.answers(from) || Campaigns.active(mgr, from.id, Campaign.Kind.PARTY)) return null;
         int[] men = new int[4];
         int total = 0;
         for (int i = 0; i < 4; i++) {
@@ -89,7 +90,8 @@ public final class WarPlan {
         if (total < 3) return null;
         BlockPos a = Campaigns.gateOutside(from), b = enemy.bannerPos.equals(BlockPos.ZERO) ? enemy.center() : enemy.bannerPos;
         double d = Math.sqrt((double) (a.getX() - b.getX()) * (a.getX() - b.getX()) + (double) (a.getZ() - b.getZ()) * (a.getZ() - b.getZ()));
-        return new Part(from.name, men, Frontier.level(level, from), (int) Math.ceil(d / Campaigns.MARCH_SPEED));
+        return new Part(from.name + (Vassals.is(from) ? " (" + from.vassal + ")" : ""), men, Frontier.level(level, from),
+                (int) Math.ceil(d / Campaigns.MARCH_SPEED));
     }
 
     /** The whole plan against one castle. */
@@ -97,10 +99,12 @@ public final class WarPlan {
         List<Part> parts = new ArrayList<>();
         double att = 0;
         int nearest = Integer.MAX_VALUE;
+        List<String> home = new ArrayList<>();
         for (Holding h : mgr.ownedBy(lord)) {
             if (h == enemy) continue;
             int d = (int) Math.sqrt(h.center().distSqr(enemy.center().atY(h.center().getY())));
             nearest = Math.min(nearest, d);
+            if (!Vassals.answers(h)) home.add(h.lordName + " (loyalty " + h.loyalty + ")");
             Part p = part(level, mgr, h, enemy);
             if (p == null) continue;
             parts.add(p);
@@ -121,6 +125,8 @@ public final class WarPlan {
         } else {
             attitude = 4;
         }
+        if (!home.isEmpty()) note = (note.isEmpty() ? "" : note + " ") + "Staying home, loyalty under " + Vassals.LOW + ": "
+                + String.join(", ", home) + ".";
         return new Target(enemy.id, enemy.name, HoldingEvents.ownerName(level, mgr, enemy.owner), attitude, enemy.center().getX(),
                 enemy.center().getZ(), nearest == Integer.MAX_VALUE ? 0 : nearest, HoldingEvents.defendersInAll(enemy), theirKit, parts,
                 parts.isEmpty() ? 0 : chance(att, def), note);

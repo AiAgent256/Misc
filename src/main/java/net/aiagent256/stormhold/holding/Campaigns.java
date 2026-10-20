@@ -195,7 +195,7 @@ public final class Campaigns {
     }
 
     /**
-     * What "All castles march" would come to against this castle: every castle the lord holds (vassals aside) sends
+     * What "All castles march" would come to against this castle: every castle the lord holds (a loyal vassal's too) sends
      * its war party, they go in together, and nobody watches. The men, the defenders and the chance, for the Realm map.
      */
     public static String allOdds(ServerLevel level, HoldingManager mgr, UUID lord, Holding enemy) {

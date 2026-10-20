@@ -31,6 +31,16 @@ public final class Vassals {
         return h.isPlayerOwned() && h.vassal != null && !h.vassal.isEmpty();
     }
 
+    /** Whether the place answers its lord's call to arms: a castle of his own always; a vassal while his loyalty holds (LOW or more). */
+    public static boolean answers(Holding h) {
+        return !is(h) || h.loyalty >= LOW;
+    }
+
+    /** Why a vassal keeps his men at home, for a line on the War Table. */
+    public static String refusal(Holding h) {
+        return h.lordName + " keeps the men of " + h.name + " at home: his loyalty is " + h.loyalty + ", and he answers at " + LOW + ".";
+    }
+
     /** The share of the rents he sends you: a third at the lowest, four fifths at the most loyal. */
     public static double share(Holding h) {
         return 0.3 + 0.5 * Math.max(0, Math.min(100, h.loyalty)) / 100.0;

@@ -236,6 +236,11 @@ public final class Labour {
     public static String forge(ServerLevel level, HoldingManager mgr, Holding h, int n) {
         int target = target(level, h);
         if (target > Frontier.MAX) return "Smiths " + n + ": the garrison's kit is the best there is.";
+        Holding first = h.forgePaid ? null : before(level, mgr, h, target);
+        if (first != null) {
+            return "Smiths " + n + " hold off: the realm's diamonds go to " + first.name + " first, whose men wear worse (level "
+                    + Frontier.level(level, first) + "). Then level " + target + " here.";
+        }
         if (!h.forgePaid && !payMetal(mgr, h, target)) {
             int[] c = cost(target);
             return "Smiths " + n + " wait on metal for " + kitName(target) + " kit (level " + target + "): " + costText(c)
@@ -248,6 +253,30 @@ public final class Labour {
         }
         int armed = finish(level, mgr, h, target);
         return "Smiths " + n + " finished " + kitName(target) + " kit (level " + target + "); " + armed + " men on the walls re-armed.";
+    }
+
+    /**
+     * The worst-armed castle of the realm still waiting on diamonds or netherite this one wants too, with smiths at work:
+     * the realm's stores go to it first. Null when there's none. Iron is plentiful and nobody waits on it.
+     */
+    @org.jetbrains.annotations.Nullable
+    static Holding before(ServerLevel level, HoldingManager mgr, Holding h, int target) {
+        UUID owner = h.ownerPlayer();
+        if (owner == null) return null;
+        int[] mine = cost(target);
+        Holding best = null;
+        int bestTarget = target;
+        for (Holding o : mgr.ownedBy(owner)) {
+            if (o == h || o.forgePaid || Math.min(o.smithsAt, o.smiths) <= 0) continue;
+            int t = target(level, o);
+            if (t > Frontier.MAX || t >= bestTarget) continue;
+            int[] theirs = cost(t);
+            if ((mine[1] > 0 && theirs[1] > 0) || (mine[2] > 0 && theirs[2] > 0)) {
+                best = o;
+                bestTarget = t;
+            }
+        }
+        return best;
     }
 
     /** The level the forge is working toward: the one paid for, else the next above what the castle has. */

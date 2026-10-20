@@ -76,12 +76,15 @@ public final class Chronicle {
         mgr.lastDawn = day;
         mgr.setDirty();
         for (ServerPlayer p : level.players()) {
+            if (Seats.ensure(level, mgr, p.getUUID())) mgr.setDirty();
             List<Holding> mine = mgr.ownedBy(p.getUUID());
             if (mine.isEmpty()) continue;
             tribute(level, mgr, p.getUUID(), mine);
             for (Component c : account(level, mgr, p.getUUID(), mine, day)) p.sendSystemMessage(c);
             Component rents = Rewards.rents(level, mgr, p.getUUID(), mine);
             if (rents != null) p.sendSystemMessage(rents);
+            Component market = Surplus.dawn(level, mgr, p.getUUID(), mine);
+            if (market != null) p.sendSystemMessage(market);
             Component tolls = Tolls.collect(level, mgr, p.getUUID(), mine);
             if (tolls != null) p.sendSystemMessage(tolls);
             Component wages = Council.wages(level, p.getUUID(), mine);

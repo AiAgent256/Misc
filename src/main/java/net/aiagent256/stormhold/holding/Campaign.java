@@ -69,6 +69,8 @@ public class Campaign {
     public String heir = "";
     /** A column a supply line sent (cancel the line and it turns back), not one you asked for. */
     public boolean supply;
+    /** A column called with the banners: a host riding to its lord in force, which nobody picks off on the road. */
+    public boolean muster;
 
     public int total() {
         int n = 0;
@@ -134,6 +136,7 @@ public class Campaign {
         if (ramMachine != null) t.putUUID("RamMachine", ramMachine);
         if (!heir.isEmpty()) t.putString("Heir", heir);
         if (supply) t.putBoolean("Supply", true);
+        if (muster) t.putBoolean("Muster", true);
         return t;
     }
 
@@ -165,6 +168,7 @@ public class Campaign {
         if (t.hasUUID("RamMachine")) c.ramMachine = t.getUUID("RamMachine");
         c.heir = t.getString("Heir");
         c.supply = t.getBoolean("Supply");
+        c.muster = t.getBoolean("Muster");
         CompoundTag cc = t.getCompound("Counts");
         for (String k : cc.getAllKeys()) {
             try {

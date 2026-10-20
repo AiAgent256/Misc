@@ -43,6 +43,20 @@ public final class Seats {
         }
     }
 
+    /** A lord with castles and no seat (his castles were his before there were seats): his largest castle of his own is it. */
+    public static boolean ensure(ServerLevel level, HoldingManager mgr, java.util.UUID player) {
+        if (mgr.seatOf(player) != null) return false;
+        Holding best = null;
+        for (Holding h : mgr.ownedBy(player)) if (!Vassals.is(h) && (best == null || h.troops() > best.troops())) best = h;
+        if (best == null) return false;
+        mgr.seats.put(player, best.id);
+        mgr.setDirty();
+        HoldingEvents.tell(level, player, HoldingEvents.gold(best.name + " is your seat, the largest castle you hold in your own hands. "
+                + "Tribute and anything paid to you while you're away go into its stores, and wages come out of them first. "
+                + "Name another on the Overview (Make this my seat)."));
+        return true;
+    }
+
     public static boolean is(HoldingManager mgr, Holding h) {
         java.util.UUID p = h.ownerPlayer();
         return p != null && h.id.equals(mgr.seats.get(p));
