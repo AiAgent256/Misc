@@ -48,6 +48,18 @@ public final class Garrisons {
         live.keySet().removeIf(id -> gone(level, id));
     }
 
+    /**
+     * A marching army's men: one out of sight has stepped back into the army's numbers (it marches and fights
+     * as a count while nobody watches), so he leaves the list. If his ground loads again he rejoins if there's
+     * room for him, else stands down (see belongs).
+     */
+    public static void pruneMarching(ServerLevel level, Map<UUID, Role> live) {
+        live.keySet().removeIf(id -> {
+            Entity e = level.getEntity(id);
+            return e == null || !e.isAlive();
+        });
+    }
+
     /** Where each soldier (and Master Builder) was last seen, so one out of sight isn't taken for dead. */
     private static final Map<UUID, BlockPos> LAST_SEEN = new java.util.HashMap<>();
 
@@ -170,8 +182,23 @@ public final class Garrisons {
      * dropped. False means drop him.
      */
     public static boolean belongs(ServerLevel level, GarrisonEntity g) {
+        if (g.campaignId() != null && g.owner() == null) {
+            // one of an army's men: his army must still be marching and have a place for him
+            for (Campaign c : HoldingManager.get(level).campaigns) {
+                if (!c.id.equals(g.campaignId())) continue;
+                if (c.stage == Campaign.Stage.DONE) return false;
+                if (c.live.containsKey(g.getUUID())) return true;
+                Role r = g.role();
+                if (liveCount(c.live, r) < c.counts.getOrDefault(r, 0)) {
+                    c.live.put(g.getUUID(), r);
+                    return true;
+                }
+                return false;
+            }
+            return false;
+        }
         UUID hid = g.holdingId();
-        if (hid == null || g.campaignId() != null || g.shipmentId() != null || g.owner() != null) return true;
+        if (hid == null || g.shipmentId() != null || g.owner() != null) return true;
         HoldingManager mgr = HoldingManager.get(level);
         Holding h = mgr.holdings.get(hid);
         if (h == null || h.live.containsKey(g.getUUID())) return true;

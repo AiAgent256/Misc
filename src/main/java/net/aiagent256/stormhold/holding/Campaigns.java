@@ -333,7 +333,7 @@ public final class Campaigns {
     public static void tick(ServerLevel level, HoldingManager mgr, long now) {
         for (Campaign c : mgr.campaigns) {
             if (c.stage == Campaign.Stage.DONE) continue;
-            Garrisons.pruneLive(level, c.live);
+            Garrisons.pruneMarching(level, c.live);
             if (c.kind == Campaign.Kind.RAID) tickRaid(level, mgr, c);
             else if (c.kind == Campaign.Kind.CAMP) tickCamp(level, mgr, c);
             else if (c.kind == Campaign.Kind.COLUMN) Columns.tick(level, mgr, c);
@@ -348,7 +348,7 @@ public final class Campaigns {
     /** Tick one campaign on its own (tests). */
     public static void tickOne(ServerLevel level, HoldingManager mgr, Campaign c) {
         if (c.stage == Campaign.Stage.DONE) return;
-        Garrisons.pruneLive(level, c.live);
+        Garrisons.pruneMarching(level, c.live);
         if (c.kind == Campaign.Kind.RAID) tickRaid(level, mgr, c);
         else if (c.kind == Campaign.Kind.ILLAGERS) Warbands.tick(level, mgr, c);
     }
@@ -508,7 +508,13 @@ public final class Campaigns {
                 if (c.progress > c.lastProgress + 1e-4) {
                     c.lastProgress = c.progress;
                     c.stallSeconds = 0;
-                } else if (++c.stallSeconds > 45 && c.progress > 0.6) {
+                } else if (++c.stallSeconds > 60 && c.progress <= 0.6) {
+                    // stuck on the road (a cliff, water, a wall in the way): they come on further along
+                    Garrisons.discardLive(level, c.live, true);
+                    c.progress = Math.min(0.6, c.progress + 12 / c.length());
+                    c.lastProgress = c.progress;
+                    c.stallSeconds = 0;
+                } else if (c.stallSeconds > 45 && c.progress > 0.6) {
                     c.rammed = true;
                     if (Gates.breach(level, h)) {
                         HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The gate of " + h.name + " is broken! They're inside the walls.")
