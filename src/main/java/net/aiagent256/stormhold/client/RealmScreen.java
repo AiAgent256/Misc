@@ -177,7 +177,7 @@ public class RealmScreen extends Screen {
         g.fill(ppx - 1, ppz - 3, ppx + 2, ppz + 4, 0xFFFFFFFF);
         g.fill(ppx - 3, ppz - 1, ppx + 4, ppz + 2, 0xFFFFFFFF);
         g.disableScissor();
-        g.drawString(this.font, "N up. 1 grid = 512 blocks. Scroll to zoom, drag to move" + (data.own().isEmpty() ? "." : ", click yours to command it."),
+        g.drawString(this.font, "N up. 1 grid = 512 blocks. Scroll to zoom, drag to move" + (data.own().isEmpty() ? "." : ", hover any for the odds, click to command."),
                 mx0 + 2, my1 + 4, 0x9C8C6C, false);
         // ---- the panel
         int rx = x0 + MAP_W + 8;
@@ -205,6 +205,12 @@ public class RealmScreen extends Screen {
             int dx = hover.x() - data.px(), dz = hover.z() - data.pz();
             tip.add(Component.literal((int) Math.sqrt(dx * dx + dz * dz) + " blocks " + way(dx, dz) + ", at " + hover.x() + ", " + hover.z()));
             if (hover.attitude() == 0) tip.add(Component.literal("Click to open it on the War Table.").withStyle(net.minecraft.ChatFormatting.GRAY));
+            else if (!hover.odds().isEmpty()) {
+                for (FormattedCharSequence l : this.font.split(Component.literal(hover.odds()), 220))
+                    tip.add(Component.literal(toString(l)).withStyle(net.minecraft.ChatFormatting.AQUA));
+                if (!data.own().isEmpty())
+                    tip.add(Component.literal("Click to make it the target of all your castles.").withStyle(net.minecraft.ChatFormatting.GRAY));
+            }
             g.renderComponentTooltip(this.font, tip, mouseX, mouseY);
         } else if (beast != null) {
             List<Component> tip = new ArrayList<>();
@@ -327,6 +333,15 @@ public class RealmScreen extends Screen {
         }
     }
 
+    private static String toString(FormattedCharSequence seq) {
+        StringBuilder b = new StringBuilder();
+        seq.accept((i, style, cp) -> {
+            b.appendCodePoint(cp);
+            return true;
+        });
+        return b.toString();
+    }
+
     @org.jetbrains.annotations.Nullable
     private RealmData.Castle castle(java.util.UUID id) {
         for (RealmData.Castle c : data.castles()) if (c.id().equals(id)) return c;
@@ -349,11 +364,17 @@ public class RealmScreen extends Screen {
         // one of your castles on the map: command it
         if (mouseX < x0 + MAP_W && mouseY > y0 + 20 && mouseY < y0 + H - 28) {
             for (RealmData.Castle c : data.castles()) {
-                if (c.attitude() != 0) continue;
                 int px = mx(c.x()), pz = mz(c.z()), r = 5;
-                if (mouseX >= px - r - 2 && mouseX <= px + r + 3 && mouseY >= pz - r - 2 && mouseY <= pz + r + 3) {
+                if (!(mouseX >= px - r - 2 && mouseX <= px + r + 3 && mouseY >= pz - r - 2 && mouseY <= pz + r + 3)) continue;
+                if (c.attitude() == 0) {
                     WarTableScreen.select(c.id());
                     Net.sendAction(new java.util.UUID(0, 0), Net.REFRESH, BlockPos.ZERO, 0);
+                    return true;
+                }
+                if (!data.own().isEmpty()) {
+                    // someone else's: every castle of yours takes it for its target, and the table opens on Orders
+                    WarTableScreen.openOrders();
+                    Net.sendAction(new java.util.UUID(0, 0), Net.TARGET_ALL, new BlockPos(c.x(), 64, c.z()), 0);
                     return true;
                 }
             }

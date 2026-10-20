@@ -61,6 +61,13 @@ public class WarTableScreen extends Screen {
         toSelect = id;
     }
 
+    /** The page to open on, picked on the Realm map. */
+    @Nullable private static Integer toTab;
+
+    public static void openOrders() {
+        toTab = ORDERS;
+    }
+
     public WarTableScreen(Net.WarTableData data) {
         super(Component.literal("War Table"));
         this.data = data;
@@ -76,6 +83,10 @@ public class WarTableScreen extends Screen {
     }
 
     private void pick() {
+        if (toTab != null) {
+            tab = toTab;
+            toTab = null;
+        }
         if (toSelect == null) return;
         List<HoldingInfo> l = data.holdings();
         for (int i = 0; i < l.size(); i++) {

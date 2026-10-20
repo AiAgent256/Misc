@@ -157,6 +157,41 @@ public final class Campaigns {
                 : pct > 0 ? "likely to break (" + pct + "%)" : "they'll break against the walls";
     }
 
+    /**
+     * What "All castles march" would come to against this castle: every castle the lord holds (vassals aside) sends
+     * its war party, they go in together, and nobody watches. The men, the defenders and the chance, for the Realm map.
+     */
+    public static String allOdds(ServerLevel level, HoldingManager mgr, UUID lord, Holding enemy) {
+        double att = 0;
+        int men = 0, parties = 0;
+        for (Holding h : mgr.ownedBy(lord)) {
+            if (Vassals.is(h)) continue;
+            int party = 0;
+            double s = 0;
+            for (Role r : new Role[]{Role.CAPTAIN, Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN}) {
+                party += sends(h, r);
+                s += sends(h, r) * r.strength();
+            }
+            if (party < 3) continue;
+            men += party;
+            parties++;
+            att += s * kit(Frontier.level(level, h));
+        }
+        int theirs = HoldingEvents.defendersInAll(enemy);
+        String them = "About " + theirs + " defenders in " + Readiness.kitName(Readiness.tier(Frontier.level(level, enemy))) + ".";
+        if (parties == 0) return them + " None of your castles has men to spare for a war party.";
+        double def = enemy.strength() * 1.3 * kit(Frontier.level(level, enemy));
+        int win = 0, n = 40;
+        for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) {
+            double a = att * (0.8 + 0.4 * (i + 0.5) / n), d = def * (0.8 + 0.4 * (j + 0.5) / n);
+            if (a > d) win++;
+        }
+        int pct = (int) Math.round(100.0 * win / (n * n));
+        String verdict = pct >= 95 ? "they'll take it" : pct >= 60 ? "likely to take it" : pct >= 30 ? "a gamble" : pct > 0 ? "likely to break" : "they'd break against the walls";
+        return them + " All your castles marching (" + parties + (parties == 1 ? " war party, " : " war parties, ") + men + " men): "
+                + verdict + " (" + pct + "%).";
+    }
+
     /** Two war parties of one lord against one castle. */
     static boolean together(Campaign o, Campaign c) {
         return o.kind == Campaign.Kind.PARTY && c.target != null && o.side.equals(c.side) && c.target.equals(o.target);

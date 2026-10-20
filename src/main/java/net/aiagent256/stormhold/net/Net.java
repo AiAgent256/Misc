@@ -31,14 +31,14 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 public final class Net {
-    private static final String VERSION = "7";
+    private static final String VERSION = "8";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(Stormhold.id("main"),
             () -> VERSION, VERSION::equals, VERSION::equals);
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
             MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19,
             SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23, TREASURY = 24, VASSAL = 25, REVOKE = 26, COUNCIL = 27,
-            COUNCIL_APPOINT = 28, COUNCIL_DISMISS = 29, MATTER_CHOOSE = 30, MARCH_ALL = 31, TIDY = 32;
+            COUNCIL_APPOINT = 28, COUNCIL_DISMISS = 29, MATTER_CHOOSE = 30, MARCH_ALL = 31, TIDY = 32, TARGET_ALL = 33;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -247,6 +247,28 @@ public final class Net {
             return;
         }
         if (a.action() == REFRESH && a.holding().equals(new UUID(0, 0))) {
+            openWarTable(player);
+            return;
+        }
+        if (a.action() == TARGET_ALL) {
+            // picked on the Realm map: every castle of yours (vassals aside) takes it for its target
+            for (ServerLevel level : player.server.getAllLevels()) {
+                HoldingManager mgr = HoldingManager.get(level);
+                Holding enemy = mgr.atXZ(a.pos(), 16);
+                List<Holding> mine = mgr.ownedBy(player.getUUID());
+                if (mine.isEmpty() || enemy == null) continue;
+                int n = 0;
+                for (Holding h : mine) {
+                    if (net.aiagent256.stormhold.holding.Vassals.is(h) || h == enemy) continue;
+                    h.attackTarget = enemy.center();
+                    n++;
+                }
+                mgr.setDirty();
+                player.sendSystemMessage(net.aiagent256.stormhold.holding.HoldingEvents.gold(enemy.name + " is the target of " + n
+                        + (n == 1 ? " castle" : " castles") + " of yours. " + Campaigns.allOdds(level, mgr, player.getUUID(), enemy)
+                        + " Press \"All castles march\" on the Orders tab to send them."));
+                break;
+            }
             openWarTable(player);
             return;
         }

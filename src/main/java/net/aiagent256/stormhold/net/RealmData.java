@@ -27,7 +27,7 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
 
     /** A castle on the map. attitude: 0 yours, 1 friendly house, 2 wary, 3 hostile, 4 brigands/other. */
     public record Castle(UUID id, String name, int tier, int x, int z, int color, int attitude, boolean lordAlive, int renown,
-                         String owner, boolean underAttack, boolean seat) {
+                         String owner, boolean underAttack, boolean seat, String odds) {
     }
 
     public record HouseMark(String id, String name, int color, int standing, int castles, String atWar, boolean seatKnown) {
@@ -67,6 +67,7 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
             b.writeUtf(c.owner);
             b.writeBoolean(c.underAttack);
             b.writeBoolean(c.seat);
+            b.writeUtf(c.odds);
         }
         b.writeVarInt(houses.size());
         for (HouseMark h : houses) {
@@ -125,7 +126,7 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
         List<Castle> castles = new ArrayList<>(n);
         for (int i = 0; i < n; i++) {
             castles.add(new Castle(b.readUUID(), b.readUtf(), b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readVarInt(),
-                    b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readUtf(), b.readBoolean(), b.readBoolean()));
+                    b.readVarInt(), b.readBoolean(), b.readVarInt(), b.readUtf(), b.readBoolean(), b.readBoolean(), b.readUtf()));
         }
         n = b.readVarInt();
         List<HouseMark> houses = new ArrayList<>(n);
@@ -187,7 +188,8 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
             }
             House house = h.isHouseOwned() ? mgr.house(h.houseId) : null;
             castles.add(new Castle(h.id, h.name, h.isTown() ? 0 : h.tier, h.center().getX(), h.center().getZ(), color, attitude, h.lordAlive, h.renown,
-                    HoldingEvents.ownerName(level, mgr, h.owner), attacked, house != null && h.id.equals(house.capital)));
+                    HoldingEvents.ownerName(level, mgr, h.owner), attacked, house != null && h.id.equals(house.capital),
+                    mine ? "" : net.aiagent256.stormhold.holding.Campaigns.allOdds(level, mgr, me, h)));
             if (mine) {
                 int troops = h.troops(), cap = 0;
                 for (Role r : new Role[]{Role.CAPTAIN, Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN}) cap += h.capacity(r);
