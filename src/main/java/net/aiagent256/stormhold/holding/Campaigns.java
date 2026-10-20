@@ -43,12 +43,23 @@ public final class Campaigns {
             if (now >= h.nextRaid) h.nextRaid = now + 24000;
             return;
         }
+        Truces.Truce truce = Truces.get(mgr, h.houseId, h.ownerPlayer());
+        if (truce != null) {
+            // nor one that's agreed a truce: the next raid comes a day after it's out at the soonest
+            if (h.nextRaid < truce.until + 24000) {
+                h.nextRaid = truce.until + 24000;
+                h.raidWarned = false;
+                mgr.setDirty();
+            }
+            return;
+        }
         boolean spy = Council.has(h.ownerPlayer(), Council.Seat.SPYMASTER);
         if (!h.raidWarned && now >= h.nextRaid - (spy ? 72000 : 24000)) {
             h.raidWarned = true;
             long days = Math.max(1, (h.nextRaid - now + 23999) / 24000);
             HoldingEvents.tell(level, h.ownerPlayer(), Component.literal((spy ? "Your Spymaster's people report " : "Scouts report ")
-                    + mgr.house(h.houseId).title() + " gathering to retake " + h.name + ". They march within "
+                    + (h.heir.isEmpty() ? mgr.house(h.houseId).title() : h.heir + " and the men of " + mgr.house(h.houseId).title())
+                    + " gathering to retake " + h.name + ". They march within "
                     + (days <= 1 ? "a day." : days + " days.")).withStyle(ChatFormatting.RED));
             mgr.setDirty();
         }
@@ -64,7 +75,7 @@ public final class Campaigns {
                 }
             }
             launchRaid(level, mgr, h);
-            h.nextRaid = now + HoldingEvents.raidDelay(level);
+            h.nextRaid = now + Heirs.delay(level, h);
             h.raidWarned = false;
             mgr.setDirty();
         }
@@ -94,12 +105,13 @@ public final class Campaigns {
         c.add(Role.KNIGHT, Math.max(4, (int) Math.ceil(h.count(Role.KNIGHT) * 0.8) + 2));
         c.add(Role.CROSSBOWMAN, Math.max(1, (int) Math.ceil(h.count(Role.CROSSBOWMAN) * 0.7)));
         c.add(Role.ARCHER, (int) Math.ceil(h.count(Role.ARCHER) * 0.4));
+        Heirs.lead(h, c);
         c.spoils = c.total();
         mgr.campaigns.add(c);
         h.lastRaidAt = level.getGameTime();
         String where = fromLord(level, h);
-        HoldingEvents.tell(level, h.ownerPlayer(), Component.literal(mgr.house(h.houseId).title() + " marches on "
-                + h.name + " with " + c.total() + " men!" + (where.isEmpty() ? "" : " It lies " + where + ".")
+        HoldingEvents.tell(level, h.ownerPlayer(), Component.literal((c.heir.isEmpty() ? mgr.house(h.houseId).title() + " marches on "
+                : c.heir + " comes to take back his father's castle, ") + h.name + " with " + c.total() + " men!" + (where.isEmpty() ? "" : " It lies " + where + ".")
                 + " They reach the walls in about " + (int) Math.ceil(c.length() / MARCH_SPEED) + " seconds.").withStyle(ChatFormatting.RED));
         alliedHelp(level, mgr, h);
         Vassals.help(level, mgr, h);
@@ -254,6 +266,8 @@ public final class Campaigns {
         Holding enemy = mgr.atXZ(target, 16);
         c.target = enemy != null && !enemy.owner.equals(h.owner) ? enemy.id : null;
         if (enemy != null && enemy.isHouseOwned() && c.target != null) {
+            if (Truces.active(mgr, enemy.houseId, h.ownerPlayer()))
+                Truces.broken(level, mgr, enemy.houseId, h.ownerPlayer(), "you marched on " + enemy.name);
             net.aiagent256.stormhold.house.Standing.change(level, mgr, enemy.houseId, h.ownerPlayer(),
                     net.aiagent256.stormhold.house.Standing.RAIDED_THEM, "you marched on " + enemy.name);
         }
@@ -341,7 +355,11 @@ public final class Campaigns {
             else if (c.kind == Campaign.Kind.SCOUT) Scouts.tick(level, mgr, c);
             else tickParty(level, mgr, c, now);
         }
-        for (Campaign c : mgr.campaigns) if (c.stage == Campaign.Stage.DONE) clearBar(c);
+        for (Campaign c : mgr.campaigns) {
+            if (c.stage != Campaign.Stage.DONE) continue;
+            clearBar(c);
+            SiegeWorks.clear(level, c);          // a ram left standing when it ended some other way
+        }
         if (mgr.campaigns.removeIf(c -> c.stage == Campaign.Stage.DONE)) mgr.setDirty();
     }
 
@@ -449,6 +467,7 @@ public final class Campaigns {
                 g.setMarchVia(via);
                 g.setMarchTarget(marchTo);
                 g.setPost(null);
+                if (r == Role.CAPTAIN && !c.heir.isEmpty() && c.kind == Campaign.Kind.RAID) Heirs.mark(g, c);
                 c.live.put(g.getUUID(), r);
                 have++;
                 budget--;
@@ -476,13 +495,16 @@ public final class Campaigns {
     private static void tickRaid(ServerLevel level, HoldingManager mgr, Campaign c) {
         Holding h = c.target != null ? mgr.holdings.get(c.target) : null;
         if (h == null || h.owner.equals(c.side)) {
+            SiegeWorks.clear(level, c);
             Garrisons.discardLive(level, c.live, false);
             c.stage = Campaign.Stage.DONE;
             return;
         }
         if (c.total() <= 0) {
+            SiegeWorks.clear(level, c);
             int spoils = Rewards.raidSpoils(c, true);
             Vassals.favour(level, mgr, h, 10, "you fought for " + h.name);
+            Heirs.beaten(level, mgr, h, c);
             boolean pack = Rewards.pay(level, mgr, h.ownerPlayer(), spoils, h) > 0;
             HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The raid on " + h.name + " is broken! The spoils of the field: "
                     + spoils + " emeralds" + (pack ? "." : ", to its stores.")).withStyle(ChatFormatting.GREEN));
@@ -503,9 +525,11 @@ public final class Campaigns {
                 }
             }
             syncProgress(level, c);
-            // held at the gate: after a while they bring the ram up and the portcullis comes down
+            // held at the gate: a ram, then ladders, then axes (see SiegeWorks)
             if (!c.live.isEmpty() && !c.rammed) {
-                if (c.progress > c.lastProgress + 1e-4) {
+                if (c.siegeSeconds > 0) {
+                    SiegeWorks.tick(level, mgr, h, c);
+                } else if (c.progress > c.lastProgress + 1e-4) {
                     c.lastProgress = c.progress;
                     c.stallSeconds = 0;
                 } else if (++c.stallSeconds > 60 && c.progress <= 0.6) {
@@ -514,12 +538,8 @@ public final class Campaigns {
                     c.progress = Math.min(0.6, c.progress + 12 / c.length());
                     c.lastProgress = c.progress;
                     c.stallSeconds = 0;
-                } else if (c.stallSeconds > 45 && c.progress > 0.6) {
-                    c.rammed = true;
-                    if (Gates.breach(level, h)) {
-                        HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The gate of " + h.name + " is broken! They're inside the walls.")
-                                .withStyle(ChatFormatting.RED));
-                    }
+                } else if (c.stallSeconds > 10 && c.progress > 0.6) {
+                    SiegeWorks.tick(level, mgr, h, c);
                 }
             }
             return;
@@ -537,9 +557,11 @@ public final class Campaigns {
         double def = h.strength() * (h.mode == Holding.Mode.DEFEND ? 1.6 : 1.2) * (0.8 + level.random.nextDouble() * 0.4)
                 * (Council.has(h.ownerPlayer(), Council.Seat.MARSHAL) ? 1.2 : 1.0) * kit(Frontier.level(level, h));
         double att = c.strength() * (0.8 + level.random.nextDouble() * 0.4) * kit(c.renown);
+        SiegeWorks.clear(level, c);
         if (att > def) {
             HoldingEvents.transfer(level, mgr, h, c.side);
         } else {
+            Heirs.beaten(level, mgr, h, c);
             int losses = (int) Math.ceil(att / 4);
             for (Role r : new Role[]{Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN}) {
                 int l = Math.min(losses, h.count(r));

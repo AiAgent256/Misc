@@ -46,6 +46,10 @@ public class HoldingManager extends SavedData {
     public long lastDawn = -1, lastPolitics, lastMend;
     /** Siege engines standing before castles. */
     public final List<Engines.Engine> engines = new ArrayList<>();
+    /** Each lord's seat: where his rents and dues are paid, where his roads start, the castle the Realm map crowns. */
+    public final Map<UUID, UUID> seats = new HashMap<>();
+    /** Truces bought from the houses: house id -> player -> the truce (see {@link Truces}). */
+    public final Map<String, Map<UUID, Truces.Truce>> truces = new HashMap<>();
     /** Each lord's council (kept in the overworld's record). */
     public final Map<UUID, java.util.EnumMap<Council.Seat, String>> councils = new HashMap<>();
     /** The frontier's centre, kept in the overworld's record: zones count out from here (see Frontier). */
@@ -120,11 +124,25 @@ public class HoldingManager extends SavedData {
         return null;
     }
 
+    /** Every place the player holds here, his seat first: rents and dues are paid into the first. */
     public List<Holding> ownedBy(UUID player) {
         String side = Sides.player(player);
         List<Holding> out = new ArrayList<>();
-        for (Holding h : holdings.values()) if (side.equals(h.owner)) out.add(h);
+        UUID seat = seats.get(player);
+        for (Holding h : holdings.values()) {
+            if (!side.equals(h.owner)) continue;
+            if (h.id.equals(seat)) out.add(0, h);
+            else out.add(h);
+        }
         return out;
+    }
+
+    /** The lord's seat here, if he's named one and still holds it. */
+    @Nullable
+    public Holding seatOf(UUID player) {
+        UUID id = seats.get(player);
+        Holding h = id == null ? null : holdings.get(id);
+        return h != null && player.equals(h.ownerPlayer()) ? h : null;
     }
 
     public void add(Holding h) {
@@ -147,6 +165,10 @@ public class HoldingManager extends SavedData {
         playerColors.forEach((k, v) -> colors.putInt(k.toString(), v.getId()));
         tag.put("PlayerColors", colors);
         if (!councils.isEmpty()) tag.put("Councils", Council.save(councils));
+        CompoundTag seatTag = new CompoundTag();
+        seats.forEach((p, h) -> seatTag.putUUID(p.toString(), h));
+        tag.put("Seats", seatTag);
+        tag.put("Truces", Truces.save(truces));
         ListTag el = new ListTag();
         for (Engines.Engine e : engines) el.add(e.save());
         tag.put("Engines", el);
@@ -189,6 +211,14 @@ public class HoldingManager extends SavedData {
     public static HoldingManager load(CompoundTag tag) {
         HoldingManager m = new HoldingManager();
         if (tag.contains("Councils")) Council.load(tag.getCompound("Councils"), m.councils);
+        CompoundTag seatTag = tag.getCompound("Seats");
+        for (String k : seatTag.getAllKeys()) {
+            try {
+                m.seats.put(UUID.fromString(k), seatTag.getUUID(k));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        Truces.load(tag.getList("Truces", Tag.TAG_COMPOUND), m.truces);
         ListTag el = tag.getList("Engines", Tag.TAG_COMPOUND);
         for (int i = 0; i < el.size(); i++) m.engines.add(Engines.Engine.load(el.getCompound(i)));
         if (tag.contains("FrontierX")) {

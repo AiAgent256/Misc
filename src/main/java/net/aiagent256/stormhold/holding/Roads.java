@@ -133,6 +133,70 @@ public final class Roads {
                 if ((x >> 4) == c.x && (z >> 4) == c.z) lamp(level, x, z);
             }
         }
+        signs(level, r, c);
+    }
+
+    /** A signpost at each end of a road between two places: to where, how far, which way. */
+    static void signs(ServerLevel level, RoadPlan r, ChunkPos c) {
+        if (r.toName.isEmpty() || r.fromName.isEmpty()) return;
+        double len = r.length();
+        if (len < 40) return;
+        sign(level, r, c, 9 / len, true);
+        sign(level, r, c, 1 - 15 / len, false);
+    }
+
+    /** The signpost at t, for a traveller going toward the far end (outbound) or back toward the start. Where it went, or null. */
+    @org.jetbrains.annotations.Nullable
+    static BlockPos sign(ServerLevel level, RoadPlan r, ChunkPos c, double t, boolean outbound) {
+        double[] p = r.at(t), q = r.at(Math.max(0, Math.min(1, t + (outbound ? 0.02 : -0.02))));
+        double dx = q[0] - p[0], dz = q[1] - p[1];
+        double l = Math.max(1e-6, Math.sqrt(dx * dx + dz * dz));
+        dx /= l;
+        dz /= l;
+        // on the left shoulder as he walks: the lamps are on the right
+        double nx = -dz, nz = dx;
+        int x = (int) Math.floor(p[0] - nx * 2.5), z = (int) Math.floor(p[1] - nz * 2.5);
+        if ((x >> 4) != c.x || (z >> 4) != c.z) return null;
+        int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+        BlockPos base = new BlockPos(x, y, z);
+        BlockState below = level.getBlockState(base.below());
+        if (!below.isSolidRender(level, base.below()) || below.is(BlockTags.LEAVES)) return null;
+        if (!level.getBlockState(base).isAir() && !level.getBlockState(base).canBeReplaced()) return null;
+        BlockPos dest = outbound ? r.to : r.from, here = base;
+        String name = outbound ? r.toName : r.fromName;
+        // facing the traveller coming up the road, as a sign he'd set himself
+        float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+        int rot = net.minecraft.world.level.block.state.properties.RotationSegment.convertToSegment(yaw + 180.0F);
+        level.setBlock(base, Blocks.SPRUCE_SIGN.defaultBlockState().setValue(net.minecraft.world.level.block.StandingSignBlock.ROTATION, rot), 3);
+        if (level.getBlockEntity(base) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign) {
+            int far = (int) Math.round(Math.sqrt(dest.distSqr(here.atY(dest.getY()))));
+            String[] lines = signLines(name, far + " blocks", compass(dest.getX() - x, dest.getZ() - z));
+            net.minecraft.world.level.block.entity.SignText text = new net.minecraft.world.level.block.entity.SignText();
+            for (int i = 0; i < 4; i++) text = text.setMessage(i, net.minecraft.network.chat.Component.literal(lines[i]));
+            sign.setText(text, true);
+            sign.setWaxed(true);
+        }
+        return base;
+    }
+
+    /** The name, split over two lines if it's long, then how far and which way. */
+    public static String[] signLines(String name, String far, String way) {
+        String a = name, b = "";
+        if (name.length() > 15) {
+            int cut = name.lastIndexOf(' ', 15);
+            if (cut <= 0) cut = Math.min(15, name.length());
+            a = name.substring(0, cut).trim();
+            b = name.substring(cut).trim();
+            if (b.length() > 15) b = b.substring(0, 15);
+        }
+        return b.isEmpty() ? new String[]{a.length() <= 12 ? "To " + a : a, far, way, ""} : new String[]{a, b, far, way};
+    }
+
+    public static String compass(int dx, int dz) {
+        String[] names = {"south", "south-west", "west", "north-west", "north", "north-east", "east", "south-east"};
+        double ang = Math.toDegrees(Math.atan2(-dx, dz));          // 0 = south, as the game turns
+        int i = (int) Math.floorMod(Math.round(ang / 45.0), 8L);
+        return names[i];
     }
 
     private static boolean ground(BlockState s) {

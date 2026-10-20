@@ -42,7 +42,9 @@ public final class Standing {
         return get(mgr, houseId, player) >= FRIENDLY;
     }
 
+    /** Hostile: its gate stays shut to you and its men attack on sight. Never while a truce holds. */
     public static boolean hostile(HoldingManager mgr, String houseId, UUID player) {
+        if (net.aiagent256.stormhold.holding.Truces.active(mgr, houseId, player)) return false;
         return get(mgr, houseId, player) <= HOSTILE;
     }
 

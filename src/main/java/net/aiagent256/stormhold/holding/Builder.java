@@ -732,62 +732,174 @@ public final class Builder {
         leaves.addAll(crown.keySet());
     }
 
-    // ------------------------------------------------------------ road: to the nearest place you hold not yet joined
+    // ------------------------------------------------------------ roads: every place you hold joined to the seat
 
-    public static void road(ServerLevel level, HoldingManager mgr, Holding h, net.minecraft.world.entity.player.Player player) {
-        if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) {
-            player.sendSystemMessage(Component.literal("Roads are laid in the overworld only.").withStyle(ChatFormatting.RED));
-            return;
-        }
-        java.util.UUID owner = h.ownerPlayer();
-        BlockPos from = Campaigns.gateOutside(h);
-        Holding best = null;
-        double bestD = Double.MAX_VALUE;
-        for (Holding o : mgr.holdings.values()) {
-            if (o == h || owner == null || !owner.equals(o.ownerPlayer()) || h.roadsTo.contains(o.id) || o.roadsTo.contains(h.id)) continue;
-            BlockPos to = Campaigns.gateOutside(o);
-            double d = Math.sqrt((double) (to.getX() - from.getX()) * (to.getX() - from.getX()) + (double) (to.getZ() - from.getZ()) * (to.getZ() - from.getZ()));
-            if (d < bestD) {
-                bestD = d;
-                best = o;
+    /** A road still to lay between two of a lord's places, and its length. */
+    public record Link(Holding a, Holding b, double length) {
+    }
+
+    /**
+     * The roads still to lay so that every place the lord holds here is joined to every other, the shortest
+     * first: the roads already laid count, and no road runs longer than ROAD_MAX. The seat's group comes first,
+     * so a road from it is laid before any other of the same length.
+     */
+    public static List<Link> missing(HoldingManager mgr, java.util.UUID owner) {
+        List<Holding> mine = mgr.ownedBy(owner);
+        java.util.Map<java.util.UUID, java.util.UUID> parent = new java.util.HashMap<>();
+        for (Holding h : mine) parent.put(h.id, h.id);
+        for (Holding h : mine)
+            for (java.util.UUID o : h.roadsTo) if (parent.containsKey(o)) union(parent, h.id, o);
+        // the groups the roads laid already make
+        java.util.Map<java.util.UUID, java.util.UUID> group = new java.util.HashMap<>();
+        for (Holding h : mine) group.put(h.id, find(parent, h.id));
+        List<Link> all = new ArrayList<>();
+        for (int i = 0; i < mine.size(); i++) {
+            for (int j = i + 1; j < mine.size(); j++) {
+                BlockPos a = Campaigns.gateOutside(mine.get(i)), b = Campaigns.gateOutside(mine.get(j));
+                double d = Math.sqrt((double) (a.getX() - b.getX()) * (a.getX() - b.getX()) + (double) (a.getZ() - b.getZ()) * (a.getZ() - b.getZ()));
+                if (d <= ROAD_MAX) all.add(new Link(mine.get(i), mine.get(j), d));
             }
         }
-        if (best == null) {
-            player.sendSystemMessage(Component.literal(h.name + " has a road to every place you hold. Take another castle or town and there'll be "
-                    + "somewhere new to build to.").withStyle(ChatFormatting.RED));
-            return;
+        all.sort(java.util.Comparator.comparingDouble(Link::length));
+        List<Link> out = new ArrayList<>();
+        for (Link l : all) {
+            if (find(parent, l.a().id).equals(find(parent, l.b().id))) continue;
+            union(parent, l.a().id, l.b().id);
+            out.add(l);
         }
-        if (bestD > ROAD_MAX) {
-            player.sendSystemMessage(Component.literal("The nearest place you hold without a road, " + best.name + ", is " + (int) bestD
-                    + " blocks off; the builder lays roads up to " + ROAD_MAX + ".").withStyle(ChatFormatting.RED));
-            return;
+        Holding seat = mgr.seatOf(owner);
+        if (seat == null || out.isEmpty()) return out;
+        // from the seat out: each next road the shortest that reaches a place not yet joined to it
+        java.util.Set<java.util.UUID> reached = new java.util.HashSet<>();
+        java.util.UUID home = group.get(seat.id);
+        for (var e : group.entrySet()) if (e.getValue().equals(home)) reached.add(e.getKey());
+        List<Link> left = new ArrayList<>(out), ordered = new ArrayList<>();
+        while (!left.isEmpty()) {
+            Link next = null;
+            for (Link l : left) {
+                if (reached.contains(l.a().id) || reached.contains(l.b().id)) {
+                    next = l;
+                    break;                                   // left is shortest first
+                }
+            }
+            if (next == null) {
+                ordered.addAll(left);
+                break;
+            }
+            left.remove(next);
+            boolean fromA = reached.contains(next.a().id);
+            Holding far = fromA ? next.b() : next.a();
+            ordered.add(fromA ? next : new Link(next.b(), next.a(), next.length()));
+            java.util.UUID g = group.get(far.id);
+            for (var e : group.entrySet()) if (e.getValue().equals(g)) reached.add(e.getKey());
         }
-        int stone = Math.max(16, (int) Math.ceil(bestD / ROAD_PER_STONE));
+        return ordered;
+    }
+
+    private static java.util.UUID find(java.util.Map<java.util.UUID, java.util.UUID> parent, java.util.UUID x) {
+        java.util.UUID p = parent.get(x);
+        while (!p.equals(x)) {
+            java.util.UUID gp = parent.get(p);
+            parent.put(x, gp);
+            x = p;
+            p = gp;
+        }
+        return x;
+    }
+
+    private static void union(java.util.Map<java.util.UUID, java.util.UUID> parent, java.util.UUID a, java.util.UUID b) {
+        java.util.UUID ra = find(parent, a), rb = find(parent, b);
+        if (!ra.equals(rb)) parent.put(ra, rb);
+    }
+
+    /** Stone a road costs: one per ROAD_PER_STONE blocks, at least 16; the Master of Works halves it. */
+    public static int roadCost(java.util.UUID owner, double length) {
+        int stone = Math.max(16, (int) Math.ceil(length / ROAD_PER_STONE));
         if (Council.has(owner, Council.Seat.WORKS)) stone = Math.max(8, stone / 2);
-        int have = stone(mgr, h);
-        if (have < stone) {
-            player.sendSystemMessage(Component.literal("A road to " + best.name + " (" + (int) bestD + " blocks) takes " + stone
-                    + " stone from the realm's stores or this castle's chests; you have " + have + ".").withStyle(ChatFormatting.RED));
-            return;
-        }
-        takeStone(mgr, h, stone);
+        return stone;
+    }
+
+    /** Set a road between two places going down: the plan, the land it crosses that's loaded now, the record. */
+    static RoadPlan lay(ServerLevel level, HoldingManager mgr, Holding a, Holding b) {
         RoadPlan r = new RoadPlan();
-        r.from = from;
-        r.to = Campaigns.gateOutside(best);
-        r.seed = h.id.getLeastSignificantBits() ^ best.id.getMostSignificantBits();
-        r.theme = h.theme == null ? "north" : h.theme;
+        r.from = Campaigns.gateOutside(a);
+        r.to = Campaigns.gateOutside(b);
+        r.seed = a.id.getLeastSignificantBits() ^ b.id.getMostSignificantBits();
+        r.theme = a.theme == null ? "north" : a.theme;
+        r.fromName = a.name;
+        r.toName = b.name;
         mgr.roads.add(r);
-        h.roadsTo.add(best.id);
+        a.roadsTo.add(b.id);
         int minX = Math.min(r.from.getX(), r.to.getX()) >> 4, maxX = Math.max(r.from.getX(), r.to.getX()) >> 4;
         int minZ = Math.min(r.from.getZ(), r.to.getZ()) >> 4, maxZ = Math.max(r.from.getZ(), r.to.getZ()) >> 4;
         for (int cx = minX - 2; cx <= maxX + 2; cx++)
             for (int cz = minZ - 2; cz <= maxZ + 2; cz++)
                 if (level.getChunkSource().getChunkNow(cx, cz) != null) Roads.enqueue(level, new net.minecraft.world.level.ChunkPos(cx, cz));
         mgr.setDirty();
-        player.sendSystemMessage(HoldingEvents.gold("Master Builder " + h.builderName + "'s road gangs set out from " + h.name + " for "
-                + best.name + ", " + (int) bestD + " blocks " + Guide.way(from, r.to).replaceAll("^\\d+ blocks ", "")
-                + ". The road goes down as the country it crosses is seen: ride it and it's there. " + stone + " stone from the stores."));
-        Chronicle.log(level, mgr, Chronicle.GROWTH, "A road is laid from " + h.name + " to " + best.name + ".", owner);
+        Chronicle.log(level, mgr, Chronicle.GROWTH, "A road is laid from " + a.name + " to " + b.name + ".", a.ownerPlayer());
+        return r;
+    }
+
+    /** The War Table's "Lay roads": every road the realm still needs that the stone will pay for, shortest first. */
+    public static void road(ServerLevel level, HoldingManager mgr, Holding h, net.minecraft.world.entity.player.Player player) {
+        if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD) {
+            player.sendSystemMessage(Component.literal("Roads are laid in the overworld only.").withStyle(ChatFormatting.RED));
+            return;
+        }
+        java.util.UUID owner = h.ownerPlayer();
+        if (owner == null) return;
+        List<Link> links = missing(mgr, owner);
+        if (links.isEmpty()) {
+            player.sendSystemMessage(Component.literal(mgr.ownedBy(owner).size() < 2 ? "Take another castle or town and there'll be somewhere "
+                    + "to build a road to." : "Every place you hold is joined by road (none lies more than " + ROAD_MAX + " blocks from the next).")
+                    .withStyle(ChatFormatting.GOLD));
+            return;
+        }
+        int have = stone(mgr, h), spent = 0;
+        List<String> laid = new ArrayList<>();
+        Link waiting = null;
+        for (Link l : links) {
+            int cost = roadCost(owner, l.length());
+            if (have - spent < cost) {
+                waiting = l;
+                break;
+            }
+            takeStone(mgr, h, cost);
+            spent += cost;
+            if (l.b() == h) l = new Link(l.b(), l.a(), l.length());   // from this castle, when it's one end
+            lay(level, mgr, l.a(), l.b());
+            laid.add(l.a().name + " to " + l.b().name + " (" + (int) l.length() + " blocks)");
+        }
+        if (laid.isEmpty()) {
+            player.sendSystemMessage(Component.literal("The road from " + waiting.a().name + " to " + waiting.b().name + " (" + (int) waiting.length()
+                    + " blocks) takes " + roadCost(owner, waiting.length()) + " stone from the realm's stores or " + h.name + "'s chests; there's "
+                    + have + ".").withStyle(ChatFormatting.RED));
+            return;
+        }
+        player.sendSystemMessage(HoldingEvents.gold("Master Builder " + h.builderName + "'s road gangs set out: " + String.join("; ", laid)
+                + ". " + spent + " stone. The roads go down as the country they cross is seen: ride them and they're there, with a signpost "
+                + "at each end." + (waiting == null ? " Every place you hold is joined now." : " Still to join: " + waiting.a().name + " to "
+                + waiting.b().name + ", " + roadCost(owner, waiting.length()) + " stone.")));
+    }
+
+    /** At dawn: the next road the realm needs, if the stores have the stone for it. The account's line, or null. */
+    @org.jetbrains.annotations.Nullable
+    public static Component dawnRoads(ServerLevel level, HoldingManager mgr, java.util.UUID owner, List<Holding> mine) {
+        if (level.dimension() != net.minecraft.world.level.Level.OVERWORLD || mine.size() < 2) return null;
+        List<Link> links = missing(mgr, owner);
+        if (links.isEmpty()) return null;
+        Link l = links.get(0);
+        Holding pay = mine.get(0);
+        int cost = roadCost(owner, l.length()), have = stone(mgr, pay);
+        if (have < cost) {
+            return Component.literal("Roads: joining " + l.a().name + " to " + l.b().name + " (" + (int) l.length() + " blocks) waits on stone: "
+                    + cost + " needed, " + have + " in the stores.").withStyle(ChatFormatting.GRAY);
+        }
+        takeStone(mgr, pay, cost);
+        lay(level, mgr, l.a(), l.b());
+        return Component.literal("Roads: the builders set out to join " + l.a().name + " to " + l.b().name + ", " + (int) l.length() + " blocks "
+                + Guide.way(Campaigns.gateOutside(l.a()), Campaigns.gateOutside(l.b())).replaceAll("^\\d+ blocks ", "") + " (" + cost + " stone).")
+                .withStyle(ChatFormatting.GREEN);
     }
 
     private Builder() {

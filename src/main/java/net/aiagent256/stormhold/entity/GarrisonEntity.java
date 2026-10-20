@@ -335,6 +335,9 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
 
     public boolean isHostileTo(LivingEntity e) {
         if (e == this || !e.isAlive() || side.isEmpty()) return false;
+        // in the lists a challenger fights the one man he rode in for, and nobody fights him
+        if (net.aiagent256.stormhold.holding.Tourney.is(this)) return net.aiagent256.stormhold.holding.Tourney.foeOf(this, e);
+        if (net.aiagent256.stormhold.holding.Tourney.is(e)) return false;
         // a company man only picks fights his orders allow (close to his lord, inside the building he's clearing)
         if (owner() != null && !net.aiagent256.stormhold.holding.Orders.inScope(this, e)) return false;
         if (e instanceof GarrisonEntity g) {
@@ -469,11 +472,14 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
             HoldingEvents.onGarrisonHurt(this, le);
             // a player's man striking a house's soldier counts as the player striking him
             Player blamed = le instanceof Player pl ? pl : le instanceof GarrisonEntity ge && ge.owner() != null ? ge.ownerPlayer() : null;
-            if (isHouse() && blamed != null && this.level() instanceof net.minecraft.server.level.ServerLevel sl) {
+            if (isHouse() && blamed != null && !net.aiagent256.stormhold.holding.Tourney.is(this)
+                    && this.level() instanceof net.minecraft.server.level.ServerLevel sl) {
                 Player p = blamed;
                 String hid = Sides.houseId(side);
                 if (hid != null) {
                     var mgr = net.aiagent256.stormhold.holding.HoldingManager.get(sl);
+                    if (net.aiagent256.stormhold.holding.Truces.active(mgr, hid, p.getUUID()))
+                        net.aiagent256.stormhold.holding.Truces.broken(sl, mgr, hid, p.getUUID(), "you attacked their men");
                     int delta = net.aiagent256.stormhold.house.Standing.friendly(mgr, hid, p.getUUID())
                             ? net.aiagent256.stormhold.house.Standing.HIT_GUARD : -3;
                     net.aiagent256.stormhold.house.Standing.change(sl, mgr, hid, p.getUUID(), delta, "you attacked their soldier");
@@ -803,7 +809,8 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
                     foe = p.getLastHurtMob();
                     if (foe != null && (!foe.isAlive() || foe.distanceToSqr(p) > 24 * 24 || p.tickCount - p.getLastHurtMobTimestamp() > 200)) foe = null;
                 }
-                if (foe != null && foe != this && !isAlly(foe) && !(foe instanceof Player fp && (fp.isCreative() || fp.isSpectator()))) {
+                if (foe != null && foe != this && !isAlly(foe) && !net.aiagent256.stormhold.holding.Tourney.is(foe)
+                        && !(foe instanceof Player fp && (fp.isCreative() || fp.isSpectator()))) {
                     this.setTarget(foe);
                 }
             }

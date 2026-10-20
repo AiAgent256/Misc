@@ -126,6 +126,8 @@ public final class Engines {
             Stores.takeFromPackThenRealm(mgr, null, player, Items.IRON_INGOT, IRON);
         }
         build(level, base, toward);
+        if (target.isHouseOwned() && Truces.active(mgr, target.houseId, player.getUUID()))
+            Truces.broken(level, mgr, target.houseId, player.getUUID(), "you set a trebuchet against " + target.name);
         if (target.isHouseOwned()) net.aiagent256.stormhold.house.Standing.change(level, mgr, target.houseId, player.getUUID(), -10,
                 "you set a trebuchet against " + target.name);
         Engine e = new Engine();

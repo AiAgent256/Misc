@@ -53,7 +53,8 @@ import java.util.UUID;
 public final class Warbands {
     public static final String SIDE = "illagers";
     public static final String TAG = "StormholdWarband";
-    private static final String LADDER = "StormholdLadder", LADDER_WALL = "StormholdLadderWall", LADDER_TOP = "StormholdLadderTop";
+    private static final String LADDER = "StormholdLadder", LADDER_WALL = "StormholdLadderWall", LADDER_TOP = "StormholdLadderTop",
+            LADDER_GOAL = "StormholdLadderGoal";
     private static final double MARCH_SPEED = 3.0;
     public static final String CAPTAIN = "captain";
 
@@ -431,6 +432,14 @@ public final class Warbands {
 
     /** Ladders up the outside of the wall at a couple of places, and a few men sent up each. */
     static int ladders(ServerLevel level, Holding h, Campaign c, List<Mob> band, Vec3 mid) {
+        return ladders(level, h, band, mid, null);
+    }
+
+    /**
+     * The same for any band: a house's men too. A soldier sent up one marches to its foot, and once over the top
+     * goes on to {@code goal} (the banner).
+     */
+    static int ladders(ServerLevel level, Holding h, List<Mob> band, Vec3 mid, @Nullable BlockPos goal) {
         Vec3 toward = Vec3.atCenterOf(h.center()).subtract(mid).multiply(1, 0, 1).normalize();
         Vec3 side = new Vec3(-toward.z, 0, toward.x);
         int raised = 0;
@@ -448,7 +457,13 @@ public final class Warbands {
                 d.putLong(LADDER, f.foot().asLong());
                 d.putLong(LADDER_WALL, f.foot().relative(f.in()).asLong());
                 d.putInt(LADDER_TOP, f.top());
+                if (goal != null) d.putLong(LADDER_GOAL, goal.asLong());
                 m.setTarget(null);
+                if (m instanceof GarrisonEntity g) {
+                    g.setMarchVia(null);
+                    g.setMarchVia2(null);
+                    g.setMarchTarget(f.foot());
+                }
             }
         }
         return raised;
@@ -484,11 +499,33 @@ public final class Warbands {
             d.remove(LADDER);
             d.remove(LADDER_WALL);
             d.remove(LADDER_TOP);
+            if (d.contains(LADDER_GOAL)) {
+                if (m instanceof GarrisonEntity g) g.setMarchTarget(BlockPos.of(d.getLong(LADDER_GOAL)));
+                d.remove(LADDER_GOAL);
+            }
             return;
         }
         m.getNavigation().stop();
         m.setDeltaMovement(in.x * 0.05 - hx * 0.2, 0.22, in.z * 0.05 - hz * 0.2);
         m.fallDistance = 0;
+    }
+
+    /** A man sent up a ladder who's come close: the last steps to its foot (a march stops a few blocks short). */
+    static void toLadder(Mob m) {
+        CompoundTag d = m.getPersistentData();
+        if (!d.contains(LADDER)) return;
+        BlockPos foot = BlockPos.of(d.getLong(LADDER));
+        double dx = m.getX() - (foot.getX() + 0.5), dz = m.getZ() - (foot.getZ() + 0.5);
+        double dd = dx * dx + dz * dz;
+        if (dd > 1.0 && dd < 8 * 8) {
+            m.setTarget(null);
+            m.getNavigation().moveTo(foot.getX() + 0.5, foot.getY(), foot.getZ() + 0.5, 1.0);
+        }
+    }
+
+    /** Whether this man was sent up a ladder and hasn't got over the top yet. */
+    public static boolean onLadderDuty(Entity e) {
+        return e.getPersistentData().contains(LADDER);
     }
 
     /** A charge under the wall where they're held: a breach to walk through. */

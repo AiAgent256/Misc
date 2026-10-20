@@ -182,6 +182,8 @@ public final class Garrisons {
      * dropped. False means drop him.
      */
     public static boolean belongs(ServerLevel level, GarrisonEntity g) {
+        // a challenger in the lists belongs while his bout is on, and only then
+        if (Tourney.is(g)) return Tourney.current(g);
         if (g.campaignId() != null && g.owner() == null) {
             // one of an army's men: his army must still be marching and have a place for him
             for (Campaign c : HoldingManager.get(level).campaigns) {

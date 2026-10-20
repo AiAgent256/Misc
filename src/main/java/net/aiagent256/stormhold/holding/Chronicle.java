@@ -87,6 +87,8 @@ public final class Chronicle {
             Component wages = Council.wages(level, p.getUUID(), mine);
             if (wages != null) p.sendSystemMessage(wages);
             Events.dawn(level, mgr, p, mine);
+            Component roads = Builder.dawnRoads(level, mgr, p.getUUID(), mine);
+            if (roads != null) p.sendSystemMessage(roads);
         }
     }
 
@@ -113,7 +115,7 @@ public final class Chronicle {
             } else if (h.nextRaid > 0 && Config.RAIDS_ENABLED.get() && !Standing.friendly(mgr, h.houseId, player)) {
                 long days = Math.max(0, (h.nextRaid - now + 23999) / 24000);
                 if (days <= 2) {
-                    out.add(Component.literal(mgr.house(h.houseId).title() + " will march on " + h.name
+                    out.add(Component.literal((h.heir.isEmpty() ? mgr.house(h.houseId).title() : h.heir) + " will march on " + h.name
                             + (days == 0 ? " today." : days == 1 ? " tomorrow." : " in " + days + " days.")).withStyle(ChatFormatting.RED));
                 }
             }

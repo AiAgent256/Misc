@@ -13,6 +13,8 @@ public class RoadPlan {
     public long seed;
     public String theme = "north";
     public final LongOpenHashSet painted = new LongOpenHashSet();
+    /** The places at either end, for the signposts; empty on a road to a village. */
+    public String fromName = "", toName = "";
 
     /** Point along the road with a gentle meander, t in [0,1]. */
     public double[] at(double t) {
@@ -42,6 +44,8 @@ public class RoadPlan {
         t.putLong("Seed", seed);
         t.putString("Theme", theme);
         t.putLongArray("Painted", painted.toLongArray());
+        t.putString("FromName", fromName);
+        t.putString("ToName", toName);
         return t;
     }
 
@@ -52,6 +56,8 @@ public class RoadPlan {
         r.seed = t.getLong("Seed");
         r.theme = t.getString("Theme");
         for (long l : t.getLongArray("Painted")) r.painted.add(l);
+        r.fromName = t.getString("FromName");
+        r.toName = t.getString("ToName");
         return r;
     }
 }

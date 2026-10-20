@@ -23,14 +23,19 @@ import java.util.UUID;
 
 /** Everything the Realm page shows: the map of known castles, the houses, your holdings, the record. */
 public record RealmData(long day, int px, int pz, List<Castle> castles, List<HouseMark> houses, List<Own> own,
-                        List<Line> lines, List<Note> notes, List<Beast> beasts) {
+                        List<Line> lines, List<Note> notes, List<Beast> beasts, List<Line> roads) {
 
     /** A castle on the map. attitude: 0 yours, 1 friendly house, 2 wary, 3 hostile, 4 brigands/other. */
     public record Castle(UUID id, String name, int tier, int x, int z, int color, int attitude, boolean lordAlive, int renown,
                          String owner, boolean underAttack, boolean seat, String odds) {
     }
 
-    public record HouseMark(String id, String name, int color, int standing, int castles, String atWar, boolean seatKnown) {
+    /**
+     * A house: truce is what's agreed ("" for none), trucePrice the emeralds it asks (-1 when it won't treat: why
+     * is in truceNo), claims the castles of yours its heirs want back.
+     */
+    public record HouseMark(String id, String name, int color, int standing, int castles, String atWar, boolean seatKnown,
+                            String truce, int trucePrice, String truceNo, String claims) {
     }
 
     public record Own(UUID id, String name, int tier, int troops, int capacity, int fiefPop, String builder, int raidDays,
@@ -78,6 +83,10 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
             b.writeVarInt(h.castles);
             b.writeUtf(h.atWar);
             b.writeBoolean(h.seatKnown);
+            b.writeUtf(h.truce);
+            b.writeVarInt(h.trucePrice);
+            b.writeUtf(h.truceNo);
+            b.writeUtf(h.claims);
         }
         b.writeVarInt(own.size());
         for (Own o : own) {
@@ -117,6 +126,13 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
             b.writeBoolean(d.dead);
             b.writeVarInt(d.bounty);
         }
+        b.writeVarInt(roads.size());
+        for (Line l : roads) {
+            b.writeVarInt(l.x1);
+            b.writeVarInt(l.z1);
+            b.writeVarInt(l.x2);
+            b.writeVarInt(l.z2);
+        }
     }
 
     public static RealmData read(FriendlyByteBuf b) {
@@ -131,7 +147,8 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
         n = b.readVarInt();
         List<HouseMark> houses = new ArrayList<>(n);
         for (int i = 0; i < n; i++) {
-            houses.add(new HouseMark(b.readUtf(), b.readUtf(), b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readUtf(), b.readBoolean()));
+            houses.add(new HouseMark(b.readUtf(), b.readUtf(), b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readUtf(), b.readBoolean(),
+                    b.readUtf(), b.readVarInt(), b.readUtf(), b.readUtf()));
         }
         n = b.readVarInt();
         List<Own> own = new ArrayList<>(n);
@@ -150,7 +167,10 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
         n = b.readVarInt();
         List<Beast> beasts = new ArrayList<>(n);
         for (int i = 0; i < n; i++) beasts.add(new Beast(b.readUtf(), b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readBoolean(), b.readVarInt()));
-        return new RealmData(day, px, pz, castles, houses, own, lines, notes, beasts);
+        n = b.readVarInt();
+        List<Line> roads = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) roads.add(new Line(b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readVarInt(), 0, false));
+        return new RealmData(day, px, pz, castles, houses, own, lines, notes, beasts, roads);
     }
 
     /** What this player knows: every castle he's come within sight of, every house he's heard of, his own holdings. */
@@ -188,7 +208,7 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
             }
             House house = h.isHouseOwned() ? mgr.house(h.houseId) : null;
             castles.add(new Castle(h.id, h.name, h.isTown() ? 0 : h.tier, h.center().getX(), h.center().getZ(), color, attitude, h.lordAlive, h.renown,
-                    HoldingEvents.ownerName(level, mgr, h.owner), attacked, house != null && h.id.equals(house.capital),
+                    HoldingEvents.ownerName(level, mgr, h.owner), attacked, mine ? h.id.equals(mgr.seats.get(me)) : house != null && h.id.equals(house.capital),
                     mine ? "" : net.aiagent256.stormhold.holding.Campaigns.allOdds(level, mgr, me, h)));
             if (mine) {
                 int troops = h.troops(), cap = 0;
@@ -215,8 +235,20 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
                 if (war.length() > 0) war.append(", ");
                 war.append(mgr.house(other).name);
             }
+            var truce = net.aiagent256.stormhold.holding.Truces.get(mgr, id, me);
+            String no = net.aiagent256.stormhold.holding.Truces.refusal(mgr, id, me);
+            StringBuilder claims = new StringBuilder();
+            for (Holding h : mgr.holdings.values()) {
+                if (!h.isPlayerOwned() || !me.equals(h.ownerPlayer()) || !id.equals(h.houseId) || h.heir.isEmpty()) continue;
+                if (claims.length() > 0) claims.append(" ");
+                claims.append(h.heir).append(" claims ").append(h.name).append(" (thrown back ").append(h.heirBeaten).append(" of ")
+                        .append(net.aiagent256.stormhold.holding.Heirs.GIVE_UP).append(").");
+            }
             houses.add(new HouseMark(id, house.name, house.base.getId(), Standing.get(mgr, id, me), Politics.castlesOf(mgr, id).size(),
-                    war.toString(), house.capital != null && known.contains(house.capital)));
+                    war.toString(), house.capital != null && known.contains(house.capital),
+                    truce == null ? "" : "Truce, " + net.aiagent256.stormhold.holding.Truces.daysLeft(level, truce) + " days left"
+                            + (truce.hostage.isEmpty() ? "" : " (" + truce.hostage + " their hostage)") + ".",
+                    no == null ? net.aiagent256.stormhold.holding.Truces.price(mgr, id, me) : -1, no == null ? "" : no, claims.toString()));
         }
         houses.sort((a, b) -> b.standing - a.standing);
         List<Note> notes = new ArrayList<>();
@@ -248,7 +280,15 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
             var card = net.aiagent256.stormhold.holding.Events.card(mgr, open);
             notes.add(new Note(-2, Chronicle.NEWS, card.text() + " Answer it on the War Table (\"Your word is needed\", under your castles) or with /stormhold matters."));
         }
-        return new RealmData(Chronicle.day(level), at.getX(), at.getZ(), castles, houses, own, lines, notes, beasts);
+        // your roads, painted or not
+        List<Line> roads = new ArrayList<>();
+        for (net.aiagent256.stormhold.holding.RoadPlan r : mgr.roads) {
+            if (r.toName.isEmpty()) continue;
+            Holding a = mgr.atXZ(r.from, 12), b = mgr.atXZ(r.to, 12);
+            if ((a == null || !me.equals(a.ownerPlayer())) && (b == null || !me.equals(b.ownerPlayer()))) continue;
+            roads.add(new Line(r.from.getX(), r.from.getZ(), r.to.getX(), r.to.getZ(), 0, false));
+        }
+        return new RealmData(Chronicle.day(level), at.getX(), at.getZ(), castles, houses, own, lines, notes, beasts, roads);
     }
 
     public static int rgb(int dye) {

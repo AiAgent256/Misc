@@ -31,14 +31,15 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 public final class Net {
-    private static final String VERSION = "8";
+    private static final String VERSION = "9";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(Stormhold.id("main"),
             () -> VERSION, VERSION::equals, VERSION::equals);
 
     public static final int DEFEND = 0, PRODUCE = 1, ATTACK = 2, SET_ATTACK = 3, SET_SUPPLY = 4, CLEAR_SUPPLY = 5,
             MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19,
             SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23, TREASURY = 24, VASSAL = 25, REVOKE = 26, COUNCIL = 27,
-            COUNCIL_APPOINT = 28, COUNCIL_DISMISS = 29, MATTER_CHOOSE = 30, MARCH_ALL = 31, TIDY = 32, TARGET_ALL = 33;
+            COUNCIL_APPOINT = 28, COUNCIL_DISMISS = 29, MATTER_CHOOSE = 30, MARCH_ALL = 31, TIDY = 32, TARGET_ALL = 33,
+            SET_SEAT = 34, RUSH = 35, BUY_CLAIM = 36, TOURNEY = 37, TRUCE = 38;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -155,7 +156,12 @@ public final class Net {
                 if (net.aiagent256.stormhold.holding.Vassals.is(h)) status.append("Vassal: ").append(h.lordName).append(", loyalty ")
                         .append(h.loyalty).append(", sends ").append(Math.round(net.aiagent256.stormhold.holding.Vassals.share(h) * 100)).append("% of rents. ");
                 if (h.reinforceKeep > 0) status.append("Supply line: keeps ").append(h.reinforceKeep).append(" men with you. ");
-                if (h.nextRaid > 0) {
+                if (net.aiagent256.stormhold.holding.Seats.is(mgr, h)) status.append("Your seat. ");
+                if (net.aiagent256.stormhold.holding.Heirs.claimed(h)) status.append("Claimed by ").append(h.heir).append(". ");
+                var truce = net.aiagent256.stormhold.holding.Truces.get(mgr, h.houseId, player.getUUID());
+                if (truce != null) status.append("Truce with ").append(mgr.house(h.houseId).title()).append(", ")
+                        .append(net.aiagent256.stormhold.holding.Truces.daysLeft(level, truce)).append(" days left. ");
+                if (h.nextRaid > 0 && truce == null && !net.aiagent256.stormhold.house.Standing.friendly(mgr, h.houseId, player.getUUID())) {
                     long days = Math.max(0, (h.nextRaid - level.getGameTime()) / 24000);
                     status.append(h.raidWarned ? "Raid expected within a day." : "Next raid in about " + days + " days.");
                 }
@@ -171,9 +177,14 @@ public final class Net {
                 String odds = h.attackTarget == null ? "" : java.util.Objects.requireNonNullElse(
                         net.aiagent256.stormhold.holding.Readiness.tableLine(level, mgr, h, h.attackTarget),
                         "No castle of another house stands at the target: a war party marches there and back.");
+                if (h.forgePaid && h.forgeTarget > 0) labour += " The forge is at level " + h.forgeTarget + ": " + h.forgeWork + " of "
+                        + net.aiagent256.stormhold.holding.Labour.SMITH_DAYS + " smith-days done.";
+                String tourney = java.util.Objects.requireNonNullElse(net.aiagent256.stormhold.holding.Tourney.refusal(level, mgr, h, player), "");
                 out.add(new HoldingInfo(h.id, h.name, h.isTown() ? 0 : h.tier, h.mode.name(), counts, cap, Economy.stockSummary(h), h.center(),
                         h.attackTarget, h.supplyTarget, status.toString(), fief, Economy.realmSummary(mgr, h, player.getUUID()),
-                        h.miners, h.smiths, labour, odds, h.tidy));
+                        h.miners, h.smiths, labour, odds, h.tidy, net.aiagent256.stormhold.holding.Seats.is(mgr, h),
+                        net.aiagent256.stormhold.holding.Labour.rushCost(level, h), net.aiagent256.stormhold.holding.Heirs.line(mgr, h),
+                        net.aiagent256.stormhold.holding.Heirs.price(h), tourney));
             }
         }
         // the council is the lord's, not a castle's: who sits, what each seat does, and the emeralds that pay them
@@ -272,6 +283,16 @@ public final class Net {
             openWarTable(player);
             return;
         }
+        if (a.action() == TRUCE) {
+            // from the Realm page: the house by its id's hash, paid (0) or with a hostage (1)
+            ServerLevel level = player.serverLevel();
+            HoldingManager mgr = HoldingManager.get(level);
+            String house = null;
+            for (String id : mgr.houses.keySet()) if (id.hashCode() == a.amount()) house = id;
+            if (house != null) net.aiagent256.stormhold.holding.Truces.ask(level, mgr, player, house, a.pos().getX() == 1);
+            openRealm(player);
+            return;
+        }
         if (a.action() == MATTER_CHOOSE) {
             for (ServerLevel level : player.server.getAllLevels())
                 if (net.aiagent256.stormhold.holding.Events.choose(level, HoldingManager.get(level), player.getUUID(), a.holding(), a.amount() == 1 ? 1 : 2)) break;
@@ -355,6 +376,12 @@ public final class Net {
                 case REPAIR -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.REPAIR, player);
                 case FORTIFY -> net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.FORTIFY, player);
                 case SCOUT -> net.aiagent256.stormhold.holding.Scouts.send(level, mgr, h, player, a.pos());
+                case SET_SEAT -> net.aiagent256.stormhold.holding.Seats.set(level, mgr, h, player);
+                case RUSH -> net.aiagent256.stormhold.holding.Labour.rush(level, mgr, h, player);
+                case BUY_CLAIM -> net.aiagent256.stormhold.holding.Heirs.buyOut(level, mgr, h, player);
+                case TOURNEY -> {
+                    if (net.aiagent256.stormhold.holding.Tourney.start(level, mgr, h, player)) return;   // the table's closed for the fight
+                }
                 case TIDY -> {
                     h.tidy = !h.tidy;
                     player.sendSystemMessage(net.aiagent256.stormhold.holding.HoldingEvents.gold(h.tidy

@@ -3,12 +3,15 @@ package net.aiagent256.stormhold.holding;
 import net.aiagent256.stormhold.entity.GarrisonEntity;
 import net.aiagent256.stormhold.entity.Loadouts;
 import net.aiagent256.stormhold.house.NameGen;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.entity.npc.VillagerProfession;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -231,44 +234,109 @@ public final class Labour {
 
     /** One day at the forge for n smiths. Returns the report. */
     public static String forge(ServerLevel level, HoldingManager mgr, Holding h, int n) {
-        UUID owner = h.ownerPlayer();
-        int target;
-        if (h.forgePaid && h.forgeTarget > 0) {
-            target = h.forgeTarget;                         // the level the metal was paid for
-        } else {
-            target = Frontier.level(level, h) + 1;
-            if (target > Frontier.MAX) return "Smiths " + n + ": the garrison's kit is the best there is.";
+        int target = target(level, h);
+        if (target > Frontier.MAX) return "Smiths " + n + ": the garrison's kit is the best there is.";
+        if (!h.forgePaid && !payMetal(mgr, h, target)) {
             int[] c = cost(target);
-            int ingots = Stores.stockWithChests(mgr, h, owner, NETHERITE);
-            int fromScrap = Math.min(Stores.stockWithChests(mgr, h, owner, SCRAP) / 4, Stores.stockWithChests(mgr, h, owner, GOLD) / 4);
-            boolean have = Stores.stockWithChests(mgr, h, owner, IRON) >= c[0] && Stores.stockWithChests(mgr, h, owner, DIAMOND) >= c[1]
-                    && ingots + fromScrap >= c[2];
-            if (!have) return "Smiths " + n + " wait on metal for " + kitName(target) + " kit (level " + target + "): " + costText(c)
+            return "Smiths " + n + " wait on metal for " + kitName(target) + " kit (level " + target + "): " + costText(c)
                     + (c[2] > 0 ? " (4 netherite scrap and 4 gold make an ingot)" : "") + ".";
-            Stores.takeWithChests(mgr, h, owner, IRON, c[0]);
-            Stores.takeWithChests(mgr, h, owner, DIAMOND, c[1]);
-            int fromIngots = Math.min(ingots, c[2]);
-            Stores.takeWithChests(mgr, h, owner, NETHERITE, fromIngots);
-            int smelt = c[2] - fromIngots;
-            Stores.takeWithChests(mgr, h, owner, SCRAP, 4 * smelt);
-            Stores.takeWithChests(mgr, h, owner, GOLD, 4 * smelt);
-            h.forgePaid = true;
-            h.forgeTarget = target;
-            h.forgeWork = 0;
         }
         h.forgeWork += n;
         if (h.forgeWork < SMITH_DAYS) {
             return "Smiths " + n + " are forging " + kitName(target) + " kit (level " + target + "): " + h.forgeWork + " of "
                     + SMITH_DAYS + " smith-days done.";
         }
+        int armed = finish(level, mgr, h, target);
+        return "Smiths " + n + " finished " + kitName(target) + " kit (level " + target + "); " + armed + " men on the walls re-armed.";
+    }
+
+    /** The level the forge is working toward: the one paid for, else the next above what the castle has. */
+    public static int target(ServerLevel level, Holding h) {
+        return h.forgePaid && h.forgeTarget > 0 ? h.forgeTarget : Frontier.level(level, h) + 1;
+    }
+
+    /** Whether the stores and the castle's chests hold the metal for a level. */
+    public static boolean hasMetal(HoldingManager mgr, Holding h, int target) {
+        UUID owner = h.ownerPlayer();
+        int[] c = cost(target);
+        int ingots = Stores.stockWithChests(mgr, h, owner, NETHERITE);
+        int fromScrap = Math.min(Stores.stockWithChests(mgr, h, owner, SCRAP) / 4, Stores.stockWithChests(mgr, h, owner, GOLD) / 4);
+        return Stores.stockWithChests(mgr, h, owner, IRON) >= c[0] && Stores.stockWithChests(mgr, h, owner, DIAMOND) >= c[1]
+                && ingots + fromScrap >= c[2];
+    }
+
+    /** Take the metal for a level from the stores and the castle's chests and set the forge to it. False if it isn't there. */
+    static boolean payMetal(HoldingManager mgr, Holding h, int target) {
+        if (!hasMetal(mgr, h, target)) return false;
+        UUID owner = h.ownerPlayer();
+        int[] c = cost(target);
+        int ingots = Stores.stockWithChests(mgr, h, owner, NETHERITE);
+        Stores.takeWithChests(mgr, h, owner, IRON, c[0]);
+        Stores.takeWithChests(mgr, h, owner, DIAMOND, c[1]);
+        int fromIngots = Math.min(ingots, c[2]);
+        Stores.takeWithChests(mgr, h, owner, NETHERITE, fromIngots);
+        int smelt = c[2] - fromIngots;
+        Stores.takeWithChests(mgr, h, owner, SCRAP, 4 * smelt);
+        Stores.takeWithChests(mgr, h, owner, GOLD, 4 * smelt);
+        h.forgePaid = true;
+        h.forgeTarget = target;
+        h.forgeWork = 0;
+        return true;
+    }
+
+    /** The level is done: the castle's kit goes up and every man on the walls is re-armed. How many were. */
+    static int finish(ServerLevel level, HoldingManager mgr, Holding h, int target) {
         h.forged = Math.max(h.forged, target);
         h.forgeWork = 0;
         h.forgePaid = false;
         h.forgeTarget = 0;
+        mgr.setDirty();
         int armed = rearm(level, mgr, h);
         Chronicle.log(level, mgr, Chronicle.GROWTH, "The smiths of " + h.name + " have forged " + kitName(target)
-                + " kit for its garrison (level " + target + ").", owner);
-        return "Smiths " + n + " finished " + kitName(target) + " kit (level " + target + "); " + armed + " men on the walls re-armed.";
+                + " kit for its garrison (level " + target + ").", h.ownerPlayer());
+        return armed;
+    }
+
+    /** Emeralds a smith-day of the level still to do costs, by the level: hired hands and work through the night. */
+    public static final int RUSH_PER_LEVEL_DAY = 2;
+
+    /** What finishing the next level now costs in emeralds on top of its metal: level x smith-days left x 2. -1 at the top. */
+    public static int rushCost(ServerLevel level, Holding h) {
+        int target = target(level, h);
+        if (target > Frontier.MAX) return -1;
+        int left = SMITH_DAYS - (h.forgePaid ? Math.min(SMITH_DAYS, h.forgeWork) : 0);
+        return target * left * RUSH_PER_LEVEL_DAY;
+    }
+
+    /** Buy the next level of kit now: its metal (unless the forge has it already) and the rush fee, then every man re-armed. */
+    public static boolean rush(ServerLevel level, HoldingManager mgr, Holding h, Player player) {
+        int target = target(level, h);
+        if (target > Frontier.MAX) {
+            player.sendSystemMessage(Component.literal(h.name + "'s garrison has the best kit there is.").withStyle(ChatFormatting.GOLD));
+            return false;
+        }
+        int left = SMITH_DAYS - (h.forgePaid ? Math.min(SMITH_DAYS, h.forgeWork) : 0);
+        int fee = rushCost(level, h);
+        int have = Stores.packPlusRealm(mgr, h, player, Items.EMERALD);
+        if (!h.forgePaid && !hasMetal(mgr, h, target)) {
+            player.sendSystemMessage(Component.literal(kitName(target) + " kit (level " + target + ") takes " + costText(cost(target))
+                    + " from the stores or " + h.name + "'s chests, and that isn't there yet.").withStyle(ChatFormatting.RED));
+            return false;
+        }
+        if (have < fee) {
+            player.sendSystemMessage(Component.literal("Finishing level " + target + " now costs " + fee + " emeralds (level " + target + " x "
+                    + left + " smith-days left x " + RUSH_PER_LEVEL_DAY + "); you have " + have + " in your pack and the stores.")
+                    .withStyle(ChatFormatting.RED));
+            return false;
+        }
+        boolean metalNow = !h.forgePaid;
+        if (metalNow) payMetal(mgr, h, target);
+        Stores.takeFromPackThenRealm(mgr, h, player, Items.EMERALD, fee);
+        int armed = finish(level, mgr, h, target);
+        player.sendSystemMessage(HoldingEvents.gold("Hired hands work the forges of " + h.name + " through the night: " + kitName(target)
+                + " kit (level " + target + ") is done and " + armed + " men on the walls are re-armed. Paid " + fee + " emeralds (level "
+                + target + " x " + left + " smith-days left x " + RUSH_PER_LEVEL_DAY + ")" + (metalNow ? " and " + costText(cost(target)) : "") + "."));
+        return true;
     }
 
     private static String costText(int[] c) {

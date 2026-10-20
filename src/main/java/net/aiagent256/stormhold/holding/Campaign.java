@@ -54,6 +54,15 @@ public class Campaign {
     @Nullable public net.minecraft.server.level.ServerBossEvent bar;
     public int barMax;
 
+    /** A house's ram before the gate (see {@link SiegeWorks}): where its head stands, which way it faces, blows struck. */
+    @Nullable public BlockPos ramHead;
+    public net.minecraft.core.Direction ramIn = net.minecraft.core.Direction.NORTH;
+    public int ramHits;
+    /** The ram is wrecked, or there was no room for one: no other comes this attack. */
+    public boolean ramDone;
+    /** The heir who leads this attack to take back his father's castle (see {@link Heirs}); empty for an ordinary raid. */
+    public String heir = "";
+
     public int total() {
         int n = 0;
         for (int v : counts.values()) n += v;
@@ -107,6 +116,13 @@ public class Campaign {
         t.put("Band", b);
         t.putInt("Spoils", spoils);
         t.putInt("Wait", waitSeconds);
+        if (ramHead != null) {
+            t.put("RamHead", NbtUtils.writeBlockPos(ramHead));
+            t.putInt("RamIn", ramIn.get3DDataValue());
+            t.putInt("RamHits", ramHits);
+        }
+        t.putBoolean("RamDone", ramDone);
+        if (!heir.isEmpty()) t.putString("Heir", heir);
         return t;
     }
 
@@ -127,6 +143,13 @@ public class Campaign {
         if (t.contains("Renown")) c.renown = t.getInt("Renown");
         c.color = t.getInt("Color");
         c.waitSeconds = t.getInt("Wait");
+        if (t.contains("RamHead")) {
+            c.ramHead = NbtUtils.readBlockPos(t.getCompound("RamHead"));
+            c.ramIn = net.minecraft.core.Direction.from3DDataValue(t.getInt("RamIn"));
+            c.ramHits = t.getInt("RamHits");
+        }
+        c.ramDone = t.getBoolean("RamDone");
+        c.heir = t.getString("Heir");
         CompoundTag cc = t.getCompound("Counts");
         for (String k : cc.getAllKeys()) {
             try {

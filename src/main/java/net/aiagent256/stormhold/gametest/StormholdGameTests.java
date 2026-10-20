@@ -1064,6 +1064,15 @@ public class StormholdGameTests {
             net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.ROAD, g.makeMockPlayer());
             if (!h.roadsTo.contains(far.id) || mgr.roads.size() != roads + 1)
                 throw new IllegalStateException("no road planned to " + far.name);
+            var plan = mgr.roads.get(roads);
+            if (!plan.toName.equals("Farhold") || !plan.fromName.equals(h.name))
+                throw new IllegalStateException("the road's signposts would read " + plan.fromName + " / " + plan.toName);
+            var lines = net.aiagent256.stormhold.holding.Roads.signLines("Hollowwatch Tower", "812 blocks", "north-east");
+            if (!lines[0].equals("Hollowwatch") || !lines[1].equals("Tower") || !lines[2].equals("812 blocks"))
+                throw new IllegalStateException("signpost lines " + String.join("|", lines));
+            if (!net.aiagent256.stormhold.holding.Roads.compass(10, -10).equals("north-east") || !net.aiagent256.stormhold.holding.Roads.compass(0, 5).equals("south")
+                    || !net.aiagent256.stormhold.holding.Roads.compass(-3, 0).equals("west"))
+                throw new IllegalStateException("the signposts point the wrong way");
             if (h.stock(cobble) != 64 - 40) throw new IllegalStateException("a 400-block road took " + (64 - h.stock(cobble)) + " stone");
             net.aiagent256.stormhold.holding.Builder.order(level, mgr, h, net.aiagent256.stormhold.holding.Builder.ROAD, g.makeMockPlayer());
             if (mgr.roads.size() != roads + 1) throw new IllegalStateException("a second road to the same place");
@@ -1690,6 +1699,23 @@ public class StormholdGameTests {
             for (var plane : h.gates) {
                 if (plane.blocks.isEmpty()) throw new IllegalStateException(id + " has an empty gate plane");
             }
+            // a house's ram fits on the road before the outer gate, swings at it, and is taken away again
+            var site = net.aiagent256.stormhold.holding.SiegeWorks.site(level, h);
+            if (site == null) throw new IllegalStateException(id + " has no place for a ram before its gate");
+            var rc = new net.aiagent256.stormhold.holding.Campaign();
+            if (!net.aiagent256.stormhold.holding.SiegeWorks.raise(level, rc, site))
+                throw new IllegalStateException(id + " ram won't fit at " + site.head() + " facing " + site.in() + ": beam cells "
+                        + level.getBlockState(site.head().above().relative(site.in().getOpposite())) + ", "
+                        + level.getBlockState(site.head().above().relative(site.in().getOpposite(), 2)));
+            if (!level.getBlockState(site.head().relative(site.in())).is(net.aiagent256.stormhold.registry.ModBlocks.PORTCULLIS.get()))
+                throw new IllegalStateException(id + " ram's head isn't at the portcullis: " + level.getBlockState(site.head().relative(site.in())));
+            int beam = net.aiagent256.stormhold.holding.SiegeWorks.beam(level, site);
+            if (beam < 3) throw new IllegalStateException(id + " ram has a beam of " + beam);
+            net.aiagent256.stormhold.holding.SiegeWorks.swing(level, site, true);
+            if (!level.getBlockState(site.head().above()).is(net.minecraft.world.level.block.Blocks.SPRUCE_LOG))
+                throw new IllegalStateException(id + " ram didn't swing into the gate");
+            net.aiagent256.stormhold.holding.SiegeWorks.clear(level, rc);
+            if (net.aiagent256.stormhold.holding.SiegeWorks.beam(level, site) != 0) throw new IllegalStateException(id + " ram left behind");
             if (!net.aiagent256.stormhold.holding.Gates.breach(level, h)) throw new IllegalStateException(id + " gate would not break");
             // a broken gate stays down ten minutes, then goes back up
             if (!net.aiagent256.stormhold.holding.Gates.down(level, h)) throw new IllegalStateException(id + " broken gate not marked down");
@@ -2844,6 +2870,228 @@ public class StormholdGameTests {
             archer.discard();
             foe.discard();
         });
+    }
+
+    /** The seat is where rents go; the forge can be rushed for emeralds, and the arithmetic holds. */
+    @GameTest(template = "arena")
+    public static void seatTakesTheRentsAndTheForgeCanBeRushed(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        Holding a = sample(g), b = sample(g);
+        b.key = a.key + "/b";
+        b.name = "Secondhold";
+        a.owner = Sides.player(player.getUUID());
+        b.owner = a.owner;
+        mgr.holdings.put(a.id, a);
+        mgr.holdings.put(b.id, b);
+        try {
+            if (!net.aiagent256.stormhold.holding.Seats.set(level, mgr, b, player)) throw new IllegalStateException("the seat wasn't set");
+            if (mgr.ownedBy(player.getUUID()).get(0) != b) throw new IllegalStateException("the seat isn't first: the rents would go elsewhere");
+            if (net.aiagent256.stormhold.holding.Seats.set(level, mgr, b, player)) throw new IllegalStateException("set twice");
+            a.vassal = "Tom";
+            if (net.aiagent256.stormhold.holding.Seats.set(level, mgr, a, player)) throw new IllegalStateException("a vassal's castle made the seat");
+            a.vassal = null;
+            // the forge: the next level now, for its metal and level x smith-days left x 2 emeralds
+            int target = net.aiagent256.stormhold.holding.Labour.target(level, b);
+            if (target <= net.aiagent256.stormhold.holding.Frontier.MAX) {
+                int fee = net.aiagent256.stormhold.holding.Labour.rushCost(level, b);
+                if (fee != target * net.aiagent256.stormhold.holding.Labour.SMITH_DAYS * net.aiagent256.stormhold.holding.Labour.RUSH_PER_LEVEL_DAY)
+                    throw new IllegalStateException("rush fee " + fee + " for level " + target);
+                // half the work done already: half the fee
+                b.forgePaid = true;
+                b.forgeTarget = target;
+                b.forgeWork = net.aiagent256.stormhold.holding.Labour.SMITH_DAYS / 2;
+                int half = net.aiagent256.stormhold.holding.Labour.rushCost(level, b);
+                if (half != target * (net.aiagent256.stormhold.holding.Labour.SMITH_DAYS - b.forgeWork) * net.aiagent256.stormhold.holding.Labour.RUSH_PER_LEVEL_DAY)
+                    throw new IllegalStateException("rush fee " + half + " with half the work done");
+                b.forgePaid = false;
+                b.forgeTarget = 0;
+                b.forgeWork = 0;
+                if (net.aiagent256.stormhold.holding.Labour.rush(level, mgr, b, player)) throw new IllegalStateException("rushed with no metal or emeralds");
+                int[] cost = net.aiagent256.stormhold.holding.Labour.cost(target);
+                var mc = (java.util.function.Function<String, net.minecraft.resources.ResourceLocation>) n -> new net.minecraft.resources.ResourceLocation("minecraft", n);
+                b.addStock(mc.apply("iron_ingot"), cost[0]);
+                b.addStock(mc.apply("diamond"), cost[1]);
+                b.addStock(mc.apply("netherite_ingot"), cost[2]);
+                b.addStock(mc.apply("emerald"), fee + 5);
+                if (!net.aiagent256.stormhold.holding.Labour.rush(level, mgr, b, player)) throw new IllegalStateException("rush refused with everything there");
+                if (b.forged != target) throw new IllegalStateException("forged " + b.forged + ", not " + target);
+                int em = net.aiagent256.stormhold.holding.Stores.realmStock(mgr, b, player.getUUID(), mc.apply("emerald"));
+                if (em != 5) throw new IllegalStateException(em + " emeralds left, not 5");
+                if (net.aiagent256.stormhold.holding.Stores.realmStock(mgr, b, player.getUUID(), mc.apply("iron_ingot")) != 0)
+                    throw new IllegalStateException("the metal wasn't taken");
+            }
+        } finally {
+            mgr.holdings.remove(a.id);
+            mgr.holdings.remove(b.id);
+            mgr.seats.remove(player.getUUID());
+        }
+        g.succeed();
+    }
+
+    /** Taking a castle by force makes an heir; a truce turns his raid back and holds off the next; a hostage comes home. */
+    @GameTest(template = "arena")
+    public static void trucesStopRaidsAndHeirsWantTheirCastlesBack(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        UUID me = player.getUUID();
+        Holding h = sample(g);
+        mgr.holdings.put(h.id, h);
+        var emerald = new net.minecraft.resources.ResourceLocation("minecraft", "emerald");
+        try {
+            HoldingEvents.transfer(level, mgr, h, Sides.player(me));
+            if (h.heir.isEmpty() || !h.heirFather.contains("Lord Test")) throw new IllegalStateException("no heir: '" + h.heir + "', son of '" + h.heirFather + "'");
+            Campaign c = Campaigns.launchRaid(level, mgr, h);
+            if (!c.heir.equals(h.heir)) throw new IllegalStateException("the heir doesn't lead the raid");
+            if (c.counts.getOrDefault(Role.KNIGHT, 0) < 4 + net.aiagent256.stormhold.holding.Heirs.MORE_KNIGHTS)
+                throw new IllegalStateException("the heir brought " + c.counts.get(Role.KNIGHT) + " knights");
+            // a truce bought: the raid turns back, the house isn't hostile, no raid while it holds
+            h.addStock(emerald, 500);
+            if (!net.aiagent256.stormhold.holding.Truces.ask(level, mgr, player, "testhouse", false))
+                throw new IllegalStateException("truce refused: " + net.aiagent256.stormhold.holding.Truces.refusal(mgr, "testhouse", me));
+            int price = net.aiagent256.stormhold.holding.Truces.price(mgr, "testhouse", me);
+            if (h.stock(emerald) != 500 - price) throw new IllegalStateException("the truce cost " + (500 - h.stock(emerald)) + ", not " + price);
+            if (c.stage != Campaign.Stage.DONE) throw new IllegalStateException("the raid didn't turn back");
+            if (net.aiagent256.stormhold.house.Standing.hostile(mgr, "testhouse", me)) throw new IllegalStateException("hostile in a truce");
+            mgr.campaigns.remove(c);
+            h.nextRaid = level.getGameTime();
+            Campaigns.scheduleRaids(level, mgr, h, level.getGameTime());
+            if (Campaigns.active(mgr, h.id, Campaign.Kind.RAID)) throw new IllegalStateException("a raid in the truce");
+            if (h.nextRaid < net.aiagent256.stormhold.holding.Truces.get(mgr, "testhouse", me).until) throw new IllegalStateException("next raid inside the truce");
+            net.aiagent256.stormhold.holding.Truces.broken(level, mgr, "testhouse", me, "a test");
+            if (net.aiagent256.stormhold.holding.Truces.active(mgr, "testhouse", me)) throw new IllegalStateException("the broken truce holds");
+            // a hostage's truce: one knight goes, and comes home when it's over
+            int knights = h.count(Role.KNIGHT);
+            if (knights < 2) h.add(Role.KNIGHT, 2 - knights);
+            knights = h.count(Role.KNIGHT);
+            if (!net.aiagent256.stormhold.holding.Truces.ask(level, mgr, player, "testhouse", true)) throw new IllegalStateException("hostage truce refused");
+            if (h.count(Role.KNIGHT) != knights - 1) throw new IllegalStateException("no hostage went");
+            net.aiagent256.stormhold.holding.Truces.get(mgr, "testhouse", me).until = level.getGameTime() - 1;
+            net.aiagent256.stormhold.holding.Truces.tick(level, mgr);
+            if (net.aiagent256.stormhold.holding.Truces.active(mgr, "testhouse", me) || h.count(Role.KNIGHT) != knights)
+                throw new IllegalStateException("the hostage didn't come home");
+            // thrown back three times, the heir gives up
+            for (int i = 0; i < net.aiagent256.stormhold.holding.Heirs.GIVE_UP; i++) net.aiagent256.stormhold.holding.Heirs.beaten(level, mgr, h, c);
+            if (!h.heir.isEmpty()) throw new IllegalStateException("the heir kept his claim after " + net.aiagent256.stormhold.holding.Heirs.GIVE_UP + " defeats");
+            // a claim bought out
+            h.heir = "Ser Testson";
+            h.heirFather = "the late Lord Test";
+            h.addStock(emerald, 500);
+            if (!net.aiagent256.stormhold.holding.Heirs.buyOut(level, mgr, h, player) || !h.heir.isEmpty())
+                throw new IllegalStateException("couldn't buy out the claim");
+        } finally {
+            mgr.holdings.remove(h.id);
+            mgr.truces.remove("testhouse");
+            mgr.campaigns.removeIf(x -> h.id.equals(x.target));
+        }
+        g.succeed();
+    }
+
+    /** A house's ram before a shut gate: ten blows and the gate's down; break its beam and it's done. */
+    @GameTest(template = "arena")
+    public static void aHouseRamBreaksTheGateUnlessItsBeamIsBroken(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = sample(g);
+        h.owner = Sides.player(UUID.randomUUID());
+        var pc = net.aiagent256.stormhold.registry.ModBlocks.PORTCULLIS.get().defaultBlockState();
+        var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+        for (int x = 4; x <= 10; x++) for (int y = 2; y <= 5; y++) for (int z = 9; z <= 14; z++) g.setBlock(new BlockPos(x, y, z), air);
+        Runnable gate = () -> {
+            for (int x = 6; x <= 8; x++) for (int y = 2; y <= 4; y++) g.setBlock(new BlockPos(x, y, 8), pc);
+            h.gates = new ArrayList<>(List.of(net.aiagent256.stormhold.holding.Gates.planeAt(level, g.absolutePos(new BlockPos(7, 2, 8)))));
+        };
+        gate.run();
+        var site = net.aiagent256.stormhold.holding.SiegeWorks.site(level, h);
+        if (site == null || !site.head().equals(g.absolutePos(new BlockPos(7, 2, 9))) || site.in() != net.minecraft.core.Direction.NORTH)
+            throw new IllegalStateException("ram site " + (site == null ? "none" : site.head() + " " + site.in()) + ", not " + g.absolutePos(new BlockPos(7, 2, 9)) + " north");
+        String side = Sides.house("testhouse");
+        List<GarrisonEntity> men = new ArrayList<>();
+        try {
+            Campaign c = new Campaign();
+            c.kind = Campaign.Kind.RAID;
+            c.side = side;
+            c.target = h.id;
+            for (int i = 0; i < 2; i++) {
+                GarrisonEntity m = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(4 + i * 6, 2, 11)), side, false);
+                if (m == null) throw new IllegalStateException("no raider");
+                men.add(m);
+                c.live.put(m.getUUID(), Role.KNIGHT);
+                c.add(Role.KNIGHT, 1);
+            }
+            c.siegeSeconds = net.aiagent256.stormhold.holding.SiegeWorks.RAM_AFTER - 1;
+            net.aiagent256.stormhold.holding.SiegeWorks.tick(level, mgr, h, c);
+            if (c.ramHead == null) throw new IllegalStateException("no ram brought up");
+            for (int i = 0; i < 40 && !c.rammed; i++) net.aiagent256.stormhold.holding.SiegeWorks.tick(level, mgr, h, c);
+            if (!c.rammed) throw new IllegalStateException("the gate stands after " + c.ramHits + " blows");
+            if (c.ramHits != net.aiagent256.stormhold.holding.SiegeWorks.RAM_HITS) throw new IllegalStateException(c.ramHits + " blows broke it");
+            if (level.getBlockState(g.absolutePos(new BlockPos(7, 2, 8))).is(pc.getBlock())) throw new IllegalStateException("the portcullis is still there");
+            if (c.ramHead != null || net.aiagent256.stormhold.holding.SiegeWorks.beam(level, site) != 0) throw new IllegalStateException("the ram wasn't taken away");
+            // a new gate, and a ram whose beam is broken: wrecked, and none comes after it
+            gate.run();
+            Campaign c2 = new Campaign();
+            c2.kind = Campaign.Kind.RAID;
+            c2.side = side;
+            c2.target = h.id;
+            c2.live.putAll(c.live);
+            c2.counts.putAll(c.counts);
+            c2.siegeSeconds = net.aiagent256.stormhold.holding.SiegeWorks.RAM_AFTER - 1;
+            net.aiagent256.stormhold.holding.SiegeWorks.tick(level, mgr, h, c2);
+            if (c2.ramHead == null) throw new IllegalStateException("no second ram");
+            for (int k = 1; k <= 3; k++) level.setBlock(site.head().relative(net.minecraft.core.Direction.SOUTH, k).above(), air, 3);
+            net.aiagent256.stormhold.holding.SiegeWorks.tick(level, mgr, h, c2);
+            if (c2.ramHead != null || !c2.ramDone) throw new IllegalStateException("the broken ram wasn't wrecked");
+            for (int i = 0; i < 10; i++) net.aiagent256.stormhold.holding.SiegeWorks.tick(level, mgr, h, c2);
+            if (c2.ramHead != null || c2.rammed) throw new IllegalStateException("another ram came, or the gate fell anyway");
+            if (!level.getBlockState(g.absolutePos(new BlockPos(7, 2, 8))).is(pc.getBlock())) throw new IllegalStateException("the gate fell to a wrecked ram");
+        } finally {
+            for (GarrisonEntity m : men) m.discard();
+        }
+        g.succeed();
+    }
+
+    /** In the lists nobody but the two strikes the other, a beaten challenger yields, and so does the player at two hearts. */
+    @GameTest(template = "arena")
+    public static void inTheListsOnlyTheTwoFightAndTheBeatenYield(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        Holding h = sample(g);
+        h.owner = Sides.player(player.getUUID());
+        GarrisonEntity ch = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(5, 2, 5)), Sides.house("testhouse"), false);
+        GarrisonEntity mine = Garrisons.spawn(level, mgr, null, Role.KNIGHT, g.absolutePos(new BlockPos(10, 2, 10)), Sides.player(player.getUUID()), false);
+        try {
+            if (ch == null || mine == null) throw new IllegalStateException("couldn't raise the men");
+            // a challenger whose bout is over (the world closed mid-tournament) doesn't belong
+            ch.getPersistentData().putUUID(net.aiagent256.stormhold.holding.Tourney.TAG, player.getUUID());
+            if (Garrisons.belongs(level, ch)) throw new IllegalStateException("a challenger with no bout stays");
+            net.aiagent256.stormhold.holding.Tourney.forTest(player.getUUID(), h, level.dimension(), ch);
+            if (!Garrisons.belongs(level, ch)) throw new IllegalStateException("the challenger in the lists was sent away");
+            if (!ch.isHostileTo(player)) throw new IllegalStateException("he won't fight the player");
+            if (ch.isHostileTo(mine) || mine.isHostileTo(ch)) throw new IllegalStateException("the player's man and the challenger go for each other");
+            if (!net.aiagent256.stormhold.holding.Tourney.apart(mine, ch) || !net.aiagent256.stormhold.holding.Tourney.apart(ch, mine))
+                throw new IllegalStateException("blows between the challenger and the player's man aren't stopped");
+            if (net.aiagent256.stormhold.holding.Tourney.apart(player, ch) || net.aiagent256.stormhold.holding.Tourney.apart(ch, player))
+                throw new IllegalStateException("the two in the lists can't strike each other");
+            var blow = new net.minecraftforge.event.entity.living.LivingDamageEvent(ch, level.damageSources().playerAttack(player), ch.getMaxHealth());
+            net.aiagent256.stormhold.holding.Tourney.onDamage(blow);
+            if (!blow.isCanceled() || !net.aiagent256.stormhold.holding.Tourney.yielded(player.getUUID()) || ch.getHealth() < 1)
+                throw new IllegalStateException("a beaten man didn't yield");
+            net.aiagent256.stormhold.holding.Tourney.forget(player.getUUID());
+            net.aiagent256.stormhold.holding.Tourney.forTest(player.getUUID(), h, level.dimension(), ch);
+            player.setHealth(6.0F);
+            var back = new net.minecraftforge.event.entity.living.LivingDamageEvent(player, level.damageSources().mobAttack(ch), 3.0F);
+            net.aiagent256.stormhold.holding.Tourney.onDamage(back);
+            if (!back.isCanceled() || !net.aiagent256.stormhold.holding.Tourney.lost(player.getUUID()))
+                throw new IllegalStateException("the player didn't yield at two hearts");
+        } finally {
+            net.aiagent256.stormhold.holding.Tourney.forget(player.getUUID());
+            if (ch != null) ch.discard();
+            if (mine != null) mine.discard();
+        }
+        g.succeed();
     }
 
     private static Holding sample(GameTestHelper g) {

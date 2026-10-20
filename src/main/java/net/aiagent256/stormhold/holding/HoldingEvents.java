@@ -122,6 +122,7 @@ public final class HoldingEvents {
                 if (c.id.equals(g.campaignId()) && c.live.remove(g.getUUID()) != null) {
                     c.add(role, -1);
                     mgr.setDirty();
+                    if (Heirs.isHeir(g)) Heirs.slain(level, mgr, c, g);
                 }
             }
         }
@@ -388,6 +389,7 @@ public final class HoldingEvents {
                     + " " + ownerName(level, mgr, newSide).replace("House ", "");
             h.fillGarrison(0.6);
         }
+        Heirs.onTransfer(level, mgr, h, oldSide, newSide, peaceful);
         net.aiagent256.stormhold.house.Politics.onTransfer(level, mgr, h, oldSide, newSide);
         h.bannersDirty = true;
         Garrisons.recolorBanners(level, mgr, h);
@@ -396,6 +398,7 @@ public final class HoldingEvents {
                 + h.name + " from " + ownerName(level, mgr, oldSide) + "!"), false);
         UUID p = Sides.playerId(newSide);
         if (p != null) {
+            Seats.firstCastle(mgr, h);
             tell(level, p, Component.literal("The garrison swears to you. Use the War Table in the hall to give orders.")
                     .withStyle(ChatFormatting.GREEN));
             // the field: what your fallen and theirs dropped, gathered in

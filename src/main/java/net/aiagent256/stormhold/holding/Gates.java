@@ -184,6 +184,11 @@ public final class Gates {
         return true;
     }
 
+    /** The portcullis plane standing at {@code start}, for the tests. */
+    public static Plane planeAt(ServerLevel level, BlockPos start) {
+        return flood(level, start, new java.util.HashSet<>());
+    }
+
     private static Plane flood(ServerLevel level, BlockPos start, Set<BlockPos> seen) {
         Plane plane = new Plane();
         ArrayDeque<BlockPos> q = new ArrayDeque<>();

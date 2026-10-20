@@ -30,6 +30,8 @@ public final class HoldingTicker {
             net.aiagent256.stormhold.house.Standing.drift(mgr);
         }
         Campaigns.tick(level, mgr, t);
+        Tourney.tick(level, mgr);
+        Truces.tick(level, mgr);
         Economy.tickShipments(level, mgr);
         net.aiagent256.stormhold.house.Politics.tick(level, mgr, t);
     }

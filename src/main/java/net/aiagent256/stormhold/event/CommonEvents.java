@@ -73,8 +73,15 @@ public final class CommonEvents {
     @SubscribeEvent
     public static void accident(net.minecraftforge.event.entity.living.LivingAttackEvent e) {
         if (e.getEntity().level() instanceof ServerLevel level
-                && net.aiagent256.stormhold.holding.Allies.spared(level, e.getSource().getEntity(), e.getEntity()))
+                && (net.aiagent256.stormhold.holding.Allies.spared(level, e.getSource().getEntity(), e.getEntity())
+                || net.aiagent256.stormhold.holding.Tourney.apart(e.getSource().getEntity(), e.getEntity())))
             e.setCanceled(true);
+    }
+
+    /** In the lists a man brought low yields instead of dying. */
+    @SubscribeEvent
+    public static void damaged(net.minecraftforge.event.entity.living.LivingDamageEvent e) {
+        if (!e.getEntity().level().isClientSide) net.aiagent256.stormhold.holding.Tourney.onDamage(e);
     }
 
     /** Every hostile mob, bosses too, is made as hard as the frontier zone it joins the world in. */
@@ -95,8 +102,9 @@ public final class CommonEvents {
     /** A warband man sent up a ladder climbs it. */
     @SubscribeEvent
     public static void livingTick(net.minecraftforge.event.entity.living.LivingEvent.LivingTickEvent e) {
-        if (e.getEntity() instanceof net.minecraft.world.entity.raid.Raider r && !r.level().isClientSide)
-            net.aiagent256.stormhold.holding.Warbands.climb(r);
+        if (e.getEntity() instanceof net.minecraft.world.entity.Mob m && !m.level().isClientSide
+                && (m instanceof net.minecraft.world.entity.raid.Raider || m instanceof net.aiagent256.stormhold.entity.GarrisonEntity))
+            net.aiagent256.stormhold.holding.Warbands.climb(m);
     }
 
     @SubscribeEvent

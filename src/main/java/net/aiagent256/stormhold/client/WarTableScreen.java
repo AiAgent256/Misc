@@ -237,6 +237,26 @@ public class WarTableScreen extends Screen {
                 () -> Net.sendAction(h.id(), Net.VASSAL, BlockPos.ZERO, 0)));
         if (vassal) row.add(button("Revoke", "Take " + h.name() + " back into your own hands. He returns to the ranks as a knight.",
                 () -> Net.sendAction(h.id(), Net.REVOKE, BlockPos.ZERO, 0)));
+        Button seat = button(h.seat() ? "Your seat" : "Make this my seat", h.seat()
+                ? h.name() + " is your seat: while you're away, rents, dues and tolls are paid into its stores; your roads start from its gate; "
+                + "the Realm map crowns it."
+                : "Rule from " + h.name() + ": while you're away, rents, dues and tolls are paid into its stores (while you're on they come to "
+                + "your purse), your roads start from its gate, and the Realm map crowns it.", () -> Net.sendAction(h.id(), Net.SET_SEAT, BlockPos.ZERO, 0));
+        seat.active = !h.seat() && !vassal;
+        row.add(seat);
+        Button tourney = button("Hold a tournament", h.tourney().isEmpty()
+                ? "Heralds, a purse and a feast for " + net.aiagent256.stormhold.holding.Tourney.COST + " emeralds. Three knights of the houses ride "
+                + "in to fight you in the yard, one at a time, in iron, diamond and netherite. A man brought low yields, and so do you at two hearts. "
+                + "Beat all three and " + h.name() + "'s renown grows, and the last swears to you and rides in your company in his own kit. "
+                + "Be at the castle; leave it and you forfeit. Once every two days."
+                : h.tourney(), () -> {
+            Net.sendAction(h.id(), Net.TOURNEY, BlockPos.ZERO, 0);
+            this.onClose();
+        });
+        tourney.active = h.tourney().isEmpty();
+        row.add(tourney);
+        if (!h.claim().isEmpty()) row.add(button("Buy out the claim", h.claim() + " " + h.claimPrice() + " emeralds from your pack and then "
+                + "the stores; he gives it up and his house thinks a little better of you.", () -> Net.sendAction(h.id(), Net.BUY_CLAIM, BlockPos.ZERO, 0)));
         textBottom = layUp(row, mx, contentBottom() - BH, mw) - 4;
     }
 
@@ -366,14 +386,16 @@ public class WarTableScreen extends Screen {
                 () -> Net.sendAction(h.id(), Net.FORTIFY, BlockPos.ZERO, 0));
         fort.active = !busy && fortifyStage(h) < 3;
         row.add(fort);
-        String[] names = {"Light it", "Clear trees", "Lay a road"};
+        String[] names = {"Light it", "Clear trees", "Lay roads"};
         String[] tips = {
                 "The builder walks every floor inside the walls and sets a torch wherever a monster could spawn, on the walls where he can. "
                         + "A coal or charcoal from the stores or the castle's chests makes " + Builder.TORCHES_PER_COAL + ". Crypts and cellars stay dark.",
                 "Woodcutters fell every wild tree within " + Builder.CLEAR_REACH + " blocks of the walls, so nothing comes at the gate unseen. "
                         + "The logs go to the stores. Orchards, fief buildings and anything inside a town are left alone.",
-                "A road from the gate to the nearest place you hold that hasn't one yet (up to " + Builder.ROAD_MAX + " blocks), lamps along it. "
-                        + "A stone from the stores or the castle's chests per " + Builder.ROAD_PER_STONE + " blocks. It goes down as the land it crosses loads."};
+                "Roads to join every place you hold, shortest first and from your seat out (none longer than " + Builder.ROAD_MAX + " blocks), "
+                        + "with lamps along them and a signpost at each end naming the place at the other. A stone from the stores or the castle's "
+                        + "chests per " + Builder.ROAD_PER_STONE + " blocks; as many as the stone pays for go down now, and at dawn the builders "
+                        + "lay the next one themselves when there's stone. They go down as the land they cross loads."};
         for (int i = 0; i < 3; i++) {
             final int p = i;
             Button b = button(names[i], tips[i], () -> Net.sendAction(h.id(), Net.PROJECT, BlockPos.ZERO, p));
@@ -401,6 +423,15 @@ public class WarTableScreen extends Screen {
                         + "), takes " + (metal[0] > 0 ? metal[0] + " iron " : "") + (metal[1] > 0 ? metal[1] + " diamonds " : "")
                         + (metal[2] > 0 ? metal[2] + " netherite " : "") + "and " + Labour.SMITH_DAYS + " smith-days; then every man is re-armed.");
         labourY = stepY + 20;
+        int rush = h.rush();
+        Button buy = Button.builder(Component.literal("Buy now"), b -> Net.sendAction(h.id(), Net.RUSH, BlockPos.ZERO, 0))
+                .tooltip(Tooltip.create(Component.literal(rush < 0 ? "The garrison's kit is the best there is."
+                        : "Hired hands finish level " + next + " (" + Labour.kitName(next) + ") tonight instead of waiting on the smiths: "
+                        + rush + " emeralds (level " + next + " x smith-days left x " + Labour.RUSH_PER_LEVEL_DAY + "), from your pack and then the "
+                        + "stores, plus the level's metal if the forge hasn't got it yet. Every man on the walls is re-armed at once.")))
+                .bounds(mx + mw - 60, labourY - 2, 60, 16).build();
+        buy.active = rush >= 0;
+        this.addRenderableWidget(buy);
         // couriers, along the bottom
         courierY = contentBottom() - 18;
         BlockPos depot = markedDepot();
@@ -587,7 +618,7 @@ public class WarTableScreen extends Screen {
         g.drawString(this.font, fit(h.fief(), mw - 140), mx + 62, peopleY, DIM, false);
         g.drawString(this.font, "Mine", mx, stepY + 4, TEXT, false);
         g.drawString(this.font, "Forge", mx + mw / 2, stepY + 4, TEXT, false);
-        lines(g, h.labour(), mx, labourY, mw, textBottom, DIM);
+        lines(g, h.labour(), mx, labourY, mw - 64, textBottom, DIM);
         g.drawString(this.font, "Couriers", mx, courierY + 5, GOLD, false);
     }
 

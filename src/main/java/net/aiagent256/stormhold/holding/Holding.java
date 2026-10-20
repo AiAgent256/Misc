@@ -207,6 +207,14 @@ public class Holding {
     public final java.util.Set<UUID> roadsTo = new java.util.LinkedHashSet<>();
     /** Brigand camps sitting on those roads, by the place at the far end: no tolls while they stand. */
     public final Map<UUID, UUID> roadCamps = new HashMap<>();
+    /**
+     * The son of the lord it was taken from, who wants it back (see {@link Heirs}): his name, his father's, and
+     * how many of his attacks have been thrown back. Empty when nobody claims it.
+     */
+    public String heir = "", heirFather = "";
+    public int heirBeaten;
+    /** When a tournament was last held here (see {@link Tourney}). */
+    public long lastTourney;
 
     public int fiefLevel() {
         int cottages = 0;
@@ -485,6 +493,12 @@ public class Holding {
         t.put("PendingMaps", mapTags);
         if (mapRoom != null) t.putIntArray("MapRoom", mapRoom);
         t.putBoolean("Tidy", tidy);
+        if (!heir.isEmpty()) {
+            t.putString("Heir", heir);
+            t.putString("HeirFather", heirFather);
+            t.putInt("HeirBeaten", heirBeaten);
+        }
+        t.putLong("LastTourney", lastTourney);
         t.putString("BuilderName", builderName);
         if (builder != null) t.putUUID("Builder", builder);
         t.putString("FiefReport", fiefReport);
@@ -634,6 +648,10 @@ public class Holding {
         h.loyalty = t.getInt("Loyalty");
         for (var m : t.getList("PendingMaps", 10)) h.pendingMaps.add(net.minecraft.world.item.ItemStack.of((CompoundTag) m));
         h.tidy = t.getBoolean("Tidy");
+        h.heir = t.getString("Heir");
+        h.heirFather = t.getString("HeirFather");
+        h.heirBeaten = t.getInt("HeirBeaten");
+        h.lastTourney = t.getLong("LastTourney");
         if (t.contains("MapRoom")) {
             int[] mr = t.getIntArray("MapRoom");
             if (mr.length == 9) h.mapRoom = mr;

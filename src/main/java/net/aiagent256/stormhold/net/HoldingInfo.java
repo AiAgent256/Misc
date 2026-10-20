@@ -9,7 +9,8 @@ import java.util.UUID;
 /** What the War Table shows for one castle. */
 public record HoldingInfo(UUID id, String name, int tier, String mode, int[] counts, int[] capacity, String stock,
                           BlockPos pos, @Nullable BlockPos attack, @Nullable BlockPos supply, String status, String fief, String realm,
-                          int miners, int smiths, String labour, String odds, boolean tidy) {
+                          int miners, int smiths, String labour, String odds, boolean tidy, boolean seat, int rush, String claim,
+                          int claimPrice, String tourney) {
 
     public void write(FriendlyByteBuf b) {
         b.writeUUID(id);
@@ -32,6 +33,11 @@ public record HoldingInfo(UUID id, String name, int tier, String mode, int[] cou
         b.writeUtf(labour);
         b.writeUtf(odds);
         b.writeBoolean(tidy);
+        b.writeBoolean(seat);
+        b.writeVarInt(rush);
+        b.writeUtf(claim);
+        b.writeVarInt(claimPrice);
+        b.writeUtf(tourney);
     }
 
     public static HoldingInfo read(FriendlyByteBuf b) {
@@ -52,6 +58,12 @@ public record HoldingInfo(UUID id, String name, int tier, String mode, int[] cou
         String labour = b.readUtf();
         String odds = b.readUtf();
         boolean tidy = b.readBoolean();
-        return new HoldingInfo(id, name, tier, mode, counts, cap, stock, pos, attack, supply, status, fief, realm, miners, smiths, labour, odds, tidy);
+        boolean seat = b.readBoolean();
+        int rush = b.readVarInt();
+        String claim = b.readUtf();
+        int claimPrice = b.readVarInt();
+        String tourney = b.readUtf();
+        return new HoldingInfo(id, name, tier, mode, counts, cap, stock, pos, attack, supply, status, fief, realm, miners, smiths, labour, odds, tidy,
+                seat, rush, claim, claimPrice, tourney);
     }
 }

@@ -115,6 +115,11 @@ public class RealmScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
         this.renderBackground(g);
+        mouseXNow = mouseX;
+        mouseYNow = mouseY;
+        chips.clear();
+        chipTips.clear();
+        chipTip = null;
         int x0 = left(), y0 = top();
         g.fill(x0, y0, x0 + W, y0 + H, BG);
         g.fill(x0 + 2, y0 + 2, x0 + W - 2, y0 + H - 2, PANEL);
@@ -128,6 +133,8 @@ public class RealmScreen extends Screen {
         for (int x = gx; mx(x) < mx1; x += 512) g.fill(mx(x), my0, mx(x) + 1, my1, 0x30FFFFFF);
         int gz = Math.floorDiv(oz, 512) * 512;
         for (int z = gz; mz(z) < my1; z += 512) g.fill(mx0, mz(z), mx1, mz(z) + 1, 0x30FFFFFF);
+        // your roads, faint and brown under everything else
+        for (RealmData.Line l : data.roads()) line(g, mx(l.x1()), mz(l.z1()), mx(l.x2()), mz(l.z2()), 0xB0A08050);
         // armies on the march
         for (RealmData.Line l : data.lines()) {
             int c = (l.raid() ? 0xFF000000 : 0xC0000000) | RealmData.rgb(l.color());
@@ -194,6 +201,10 @@ public class RealmScreen extends Screen {
         g.disableScissor();
         maxScroll = Math.max(0, (y + scroll) - (y0 + H - 10));
         super.render(g, mouseX, mouseY, partial);
+        if (chipTip != null) {
+            List<FormattedCharSequence> tip = this.font.split(Component.literal(chipTip), 220);
+            g.renderTooltip(this.font, tip, mouseX, mouseY);
+        }
         if (hover != null) {
             List<Component> tip = new ArrayList<>();
             tip.add(Component.literal(hover.name()));
@@ -281,9 +292,48 @@ public class RealmScreen extends Screen {
                     y += 9;
                 }
             }
+            if (!h.claims().isEmpty()) {
+                for (FormattedCharSequence l : this.font.split(Component.literal(h.claims()), rw)) {
+                    g.drawString(this.font, l, rx, y, 0xFFB060, false);
+                    y += 9;
+                }
+            }
+            if (!h.truce().isEmpty()) {
+                g.drawString(this.font, h.truce(), rx, y, 0x80E080, false);
+                y += 10;
+            } else if (h.trucePrice() >= 0 && !data.own().isEmpty()) {
+                // two things to click: a truce bought, or one given a hostage for
+                String pay = "[Truce: " + h.trucePrice() + " emeralds]", hostage = "[Truce: a hostage]";
+                int wp = this.font.width(pay), wh = this.font.width(hostage);
+                int hx = rx + Math.min(wp + 6, rw - wh);
+                int hy = wp + 6 + wh > rw ? y + 10 : y;
+                chip(g, pay, rx, y, h.id(), 0, "Three days without raids from House " + h.name() + ", its gates open to you and its men leave yours "
+                        + "alone. " + h.trucePrice() + " emeralds from your pack and then the stores.");
+                chip(g, hostage, hy == y ? hx : rx, hy, h.id(), 1, "The same three days, paid with one of your knights sent to them as a hostage (from "
+                        + "your seat, or the castle with the most). He comes home when it's over; break the truce and they hang him.");
+                y = hy + 10;
+            } else if (!h.truceNo().isEmpty() && h.standing() < 25) {
+                g.drawString(this.font, h.truceNo(), rx, y, 0x9C8C6C, false);
+                y += 10;
+            }
             y += 5;
         }
         return y;
+    }
+
+    /** Where each house's truce offers were drawn, for clicks: x0, y0, x1, y1, house id hash, 0 pay / 1 hostage; and the tip. */
+    private final List<int[]> chips = new ArrayList<>();
+    private final List<String> chipTips = new ArrayList<>();
+    private int mouseXNow, mouseYNow;
+    @org.jetbrains.annotations.Nullable private String chipTip;
+
+    private void chip(GuiGraphics g, String text, int x, int y, String house, int mode, String tip) {
+        int w = this.font.width(text);
+        boolean over = mouseXNow >= x && mouseXNow < x + w && mouseYNow >= y - 1 && mouseYNow < y + 9;
+        g.drawString(this.font, text, x, y, over ? 0xFFFFE080 : 0xFFD8B060, false);
+        chips.add(new int[]{x, y - 1, x + w, y + 9, house.hashCode(), mode});
+        chipTips.add(tip);
+        if (over) chipTip = tip;
     }
 
     private int record(GuiGraphics g, int rx, int y, int rw) {
@@ -361,6 +411,15 @@ public class RealmScreen extends Screen {
         if (super.mouseClicked(mouseX, mouseY, button)) return true;
         if (button != 0) return false;
         int x0 = left(), y0 = top();
+        // a truce offered on the Houses page
+        if (tab == 1 && mouseX >= x0 + MAP_W + 8 && mouseY >= y0 + 42 && mouseY < y0 + H - 6) {
+            for (int[] c : chips) {
+                if (mouseX >= c[0] && mouseX < c[2] && mouseY >= c[1] && mouseY < c[3]) {
+                    Net.sendAction(new java.util.UUID(0, 0), Net.TRUCE, new BlockPos(c[5], 0, 0), c[4]);
+                    return true;
+                }
+            }
+        }
         // one of your castles on the map: command it
         if (mouseX < x0 + MAP_W && mouseY > y0 + 20 && mouseY < y0 + H - 28) {
             for (RealmData.Castle c : data.castles()) {
