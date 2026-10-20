@@ -1576,7 +1576,10 @@ public class StormholdGameTests {
                 if (plane.blocks.isEmpty()) throw new IllegalStateException(id + " has an empty gate plane");
             }
             if (!net.aiagent256.stormhold.holding.Gates.breach(level, h)) throw new IllegalStateException(id + " gate would not break");
-            h.gates = null;
+            // a broken gate stays down ten minutes, then goes back up
+            if (!net.aiagent256.stormhold.holding.Gates.down(level, h)) throw new IllegalStateException(id + " broken gate not marked down");
+            if (net.aiagent256.stormhold.holding.Gates.restore(level, mgr, h) != 0) throw new IllegalStateException(id + " gate rebuilt inside its ten minutes");
+            h.gateBrokenAt = level.getGameTime() - net.aiagent256.stormhold.holding.Gates.DOWN_TICKS - 1;
             net.aiagent256.stormhold.holding.Gates.tick(level, mgr, h);
             if (h.gates == null || h.gates.isEmpty()) throw new IllegalStateException(id + " gate was not rebuilt");
             if (i == 0) {
