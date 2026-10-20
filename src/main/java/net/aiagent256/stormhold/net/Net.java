@@ -39,7 +39,7 @@ public final class Net {
             MUSTER = 6, REFRESH = 7, MARCH_NOW = 8, MUSTER_KNIGHTS = 9, MUSTER_ARCHERS = 10, MUSTER_CROSSBOWMEN = 11, DISMISS = 12, ARM = 13, SEND_COLUMN = 14, KEEP_WITH_ME = 15, EXPAND_FIEF = 16, REPAIR = 17, FORTIFY = 18, OPEN_REALM = 19,
             SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23, TREASURY = 24, VASSAL = 25, REVOKE = 26, COUNCIL = 27,
             COUNCIL_APPOINT = 28, COUNCIL_DISMISS = 29, MATTER_CHOOSE = 30, MARCH_ALL = 31, TIDY = 32, TARGET_ALL = 33,
-            SET_SEAT = 34, RUSH = 35, BUY_CLAIM = 36, TOURNEY = 37, TRUCE = 38, SEND_HOME = 39;
+            SET_SEAT = 34, RUSH = 35, BUY_CLAIM = 36, TOURNEY = 37, TRUCE = 38, SEND_HOME = 39, ATTACK_ALL = 40;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -72,7 +72,7 @@ public final class Net {
     }
 
     public record WarTableData(List<HoldingInfo> holdings, boolean recruits, List<Seat> council, int treasury,
-                               @org.jetbrains.annotations.Nullable Decision decision) {
+                               @org.jetbrains.annotations.Nullable Decision decision, List<net.aiagent256.stormhold.holding.WarPlan.Target> targets) {
         void write(FriendlyByteBuf b) {
             b.writeVarInt(holdings.size());
             for (HoldingInfo h : holdings) h.write(b);
@@ -94,6 +94,8 @@ public final class Net {
                 b.writeUtf(decision.first());
                 b.writeUtf(decision.second());
             }
+            b.writeVarInt(targets.size());
+            for (var t : targets) t.write(b);
         }
 
         static WarTableData read(FriendlyByteBuf b) {
@@ -106,7 +108,10 @@ public final class Net {
             for (int i = 0; i < k; i++) c.add(new Seat(b.readVarInt(), b.readUtf(), b.readUtf(), b.readVarInt(), b.readUtf(), b.readUtf()));
             int treasury = b.readVarInt();
             Decision d = b.readBoolean() ? new Decision(b.readUUID(), b.readUtf(), b.readUtf(), b.readUtf()) : null;
-            return new WarTableData(l, recruits, c, treasury, d);
+            int nt = b.readVarInt();
+            List<net.aiagent256.stormhold.holding.WarPlan.Target> targets = new ArrayList<>(nt);
+            for (int i = 0; i < nt; i++) targets.add(net.aiagent256.stormhold.holding.WarPlan.Target.read(b));
+            return new WarTableData(l, recruits, c, treasury, d, targets);
         }
 
         void handle(Supplier<NetworkEvent.Context> ctx) {
@@ -118,6 +123,32 @@ public final class Net {
 
     public static void openWarTable(ServerPlayer player) {
         CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), build(player));
+    }
+
+    /** Every castle of the player's (vassals aside) sends its war party at the target; what went, in chat. */
+    private static void marchAll(ServerLevel level, HoldingManager mgr, ServerPlayer player, BlockPos target) {
+        Holding enemy = mgr.atXZ(target, 16);
+        var plan = enemy != null ? net.aiagent256.stormhold.holding.WarPlan.plan(level, mgr, player.getUUID(), enemy) : null;
+        List<String> went = new ArrayList<>(), stayed = new ArrayList<>();
+        int[] men = new int[4];
+        for (Holding o : mgr.ownedBy(player.getUUID())) {
+            if (net.aiagent256.stormhold.holding.Vassals.is(o) || o == enemy) continue;
+            Campaign c = Campaigns.launchParty(level, mgr, o, target);
+            if (c != null) {
+                went.add(o.name);
+                Role[] rs = {Role.CAPTAIN, Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN};
+                for (int i = 0; i < 4; i++) men[i] += c.counts.getOrDefault(rs[i], 0);
+            } else {
+                stayed.add(o.name);
+            }
+        }
+        player.sendSystemMessage(Component.literal(went.isEmpty() ? "No castle of yours has men to spare, or each has a war party out already."
+                : went.size() + (went.size() == 1 ? " war party marches" : " war parties march") + (enemy != null ? " on " + enemy.name : " on the target")
+                + " from " + String.join(", ", went) + ": " + net.aiagent256.stormhold.holding.WarPlan.men(men) + "."
+                + (plan != null && !plan.parts().isEmpty() ? " Chance: " + plan.pct() + "%, " + net.aiagent256.stormhold.holding.WarPlan.verdict(plan.pct()) + "." : "")
+                + " They wait at the walls for each other and go in together."
+                + (stayed.isEmpty() ? "" : " Staying home: " + String.join(", ", stayed) + "."))
+                .withStyle(went.isEmpty() ? net.minecraft.ChatFormatting.RED : net.minecraft.ChatFormatting.GOLD));
     }
 
     /** The odds against the castle a place is set to march on, in chat. */
@@ -217,7 +248,9 @@ public final class Net {
                 break;
             }
         }
-        return new WarTableData(out, RecruitsCompat.loaded(), council, treasury, decision);
+        // the castles you know near your own, with what you'd send at each and the chance: in the world you stand in
+        var targets = net.aiagent256.stormhold.holding.WarPlan.targets(player.serverLevel(), HoldingManager.get(player.serverLevel()), player.getUUID());
+        return new WarTableData(out, RecruitsCompat.loaded(), council, treasury, decision, targets);
     }
 
     // ------------------------------------------------------------ client -> server
@@ -281,6 +314,19 @@ public final class Net {
                         + (n == 1 ? " castle" : " castles") + " of yours. " + Campaigns.allOdds(level, mgr, player.getUUID(), enemy)
                         + " Press \"All castles march\" on the Orders tab to send them."));
                 break;
+            }
+            openWarTable(player);
+            return;
+        }
+        if (a.action() == ATTACK_ALL) {
+            // from the Attack page: every castle of yours takes the castle at pos for its target and marches on it
+            ServerLevel level = player.serverLevel();
+            HoldingManager mgr = HoldingManager.get(level);
+            Holding enemy = mgr.atXZ(a.pos(), 16);
+            if (enemy != null && !enemy.owner.equals(Sides.player(player.getUUID()))) {
+                for (Holding o : mgr.ownedBy(player.getUUID())) if (!net.aiagent256.stormhold.holding.Vassals.is(o)) o.attackTarget = enemy.center();
+                mgr.setDirty();
+                marchAll(level, mgr, player, enemy.center());
             }
             openWarTable(player);
             return;
@@ -402,17 +448,7 @@ public final class Net {
                         player.sendSystemMessage(Component.literal("Set a target first."));
                     } else {
                         tellOdds(level, mgr, player, h);
-                        List<String> went = new ArrayList<>(), stayed = new ArrayList<>();
-                        for (Holding o : mgr.ownedBy(player.getUUID())) {
-                            if (net.aiagent256.stormhold.holding.Vassals.is(o) || o == mgr.atXZ(h.attackTarget, 16)) continue;
-                            if (Campaigns.launchParty(level, mgr, o, h.attackTarget) != null) went.add(o.name);
-                            else stayed.add(o.name);
-                        }
-                        player.sendSystemMessage(Component.literal(went.isEmpty() ? "No castle of yours has men to spare, or each has a war party out already."
-                                : went.size() + (went.size() == 1 ? " war party marches" : " war parties march") + " on the target: from "
-                                + String.join(", ", went) + ". They wait at the walls for each other and go in together."
-                                + (stayed.isEmpty() ? "" : " Staying home: " + String.join(", ", stayed) + "."))
-                                .withStyle(went.isEmpty() ? net.minecraft.ChatFormatting.RED : net.minecraft.ChatFormatting.GOLD));
+                        marchAll(level, mgr, player, h.attackTarget);
                     }
                 }
                 case VASSAL -> {

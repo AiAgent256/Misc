@@ -34,7 +34,7 @@ public class WarTableScreen extends Screen {
     private static final int BG = 0xF0241c14, PANEL = 0xF0302619, CARD = 0xF0423525, LINE = 0xFF6b5a40;
     private static final int GOLD = 0xF0D8A0, TEXT = 0xE0D0B0, DIM = 0x9C8C6C, WARN = 0xE89060, BLUE = 0xA8B8C8, NAME = 0xFFE8B0;
     private static final String[] TABS = {"Overview", "Orders", "Company", "Works", "Council"};
-    private static final int OVERVIEW = 0, ORDERS = 1, COMPANY = 2, WORKS = 3, COUNCIL = 4, DECIDE = 5;
+    private static final int OVERVIEW = 0, ORDERS = 1, COMPANY = 2, WORKS = 3, COUNCIL = 4, DECIDE = 5, TARGETS = 6;
     private static final int SIDE = 104, BH = 20, STEP = 22, MIN_BUTTON = 64;
 
     private Net.WarTableData data;
@@ -159,6 +159,7 @@ public class WarTableScreen extends Screen {
         }
         HoldingInfo h = current();
         if (tab == DECIDE && data.decision() != null) decisionWidgets(mx, mw);
+        else if (tab == TARGETS) targetsWidgets(mx, mw);
         else if (tab == COUNCIL) councilWidgets(mx, mw);
         else if (h != null) {
             switch (tab) {
@@ -174,8 +175,13 @@ public class WarTableScreen extends Screen {
     private void sideList(int x0, int y0) {
         List<HoldingInfo> l = data.holdings();
         boolean deciding = data.decision() != null;
-        int listTop = y0 + 20, listBottom = y0 + H - (l.size() > 1 ? 46 : 28) - (deciding ? 18 : 0);
+        int listTop = y0 + 20, listBottom = y0 + H - 46 - (deciding ? 18 : 0);
         int perPage = Math.max(1, (listBottom - listTop) / 18);
+        boolean paged = l.size() > perPage;
+        if (paged) {
+            listBottom -= 18;
+            perPage = Math.max(1, (listBottom - listTop) / 18);
+        }
         if (pageToSelected) {
             page = selected / perPage;
             pageToSelected = false;
@@ -189,24 +195,25 @@ public class WarTableScreen extends Screen {
             Button b = Button.builder(Component.literal((alarm ? "! " : "") + trim(h.name(), alarm ? 13 : 15)), x -> {
                 selected = idx;
                 scroll = 0;
-                if (tab == COUNCIL || tab == DECIDE) tab = OVERVIEW;
+                if (tab == COUNCIL || tab == DECIDE || tab == TARGETS) tab = OVERVIEW;
                 rebuildWidgets();
             }).tooltip(Tooltip.create(Component.literal(h.name() + "\n" + (h.status().isEmpty() ? "All quiet." : h.status()))))
                     .bounds(x0 + 6, listTop + (i - start) * 18, SIDE - 12, 16).build();
-            b.active = idx != selected || tab == COUNCIL || tab == DECIDE;
+            b.active = idx != selected || tab == COUNCIL || tab == DECIDE || tab == TARGETS;
             this.addRenderableWidget(b);
         }
-        if (l.size() > perPage) {
+        if (paged) {
+            final int pp = perPage;
             Button prev = Button.builder(Component.literal("<"), b -> {
                 page = Math.max(0, page - 1);
                 rebuildWidgets();
-            }).bounds(x0 + 6, y0 + H - 42, 20, 16).build();
+            }).bounds(x0 + 6, listBottom + (deciding ? 20 : 2), 20, 16).build();
             prev.active = page > 0;
             this.addRenderableWidget(prev);
             Button next = Button.builder(Component.literal(">"), b -> {
-                page = Math.min((l.size() - 1) / perPage, page + 1);
+                page = Math.min((l.size() - 1) / pp, page + 1);
                 rebuildWidgets();
-            }).bounds(x0 + SIDE - 26, y0 + H - 42, 20, 16).build();
+            }).bounds(x0 + SIDE - 26, listBottom + (deciding ? 20 : 2), 20, 16).build();
             next.active = page < (l.size() - 1) / perPage;
             this.addRenderableWidget(next);
         }
@@ -218,6 +225,14 @@ public class WarTableScreen extends Screen {
             d.active = tab != DECIDE;
             this.addRenderableWidget(d);
         }
+        Button attack = Button.builder(Component.literal("Attack a castle"), b -> {
+            tab = TARGETS;
+            rebuildWidgets();
+        }).tooltip(Tooltip.create(Component.literal("The castles you know near your own, nearest first: who holds them, how many defend them in "
+                + "what kit, what every castle of yours would send, and the chance. One click sends them all.")))
+                .bounds(x0 + 6, y0 + H - 42, SIDE - 12, 16).build();
+        attack.active = tab != TARGETS;
+        this.addRenderableWidget(attack);
         this.addRenderableWidget(Button.builder(Component.literal("Realm map"), b -> Net.sendAction(new UUID(0, 0), Net.OPEN_REALM, BlockPos.ZERO, 0))
                 .tooltip(Tooltip.create(Component.literal("Every castle you know on a map, the houses and how they stand with you, and the realm's record.")))
                 .bounds(x0 + 6, y0 + H - 24, SIDE - 12, 16).build());
@@ -456,6 +471,107 @@ public class WarTableScreen extends Screen {
         textBottom = courierY - 4;
     }
 
+    // ------------------------------------------------------------------ the Attack page
+
+    private int targetSel, targetScroll, tListY, tRows, tDetailY;
+    private static final int ROW = 11, MOST_PARTS = 5;
+
+    private void targetsWidgets(int mx, int mw) {
+        List<net.aiagent256.stormhold.holding.WarPlan.Target> ts = data.targets();
+        if (ts.isEmpty()) return;
+        targetSel = Math.max(0, Math.min(targetSel, ts.size() - 1));
+        var t = ts.get(targetSel);
+        int detail = 2 + Math.min(MOST_PARTS + 1, Math.max(1, t.parts().size())) + (t.note().isEmpty() ? 0 : 1);
+        tDetailY = contentBottom() - BH - 4 - detail * 10;
+        tListY = contentTop() + 11;
+        tRows = Math.max(2, (tDetailY - 6 - tListY) / ROW);
+        targetScroll = Math.max(0, Math.min(targetScroll, Math.max(0, ts.size() - tRows)));
+        if (targetSel < targetScroll) targetScroll = targetSel;
+        if (targetSel >= targetScroll + tRows) targetScroll = targetSel - tRows + 1;
+        int[] all = new int[4];
+        for (var p : t.parts()) for (int i = 0; i < 4; i++) all[i] += p.men()[i];
+        Button go = Button.builder(Component.literal(fit("Attack " + t.name() + " with everything", mw - 8)), b ->
+                        Net.sendAction(new UUID(0, 0), Net.ATTACK_ALL, new BlockPos(t.x(), 64, t.z()), 0))
+                .tooltip(Tooltip.create(Component.literal(t.parts().isEmpty() ? "None of your castles has three men to spare, or each has a war party out already."
+                        : "Every castle listed above sends its war party at " + t.name() + " (" + net.aiagent256.stormhold.holding.WarPlan.men(all)
+                        + "). They wait at the walls for each other, up to five minutes from the first, and go in together. Fought out of "
+                        + "sight it's " + t.pct() + "%; ride with them and you can do better." + (t.note().isEmpty() ? "" : " " + t.note()))))
+                .bounds(mx, contentBottom() - BH, mw, BH).build();
+        go.active = !t.parts().isEmpty();
+        this.addRenderableWidget(go);
+    }
+
+    private void drawTargets(GuiGraphics g, int mx, int mw, int mouseX, int mouseY) {
+        List<net.aiagent256.stormhold.holding.WarPlan.Target> ts = data.targets();
+        if (ts.isEmpty()) {
+            lines(g, "You know no castle within " + net.aiagent256.stormhold.holding.WarPlan.REACH + " blocks of your own yet. Ride out, or send "
+                    + "scouts from the Orders tab: every castle they find shows here.", mx, contentTop(), mw, contentBottom(), TEXT);
+            return;
+        }
+        int cName = mx, cOwner = mx + mw * 36 / 100, cAway = mx + mw * 62 / 100, cDef = mx + mw * 75 / 100, cPct = mx + mw * 88 / 100;
+        g.drawString(this.font, "Castle", cName, contentTop(), DIM, false);
+        g.drawString(this.font, "Held by", cOwner, contentTop(), DIM, false);
+        g.drawString(this.font, "Away", cAway, contentTop(), DIM, false);
+        g.drawString(this.font, "Men", cDef, contentTop(), DIM, false);
+        g.drawString(this.font, "Odds", cPct, contentTop(), DIM, false);
+        for (int r = 0; r < tRows && targetScroll + r < ts.size(); r++) {
+            int i = targetScroll + r;
+            var t = ts.get(i);
+            int y = tListY + r * ROW;
+            boolean sel = i == targetSel, over = mouseX >= mx && mouseX < mx + mw && mouseY >= y - 1 && mouseY < y + ROW - 1;
+            if (sel) g.fill(mx - 2, y - 1, mx + mw, y + ROW - 1, CARD);
+            else if (over) g.fill(mx - 2, y - 1, mx + mw, y + ROW - 1, 0x40FFFFFF);
+            int nameC = t.attitude() == 1 ? 0x80E080 : t.attitude() == 3 ? 0xFF8080 : t.attitude() == 4 ? 0xC0A0A0 : NAME;
+            g.drawString(this.font, fit(t.name(), cOwner - cName - 4), cName, y, nameC, false);
+            g.drawString(this.font, fit(t.owner().replace("House ", ""), cAway - cOwner - 4), cOwner, y, TEXT, false);
+            g.drawString(this.font, String.valueOf(t.distance()), cAway, y, DIM, false);
+            g.drawString(this.font, String.valueOf(t.defenders()), cDef, y, TEXT, false);
+            g.drawString(this.font, t.parts().isEmpty() ? "-" : t.pct() + "%", cPct, y, pctColor(t.pct(), t.parts().isEmpty()), false);
+        }
+        if (ts.size() > tRows) {
+            int track = tRows * ROW, bar = Math.max(8, track * tRows / ts.size());
+            int by = tListY + (track - bar) * targetScroll / Math.max(1, ts.size() - tRows);
+            g.fill(mx + mw - 2, tListY, mx + mw, tListY + track, 0x40FFFFFF);
+            g.fill(mx + mw - 2, by, mx + mw, by + bar, 0xC0F0D8A0);
+        }
+        // the chosen castle: who defends it, who'd go, the chance
+        var t = ts.get(Math.min(targetSel, ts.size() - 1));
+        int y = tDetailY;
+        g.fill(mx - 2, y - 4, mx + mw, y - 3, LINE);
+        g.drawString(this.font, fit(t.name() + ", " + t.owner() + ": about " + t.defenders() + " defenders in "
+                + net.aiagent256.stormhold.holding.WarPlan.kit(t.theirKit()) + ".", mw), mx, y, NAME, false);
+        y += 10;
+        if (t.parts().isEmpty()) {
+            g.drawString(this.font, fit("None of your castles has three men to spare, or each has a war party out already.", mw), mx, y, WARN, false);
+            y += 10;
+        } else {
+            int shown = 0;
+            for (var p : t.parts()) {
+                if (shown == MOST_PARTS && t.parts().size() > MOST_PARTS + 1) {
+                    g.drawString(this.font, "  and " + (t.parts().size() - shown) + " more castles", mx, y, DIM, false);
+                    y += 10;
+                    break;
+                }
+                g.drawString(this.font, fit(p.castle() + ": " + net.aiagent256.stormhold.holding.WarPlan.men(p.men()) + ", "
+                        + net.aiagent256.stormhold.holding.WarPlan.kit(p.kit()) + ", " + net.aiagent256.stormhold.holding.WarPlan.time(p.seconds()), mw), mx, y, TEXT, false);
+                y += 10;
+                shown++;
+            }
+        }
+        int[] all = new int[4];
+        for (var p : t.parts()) for (int i = 0; i < 4; i++) all[i] += p.men()[i];
+        if (!t.parts().isEmpty()) {
+            g.drawString(this.font, fit("In all " + t.men() + " men (" + net.aiagent256.stormhold.holding.WarPlan.men(all) + "): " + t.pct() + "%, "
+                    + net.aiagent256.stormhold.holding.WarPlan.verdict(t.pct()) + ".", mw), mx, y, pctColor(t.pct(), false), false);
+            y += 10;
+        }
+        if (!t.note().isEmpty()) g.drawString(this.font, fit(t.note(), mw), mx, y, WARN, false);
+    }
+
+    private static int pctColor(int pct, boolean none) {
+        return none ? DIM : pct >= 60 ? 0x80E080 : pct >= 30 ? 0xE8D080 : WARN;
+    }
+
     private int decisionY;
 
     /** The matter waiting on your word: its two answers as buttons under the story, and Later. */
@@ -512,6 +628,9 @@ public class WarTableScreen extends Screen {
         if (tab == DECIDE && data.decision() != null) {
             g.drawString(this.font, "Your word is needed", mx, y0 + 7, NAME, false);
             g.drawString(this.font, fit("Choose one. Unanswered for two days, it goes the second way.", mw), mx, y0 + 18, DIM, false);
+        } else if (tab == TARGETS) {
+            g.drawString(this.font, "Attack a castle", mx, y0 + 7, NAME, false);
+            g.drawString(this.font, fit("Nearest first. Odds: every castle of yours marching together, fought out of sight.", mw), mx, y0 + 18, DIM, false);
         } else if (tab == COUNCIL) {
             g.drawString(this.font, "Your council", mx, y0 + 7, NAME, false);
             g.drawString(this.font, fit("Four officers who serve every place you hold. Hover a seat's button for the details.", mw), mx, y0 + 18, DIM, false);
@@ -524,6 +643,7 @@ public class WarTableScreen extends Screen {
         }
         g.fill(mx - 2, y0 + 50, mx + mw, y0 + 51, LINE);
         if (tab == DECIDE && data.decision() != null) g.drawWordWrap(this.font, Component.literal(data.decision().text()), mx, contentTop(), mw, TEXT);
+        else if (tab == TARGETS) drawTargets(g, mx, mw, mouseX, mouseY);
         else if (tab == COUNCIL) drawCouncil(g, mx, mw);
         else if (h == null) {
             g.drawWordWrap(this.font, Component.literal("You hold no castles yet. Kill a castle's lord, raise a War Banner on its banner stand and "
@@ -647,7 +767,28 @@ public class WarTableScreen extends Screen {
     }
 
     @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (super.mouseClicked(mouseX, mouseY, button)) return true;
+        if (tab == TARGETS && button == 0 && !data.targets().isEmpty()) {
+            int mx = mainX(), mw = mainW();
+            if (mouseX >= mx && mouseX < mx + mw && mouseY >= tListY - 1 && mouseY < tListY + tRows * ROW - 1) {
+                int i = targetScroll + (int) ((mouseY - tListY + 1) / ROW);
+                if (i >= 0 && i < data.targets().size()) {
+                    targetSel = i;
+                    rebuildWidgets();
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (tab == TARGETS && data.targets().size() > tRows) {
+            targetScroll = (int) Math.max(0, Math.min(data.targets().size() - tRows, targetScroll - Math.signum(delta)));
+            return true;
+        }
         if (tab == OVERVIEW && overviewHeight > 0) {
             int view = textBottom - contentTop();
             scroll = (int) Math.max(0, Math.min(Math.max(0, overviewHeight - view), scroll - delta * 18));

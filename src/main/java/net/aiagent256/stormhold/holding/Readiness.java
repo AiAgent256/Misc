@@ -129,8 +129,18 @@ public final class Readiness {
         for (Role r : new Role[]{Role.CAPTAIN, Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN}) party += Campaigns.sends(from, r);
         String led = verdict(ratio(total, theirs, party, ours, ours));
         String alone = Campaigns.odds(level, from, enemy);
-        return "Against " + enemy.name + ": about " + total + " men in " + kitName(theirs) + ". A war party from here is " + party
-                + " in " + kitName(ours) + ". Led by you: " + led + ". Sent alone: " + alone + ".";
+        WarPlan.Part here = WarPlan.part(level, mgr, from, enemy);
+        String sends = here == null ? "This castle can't send a war party now (fewer than three to spare, or one is out already)."
+                : "From here: " + WarPlan.men(here.men()) + " in " + WarPlan.kit(here.kit()) + ", " + WarPlan.time(here.seconds()) + " away.";
+        UUID lord = from.ownerPlayer();
+        String all = "";
+        if (lord != null) {
+            WarPlan.Target t = WarPlan.plan(level, mgr, lord, enemy);
+            if (t.parts().size() > 1) all = " With every castle (" + t.parts().size() + " war parties, " + t.men() + " men): " + t.pct() + "%, "
+                    + WarPlan.verdict(t.pct()) + ".";
+        }
+        return "Against " + enemy.name + ": about " + total + " men in " + WarPlan.kit(Frontier.level(level, enemy)) + ". " + sends
+                + (here == null ? "" : " Led by you: " + led + ". Sent alone: " + alone + ".") + all;
     }
 
     private Readiness() {

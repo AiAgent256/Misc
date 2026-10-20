@@ -20,7 +20,7 @@ import java.util.UUID;
 
 /** Raids against player castles and war parties sent out by them. */
 public final class Campaigns {
-    private static final double MARCH_SPEED = 3.0; // blocks per second while unseen
+    static final double MARCH_SPEED = 3.0; // blocks per second while unseen
     /** How near a player must come for a raid on a castle to be fought for real. */
     public static final int WATCH = 160;
     /** Once it's real, how far he must go before it turns back into numbers. */
@@ -175,34 +175,13 @@ public final class Campaigns {
      * its war party, they go in together, and nobody watches. The men, the defenders and the chance, for the Realm map.
      */
     public static String allOdds(ServerLevel level, HoldingManager mgr, UUID lord, Holding enemy) {
-        double att = 0;
-        int men = 0, parties = 0;
-        for (Holding h : mgr.ownedBy(lord)) {
-            if (Vassals.is(h)) continue;
-            int party = 0;
-            double s = 0;
-            for (Role r : new Role[]{Role.CAPTAIN, Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN}) {
-                party += sends(h, r);
-                s += sends(h, r) * r.strength();
-            }
-            if (party < 3) continue;
-            men += party;
-            parties++;
-            att += s * kit(Frontier.level(level, h));
-        }
-        int theirs = HoldingEvents.defendersInAll(enemy);
-        String them = "About " + theirs + " defenders in " + Readiness.kitName(Readiness.tier(Frontier.level(level, enemy))) + ".";
-        if (parties == 0) return them + " None of your castles has men to spare for a war party.";
-        double def = enemy.strength() * 1.3 * kit(Frontier.level(level, enemy));
-        int win = 0, n = 40;
-        for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) {
-            double a = att * (0.8 + 0.4 * (i + 0.5) / n), d = def * (0.8 + 0.4 * (j + 0.5) / n);
-            if (a > d) win++;
-        }
-        int pct = (int) Math.round(100.0 * win / (n * n));
-        String verdict = pct >= 95 ? "they'll take it" : pct >= 60 ? "likely to take it" : pct >= 30 ? "a gamble" : pct > 0 ? "likely to break" : "they'd break against the walls";
-        return them + " All your castles marching (" + parties + (parties == 1 ? " war party, " : " war parties, ") + men + " men): "
-                + verdict + " (" + pct + "%).";
+        WarPlan.Target t = WarPlan.plan(level, mgr, lord, enemy);
+        String them = "About " + t.defenders() + " defenders in " + WarPlan.kit(t.theirKit()) + ".";
+        if (t.parts().isEmpty()) return them + " None of your castles has men to spare for a war party.";
+        int[] all = new int[4];
+        for (WarPlan.Part p : t.parts()) for (int i = 0; i < 4; i++) all[i] += p.men()[i];
+        return them + " All your castles marching (" + t.parts().size() + (t.parts().size() == 1 ? " war party: " : " war parties: ")
+                + WarPlan.men(all) + "): " + WarPlan.verdict(t.pct()) + " (" + t.pct() + "%).";
     }
 
     /** Two war parties of one lord against one castle. */

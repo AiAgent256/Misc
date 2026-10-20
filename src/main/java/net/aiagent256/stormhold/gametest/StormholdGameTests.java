@@ -3258,6 +3258,56 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** The Attack page's plan: each castle's war party, its kit, and the chance; the castles known near yours, nearest first. */
+    @GameTest(template = "arena")
+    public static void theAttackPageShowsWhoWouldGoAndTheChance(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        UUID me = UUID.randomUUID();
+        Holding a = sample(g), b = sample(g), enemy = sample(g), far = sample(g);
+        b.key = a.key + "/b";
+        enemy.key = a.key + "/e";
+        far.key = a.key + "/f";
+        enemy.name = "Foehold";
+        far.name = "Farfoe";
+        BlockPos c = a.center();
+        enemy.box = new BoundingBox(c.getX() + 300, c.getY(), c.getZ(), c.getX() + 315, c.getY() + 7, c.getZ() + 15);
+        enemy.bannerPos = enemy.box.getCenter();
+        far.box = new BoundingBox(c.getX() + 9000, c.getY(), c.getZ(), c.getX() + 9015, c.getY() + 7, c.getZ() + 15);
+        a.owner = Sides.player(me);
+        b.owner = a.owner;
+        enemy.greeted.add(me);
+        far.greeted.add(me);
+        for (Holding x : List.of(a, b, enemy, far)) mgr.holdings.put(x.id, x);
+        try {
+            var t = net.aiagent256.stormhold.holding.WarPlan.plan(level, mgr, me, enemy);
+            if (t.parts().size() != 2) throw new IllegalStateException(t.parts().size() + " war parties, not 2");
+            int knights = Campaigns.sends(a, Role.KNIGHT) + Campaigns.sends(b, Role.KNIGHT);
+            int got = 0;
+            for (var p : t.parts()) got += p.men()[1];
+            if (got != knights) throw new IllegalStateException(got + " knights in the plan, not " + knights);
+            if (t.pct() < 0 || t.pct() > 100) throw new IllegalStateException("chance " + t.pct());
+            if (t.parts().get(0).seconds() < 300 / 3 - 10) throw new IllegalStateException("a 300-block march in " + t.parts().get(0).seconds() + "s");
+            if (net.aiagent256.stormhold.holding.WarPlan.chance(2, 1) != 100 || net.aiagent256.stormhold.holding.WarPlan.chance(1, 2) != 0)
+                throw new IllegalStateException("the odds sum is off");
+            int even = net.aiagent256.stormhold.holding.WarPlan.chance(1, 1);
+            if (even < 45 || even > 55) throw new IllegalStateException("an even fight is " + even + "%");
+            var list = net.aiagent256.stormhold.holding.WarPlan.targets(level, mgr, me);
+            boolean foe = false, farOne = false;
+            for (var x : list) {
+                if (x.id().equals(enemy.id)) foe = true;
+                if (x.id().equals(far.id)) farOne = true;
+            }
+            if (!foe) throw new IllegalStateException("the castle next door isn't listed");
+            if (farOne) throw new IllegalStateException("a castle 9000 blocks off is listed");
+            if (!net.aiagent256.stormhold.holding.WarPlan.men(new int[]{1, 5, 2, 0}).equals("1 captain, 5 knights, 2 archers"))
+                throw new IllegalStateException("men read " + net.aiagent256.stormhold.holding.WarPlan.men(new int[]{1, 5, 2, 0}));
+        } finally {
+            for (Holding x : List.of(a, b, enemy, far)) mgr.holdings.remove(x.id);
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();
