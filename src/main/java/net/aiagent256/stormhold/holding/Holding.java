@@ -187,6 +187,13 @@ public class Holding {
     public int spoilsTaken;
     /** Scouts' maps waiting to go up in the hall. */
     public final List<net.minecraft.world.item.ItemStack> pendingMaps = new ArrayList<>();
+    /**
+     * The map room's wall: top-left frame cell x, y, z, the way the frames face (a Direction's 3D index), frames
+     * across and down, and the map squares (MapRoom.CELL blocks) of the castle itself. Null until scouts come home.
+     */
+    @Nullable public int[] mapRoom;
+    /** Not saved: when the castle last looked for a map-room wall and found none. */
+    public long mapRoomTriedAt;
     /** A ruin (see {@link Ruins}): brigand-held, a few men on the ground, until the Master Builder restores it. */
     public boolean ruined;
     /** The vassal lord who holds it in the owner's name (his first name), and his loyalty, 0 to 100. */
@@ -472,6 +479,7 @@ public class Holding {
         ListTag mapTags = new ListTag();
         for (var m : pendingMaps) mapTags.add(m.save(new CompoundTag()));
         t.put("PendingMaps", mapTags);
+        if (mapRoom != null) t.putIntArray("MapRoom", mapRoom);
         t.putString("BuilderName", builderName);
         if (builder != null) t.putUUID("Builder", builder);
         t.putString("FiefReport", fiefReport);
@@ -620,6 +628,10 @@ public class Holding {
         h.ruined = t.getBoolean("Ruined");
         h.loyalty = t.getInt("Loyalty");
         for (var m : t.getList("PendingMaps", 10)) h.pendingMaps.add(net.minecraft.world.item.ItemStack.of((CompoundTag) m));
+        if (t.contains("MapRoom")) {
+            int[] mr = t.getIntArray("MapRoom");
+            if (mr.length == 9) h.mapRoom = mr;
+        }
         h.builderName = t.getString("BuilderName");
         if (t.hasUUID("Builder")) h.builder = t.getUUID("Builder");
         h.fiefReport = t.getString("FiefReport");

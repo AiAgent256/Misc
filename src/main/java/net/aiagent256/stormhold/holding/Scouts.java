@@ -132,12 +132,12 @@ public final class Scouts {
         if (sp != null) {
             ItemStack copy = map.copy();
             if (!sp.getInventory().add(copy)) sp.drop(copy, false);
-            HoldingEvents.tell(level, c.player, Component.literal("  They've drawn it on a map: a copy is in your pack, and one goes up in the hall at "
+            HoldingEvents.tell(level, c.player, Component.literal("  They've drawn it on a map: a copy is in your pack, and one goes up in the map room at "
                     + h.name + ".").withStyle(ChatFormatting.GRAY));
         }
         hangPending(level, mgr, h);
         if (!h.pendingMaps.isEmpty())
-            HoldingEvents.tell(level, c.player, Component.literal("  The hall's copy goes up on a bare wall near the War Table of " + h.name
+            HoldingEvents.tell(level, c.player, Component.literal("  The castle's copy goes up in the map room of " + h.name
                     + " when you're next there.").withStyle(ChatFormatting.GRAY));
         Chronicle.log(level, mgr, Chronicle.NEWS, "Scouts from " + h.name + " report " + (lines.size() - 1) + " places near "
                 + c.to.getX() + ", " + c.to.getZ() + ".", c.player);
@@ -279,14 +279,23 @@ public final class Scouts {
         if (h.pendingMaps.isEmpty()) return;
         BlockPos anchor = !h.warTablePos.equals(BlockPos.ZERO) ? h.warTablePos : !h.bannerPos.equals(BlockPos.ZERO) ? h.bannerPos : h.center();
         if (!level.isLoaded(anchor)) return;
+        boolean room = MapRoom.ensure(level, mgr, h);
         for (java.util.Iterator<ItemStack> it = h.pendingMaps.iterator(); it.hasNext(); ) {
             ItemStack map = it.next();
+            if (room && MapRoom.hang(level, h, map)) {
+                it.remove();
+                mgr.setDirty();
+                HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The scouts' map goes up in its place in the map room of "
+                        + h.name + ".").withStyle(ChatFormatting.GRAY));
+                continue;
+            }
+            // no map room (no bare wall for one yet), or the square lies off its wall: the nearest bare wall
             BlockPos at = hang(level, h, anchor, map);
             if (at == null) return;   // no bare wall yet: it waits, and goes up when there is one
             it.remove();
             mgr.setDirty();
             HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The scouts' map hangs in the hall of " + h.name + " ("
-                    + at.getX() + ", " + at.getY() + ", " + at.getZ() + ").").withStyle(ChatFormatting.GRAY));
+                    + at.getX() + ", " + at.getY() + ", " + at.getZ() + ")" + (room ? ": its country lies past the edge of the map-room wall." : ".")).withStyle(ChatFormatting.GRAY));
         }
     }
 
@@ -300,7 +309,7 @@ public final class Scouts {
                     for (int dz = -r; dz <= r; dz++) {
                         if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
                         BlockPos p = anchor.offset(dx, dy, dz);
-                        if (!h.box.isInside(p) || !level.isLoaded(p) || !level.getBlockState(p).isAir()) continue;
+                        if (!h.box.isInside(p) || !level.isLoaded(p) || !level.getBlockState(p).isAir() || MapRoom.onWall(h, p)) continue;
                         for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
                             BlockPos wall = p.relative(d.getOpposite());
                             var ws = level.getBlockState(wall);

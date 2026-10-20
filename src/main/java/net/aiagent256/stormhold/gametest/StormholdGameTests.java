@@ -750,6 +750,58 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    @GameTest(template = "arena")
+    public static void scoutsMapRoomHangsMapsInPlace(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = sample(g);
+        BlockPos o = g.absolutePos(BlockPos.ZERO);
+        h.box = new BoundingBox(o.getX(), o.getY(), o.getZ(), o.getX() + 15, o.getY() + 12, o.getZ() + 15);
+        h.warTablePos = g.absolutePos(new BlockPos(7, 2, 4));
+        // a bare wall along the north side of the room, eleven across and seven high, the floor in front of it
+        for (int x = 2; x <= 12; x++) for (int y = 2; y <= 8; y++) g.setBlock(new BlockPos(x, y, 1), net.minecraft.world.level.block.Blocks.STONE_BRICKS);
+        mgr.holdings.put(h.id, h);
+        try {
+            BlockPos c = h.center();
+            var east = net.minecraft.world.item.MapItem.create(level, c.getX() + net.aiagent256.stormhold.holding.MapRoom.CELL, c.getZ(), (byte) 3, true, true);
+            h.pendingMaps.add(east);
+            net.aiagent256.stormhold.holding.Scouts.hangPending(level, mgr, h);
+            if (h.mapRoom == null) throw new IllegalStateException("no map room on an eleven-by-seven bare wall");
+            if (h.mapRoom[4] != 9 || h.mapRoom[5] != 5 || h.mapRoom[3] != net.minecraft.core.Direction.SOUTH.get3DDataValue())
+                throw new IllegalStateException("map room " + java.util.Arrays.toString(h.mapRoom));
+            if (!h.pendingMaps.isEmpty()) throw new IllegalStateException("the map is still waiting");
+            BlockPos home = net.aiagent256.stormhold.holding.MapRoom.frameAt(h, 4, 2), next = net.aiagent256.stormhold.holding.MapRoom.frameAt(h, 5, 2);
+            if (!next.equals(home.east())) throw new IllegalStateException("east of home is " + next + ", home " + home);
+            if (!level.getBlockState(net.aiagent256.stormhold.holding.MapRoom.frameAt(h, 4, 4).below()).is(net.minecraft.world.level.block.Blocks.CARTOGRAPHY_TABLE))
+                throw new IllegalStateException("no cartography table at the foot of the wall");
+            java.util.function.Function<BlockPos, List<net.minecraft.world.entity.decoration.ItemFrame>> at = p -> level.getEntitiesOfClass(
+                    net.minecraft.world.entity.decoration.ItemFrame.class, new net.minecraft.world.phys.AABB(p));
+            var homeFrames = at.apply(home);
+            var eastFrames = at.apply(next);
+            if (homeFrames.size() != 1 || !homeFrames.get(0).getItem().getHoverName().getString().contains("Testhold"))
+                throw new IllegalStateException("home square: " + homeFrames.stream().map(f -> f.getItem().getHoverName().getString()).toList());
+            var eastData = eastFrames.isEmpty() ? null : net.minecraft.world.item.MapItem.getSavedData(eastFrames.get(0).getItem(), level);
+            if (eastFrames.size() != 1 || eastData == null
+                    || net.aiagent256.stormhold.holding.MapRoom.cell(eastData.centerX) != net.aiagent256.stormhold.holding.MapRoom.cell(c.getX()) + 1)
+                throw new IllegalStateException("east square: " + eastFrames.size() + " frames");
+            // ridden again: the newer map takes the same frame
+            h.pendingMaps.add(net.minecraft.world.item.MapItem.create(level, c.getX() + net.aiagent256.stormhold.holding.MapRoom.CELL, c.getZ(), (byte) 3, true, true));
+            net.aiagent256.stormhold.holding.Scouts.hangPending(level, mgr, h);
+            if (at.apply(next).size() != 1 || !h.pendingMaps.isEmpty()) throw new IllegalStateException("a second map of the east square made "
+                    + at.apply(next).size() + " frames");
+            // a square past the wall's edge goes on another bare wall, never into the room's empty frames
+            h.pendingMaps.add(net.minecraft.world.item.MapItem.create(level, c.getX() + 9 * net.aiagent256.stormhold.holding.MapRoom.CELL, c.getZ(), (byte) 3, true, true));
+            net.aiagent256.stormhold.holding.Scouts.hangPending(level, mgr, h);
+            for (var f : level.getEntitiesOfClass(net.minecraft.world.entity.decoration.ItemFrame.class, net.minecraft.world.phys.AABB.of(h.box).inflate(2)))
+                if (net.aiagent256.stormhold.holding.MapRoom.onWall(h, f.blockPosition()) && !f.blockPosition().equals(home) && !f.blockPosition().equals(next))
+                    throw new IllegalStateException("a far map hung in the room's frame at " + f.blockPosition());
+        } finally {
+            for (var f : level.getEntitiesOfClass(net.minecraft.world.entity.decoration.ItemFrame.class, net.minecraft.world.phys.AABB.of(h.box).inflate(2))) f.discard();
+            mgr.holdings.remove(h.id);
+        }
+        g.succeed();
+    }
+
     /** A chest at {@code at} with a standing sign on it reading {@code lines}. */
     private static net.minecraft.world.Container signedChest(GameTestHelper g, BlockPos at, String... lines) {
         ServerLevel level = g.getLevel();
