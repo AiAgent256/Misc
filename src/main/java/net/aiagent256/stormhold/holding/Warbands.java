@@ -86,6 +86,13 @@ public final class Warbands {
             return;
         }
         if (active(mgr, h.id)) return;
+        // two days at least between attacks on a lord's places, whatever comes
+        long earliest = Campaigns.earliest(mgr, h.ownerPlayer());
+        if (h.nextWarband < earliest) {
+            h.nextWarband = earliest + level.random.nextInt(12000);
+            h.warbandWarned = false;
+            mgr.setDirty();
+        }
         if (!h.warbandWarned && now >= h.nextWarband - (Council.has(h.ownerPlayer(), Council.Seat.SPYMASTER) ? 72000 : 24000)) {
             h.warbandWarned = true;
             HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("Scouts sight an illager warband gathering in the hills near "
@@ -155,6 +162,8 @@ public final class Warbands {
         c.tier = h.tier;
         c.band.putAll(muster(level, h));
         c.spoils = 2 * c.total() + 10;   // two emeralds a head, and the captain's purse
+        c.mustered = c.total();
+        Campaigns.attacked(mgr, h.ownerPlayer(), level.getGameTime());
         double ang = level.random.nextDouble() * Math.PI * 2;
         BlockPos center = h.center();
         int reach = Math.max(h.box.getXSpan(), h.box.getZSpan()) / 2 + 48;
@@ -211,6 +220,13 @@ public final class Warbands {
         }
         if (c.bandLive.isEmpty()) return;
         List<Mob> band = live(level, c);
+        SiegeWorks.hunt(level, h, band);
+        if (SiegeWorks.rout(level, h, c, "the illagers")) {
+            discardLive(level, c);
+            c.band.clear();
+            broken(level, mgr, h, c, c.spoils, true);
+            return;
+        }
         int inside = 0;
         double sx = 0, sz = 0;
         AABB yard = AABB.of(h.box).deflate(6, 0, 6);
@@ -242,19 +258,7 @@ public final class Warbands {
                 }
             }
         }
-        // held at the walls: ladders, then a charge under the wall
-        if (inside < 3 && !c.laddered && c.siegeSeconds >= 45) {
-            c.laddered = true;
-            int raised = ladders(level, h, c, band, mid);
-            if (raised > 0) HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("Ladders against the walls of " + h.name
-                    + "! " + raised + " places.").withStyle(ChatFormatting.RED));
-        }
-        if (inside < 3 && !c.sapped && c.siegeSeconds >= 90 && Config.WARBAND_SAPPERS.get()) {
-            c.sapped = true;
-            BlockPos at = sap(level, h, band, mid);
-            if (at != null) HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("Sappers have set a charge under the wall of "
-                    + h.name + " at " + at.getX() + ", " + at.getZ() + "!").withStyle(ChatFormatting.RED));
-        }
+        // the gate is the only way in: no ladders, no charges under the walls
         // the yard taken: no man of the garrison left inside and the illagers in it
         if (inside >= 3 && defenders(level, h) == 0) {
             if (++c.sackSeconds >= 20) {
@@ -491,6 +495,18 @@ public final class Warbands {
         if (!d.contains(LADDER)) return;
         BlockPos foot = BlockPos.of(d.getLong(LADDER)), wall = BlockPos.of(d.getLong(LADDER_WALL));
         int top = d.getInt(LADDER_TOP);
+        if (m.tickCount % 20 == 0 && m.level().isLoaded(foot) && !(m.level().getBlockState(foot).getBlock() instanceof LadderBlock)
+                && !(m.level().getBlockState(foot.above()).getBlock() instanceof LadderBlock)) {
+            // the ladder's been thrown down (or never stood): he stops pressing at the foot of the wall and fights on
+            d.remove(LADDER);
+            d.remove(LADDER_WALL);
+            d.remove(LADDER_TOP);
+            if (d.contains(LADDER_GOAL)) {
+                if (m instanceof GarrisonEntity g) g.setMarchTarget(BlockPos.of(d.getLong(LADDER_GOAL)));
+                d.remove(LADDER_GOAL);
+            }
+            return;
+        }
         double cx = foot.getX() + 0.5, cz = foot.getZ() + 0.5;
         double hx = m.getX() - cx, hz = m.getZ() - cz;
         if (hx * hx + hz * hz > 1.2) return;                       // not at the ladder yet: steer() walks him there

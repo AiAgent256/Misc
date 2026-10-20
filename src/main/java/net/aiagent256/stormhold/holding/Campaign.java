@@ -58,8 +58,13 @@ public class Campaign {
     @Nullable public BlockPos ramHead;
     public net.minecraft.core.Direction ramIn = net.minecraft.core.Direction.NORTH;
     public int ramHits;
-    /** The ram is wrecked, or there was no room for one: no other comes this attack. */
+    /** The ram is wrecked, or there was no room for one. */
     public boolean ramDone;
+    /** Rams brought up this attack, the second the next may come, the second the last one came; the Siege Machines ram, if it's one. */
+    public int ramsUsed, nextRamAt, ramRaisedAt;
+    /** How many marched out, to tell when four in five have fallen; seconds since they did. */
+    public int mustered, routSeconds;
+    @Nullable public java.util.UUID ramMachine;
     /** The heir who leads this attack to take back his father's castle (see {@link Heirs}); empty for an ordinary raid. */
     public String heir = "";
     /** A column a supply line sent (cancel the line and it turns back), not one you asked for. */
@@ -124,6 +129,9 @@ public class Campaign {
             t.putInt("RamHits", ramHits);
         }
         t.putBoolean("RamDone", ramDone);
+        t.putInt("RamsUsed", ramsUsed);
+        t.putInt("Mustered", mustered);
+        if (ramMachine != null) t.putUUID("RamMachine", ramMachine);
         if (!heir.isEmpty()) t.putString("Heir", heir);
         if (supply) t.putBoolean("Supply", true);
         return t;
@@ -152,6 +160,9 @@ public class Campaign {
             c.ramHits = t.getInt("RamHits");
         }
         c.ramDone = t.getBoolean("RamDone");
+        c.ramsUsed = t.getInt("RamsUsed");
+        c.mustered = t.getInt("Mustered");
+        if (t.hasUUID("RamMachine")) c.ramMachine = t.getUUID("RamMachine");
         c.heir = t.getString("Heir");
         c.supply = t.getBoolean("Supply");
         CompoundTag cc = t.getCompound("Counts");

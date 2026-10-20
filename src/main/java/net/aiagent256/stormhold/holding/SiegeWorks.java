@@ -12,6 +12,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.RotatedPillarBlock;
@@ -27,16 +28,19 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * What a house's army does at your shut gate while you're there to see it. A quarter minute held at the walls and
- * they bring up a ram: a timber shed on the road before the gate with a log beam slung inside, swung against the
- * portcullis every three seconds while a man of theirs is at it. Ten blows and the gate gives. Break or burn the
- * beam (two logs left and it's done for) or cut down its crew and the gate holds. Forty seconds at the walls and
- * ladders go up the curtain on either side of the gate, three men to each; break the rungs to throw them down.
- * Three minutes and they hack the gate down with axes whatever you do, so an attack never stands there for ever.
+ * What a house's army does at your shut gate while you're there to see it: they ram it. A quarter minute held at the
+ * walls and they bring up a ram (the Siege Machines battering ram when that mod is in the pack, else a timber shed with
+ * a log beam slung inside) and swing it against the portcullis every three seconds while a man of theirs is at it.
+ * Ten blows and the gate gives. Smash the ram (or break or burn the shed's beam: two logs left and it's done for), or
+ * cut down its crew, and the gate holds. A wrecked ram is replaced 45 seconds later, three rams in all; a minute after
+ * the last is wrecked they give it up and the attack is thrown back. No ladders, no axes: the gate is the only way in.
  */
 public final class SiegeWorks {
-    public static final int RAM_AFTER = 15, LADDERS_AFTER = 40, AXES_AFTER = 180;
-    public static final int RAM_HITS = 10, RAM_EVERY = 3, CREW_RANGE = 7;
+    /** Seconds held at the walls before the first ram; after a ram's wrecked, before the next; rams in all; seconds after the last before they go. */
+    public static final int RAM_AFTER = 15, RAM_AGAIN = 45, RAMS = 3, GIVE_UP = 60;
+    public static final int RAM_HITS = 10, RAM_EVERY = 3, CREW_RANGE = 8;
+    /** Seconds a Siege Machines ram takes to be ready once it's brought up. */
+    static final int DEPLOY = 4;
     /** The shed's length out from the gate, and the beam's: drawn back it lies in cells 1 to BEAM, struck in 0 to BEAM - 1. */
     static final int SHED = 5, BEAM = 4;
 
@@ -44,58 +48,126 @@ public final class SiegeWorks {
     public record Site(BlockPos head, Direction in) {
     }
 
-    /** Once a second while a watched raid is held at the walls. */
-    public static void tick(ServerLevel level, HoldingManager mgr, Holding h, Campaign c) {
-        if (c.rammed) return;
+    /**
+     * Once a second while a watched raid is held at the walls. True when they give it up: three rams wrecked and a
+     * minute more before the gate, and the attack is thrown back.
+     */
+    public static boolean tick(ServerLevel level, HoldingManager mgr, Holding h, Campaign c) {
+        if (c.rammed) return false;
         c.siegeSeconds++;
         List<Mob> men = live(level, c);
         if (!shut(level, h)) {
             // nothing standing in the gate (broken, or never there): straight in
             c.rammed = true;
             clear(level, c);
-            return;
+            return false;
         }
-        if (c.ramHead == null && !c.ramDone && c.siegeSeconds >= RAM_AFTER) {
+        boolean up = c.ramHead != null;
+        if (!up && c.ramsUsed < RAMS && c.siegeSeconds >= Math.max(RAM_AFTER, c.nextRamAt)) {
             Site s = site(level, h);
-            if (s != null && raise(level, c, s)) {
-                HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("They bring up a ram against the gate of " + h.name + " ("
-                        + s.head().getX() + ", " + s.head().getY() + ", " + s.head().getZ() + ")! Ten blows and it's down: break or burn its "
-                        + "beam, or kill the men working it.").withStyle(ChatFormatting.RED));
+            c.ramsUsed++;
+            c.ramDone = false;
+            boolean machine = s != null && raiseMachine(level, c, s);
+            if (s != null && (machine || raise(level, c, s))) {
+                c.ramRaisedAt = c.siegeSeconds;
+                HoldingEvents.tell(level, h.ownerPlayer(), Component.literal((c.ramsUsed == 1 ? "They bring up a ram" : "They bring up another ram")
+                        + " against the gate of " + h.name + " (" + s.head().getX() + ", " + s.head().getY() + ", " + s.head().getZ() + ")! "
+                        + RAM_HITS + " blows and it's down: " + (machine ? "smash the ram" : "break or burn its beam") + ", or kill the men working it.")
+                        .withStyle(ChatFormatting.RED));
             } else {
-                c.ramDone = true;            // no room for one before this gate
+                c.ramsUsed = RAMS;           // no room for one before this gate
+                c.ramDone = true;
+                c.nextRamAt = c.siegeSeconds;
             }
         }
         if (c.ramHead != null) {
             Site s = new Site(c.ramHead, c.ramIn);
-            if (beam(level, s) < 2) {
-                HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The ram before " + h.name + " is wrecked!").withStyle(ChatFormatting.GREEN));
+            Entity m = c.ramMachine != null ? level.getEntity(c.ramMachine) : null;
+            boolean wrecked = c.ramMachine != null ? (m == null && level.isLoaded(s.head()) || m != null && !m.isAlive()) : beam(level, s) < 2;
+            if (wrecked) {
+                HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The ram before " + h.name + " is wrecked!"
+                        + (c.ramsUsed < RAMS ? " They'll bring up another." : " It was their last.")).withStyle(ChatFormatting.GREEN));
                 level.playSound(null, s.head(), SoundEvents.WOOD_BREAK, SoundSource.BLOCKS, 2.0F, 0.6F);
                 clear(level, c);
                 c.ramDone = true;
-            } else if (crewed(s, men)) {
+                c.nextRamAt = c.siegeSeconds + RAM_AGAIN;
+            } else if (crewed(s, men) && c.siegeSeconds - c.ramRaisedAt >= DEPLOY) {
                 int phase = c.siegeSeconds % RAM_EVERY;
                 if (phase == 0) {
-                    swing(level, s, true);
-                    strike(level, h, s);
+                    if (m != null) {
+                        useMachine(m, nearest(men, m));
+                        strike(level, h, s);
+                    } else {
+                        swing(level, s, true);
+                        strike(level, h, s);
+                    }
                     if (++c.ramHits >= RAM_HITS) {
                         breach(level, h, c, "The ram staves in the gate of " + h.name + "! They're inside the walls.");
-                        return;
+                        return false;
                     }
-                } else if (phase == 1) {
+                } else if (phase == 1 && m == null) {
                     swing(level, s, false);
                 }
             }
         }
-        if (!c.laddered && c.siegeSeconds >= LADDERS_AFTER) {
-            c.laddered = true;
-            Vec3 mid = mid(men, h);
-            int raised = Warbands.ladders(level, h, men, mid, c.to);
-            if (raised > 0) HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("Ladders against the walls of " + h.name + ": "
-                    + raised + (raised == 1 ? " place" : " places") + "! Break the rungs to throw them down.").withStyle(ChatFormatting.RED));
+        // no ram left to them, and a minute more before the gate: they give it up
+        return c.ramHead == null && c.ramsUsed >= RAMS && c.siegeSeconds >= c.nextRamAt + GIVE_UP;
+    }
+
+    // ------------------------------------------------------------ the garrison's part
+
+    /**
+     * Raiders come first. Every man of the garrison within 48 blocks of a raider, idle or busy with some monster in
+     * the field, goes for the nearest raider, however high or low he stands (a guard's own eye looks only four blocks
+     * up or down, so a man on a roof or a wall-walk was left alone). How many were set on one.
+     */
+    public static int hunt(ServerLevel level, Holding h, List<? extends Mob> raiders) {
+        if (raiders.isEmpty()) return 0;
+        java.util.Set<UUID> theirs = new java.util.HashSet<>();
+        for (Mob r : raiders) theirs.add(r.getUUID());
+        int set = 0;
+        for (UUID id : h.live.keySet()) {
+            if (!(level.getEntity(id) instanceof GarrisonEntity g) || !g.isAlive() || g.role() == net.aiagent256.stormhold.entity.Role.COURIER) continue;
+            LivingEntity t = g.getTarget();
+            if (t != null && t.isAlive() && theirs.contains(t.getUUID())) continue;
+            Mob best = null;
+            double bd = 48.0 * 48.0;
+            for (Mob r : raiders) {
+                if (!r.isAlive()) continue;
+                double d = r.distanceToSqr(g);
+                if (d < bd) {
+                    bd = d;
+                    best = r;
+                }
+            }
+            if (best == null) continue;
+            g.setTarget(best);
+            set++;
         }
-        // men sent up a ladder walk to its foot (their march only brings them within a few blocks)
-        for (Mob m : men) Warbands.toLadder(m);
-        if (c.siegeSeconds >= AXES_AFTER) breach(level, h, c, "Axes hack through the gate of " + h.name + "! They're inside the walls.");
+        return set;
+    }
+
+    /**
+     * When four in five of an attack have fallen, the rest lose heart: after fifteen seconds of it they run, and the
+     * attack is broken. True when they've gone.
+     */
+    public static boolean rout(ServerLevel level, Holding h, Campaign c, String who) {
+        if (c.mustered <= 0 || c.total() * 5 > c.mustered) {
+            c.routSeconds = 0;
+            return false;
+        }
+        if (++c.routSeconds < 15) return false;
+        HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The last " + c.total() + " of " + who + " lose heart and run from "
+                + h.name + ".").withStyle(ChatFormatting.GREEN));
+        clear(level, c);
+        return true;
+    }
+
+    @Nullable
+    private static LivingEntity nearest(List<Mob> men, Entity to) {
+        Mob best = null;
+        for (Mob x : men) if (best == null || x.distanceToSqr(to) < best.distanceToSqr(to)) best = x;
+        return best;
     }
 
     private static void breach(ServerLevel level, Holding h, Campaign c, String says) {
@@ -248,6 +320,11 @@ public final class SiegeWorks {
 
     /** Take what's left of the ram away: the shed and the beam, whatever of it still stands. */
     public static void clear(ServerLevel level, Campaign c) {
+        if (c.ramMachine != null) {
+            Entity m = level.getEntity(c.ramMachine);
+            if (m != null) m.discard();
+            c.ramMachine = null;
+        }
         if (c.ramHead == null) return;
         Site s = new Site(c.ramHead, c.ramIn);
         if (!level.isLoaded(s.head())) return;
@@ -262,6 +339,49 @@ public final class SiegeWorks {
             }
         }
         c.ramHead = null;
+    }
+
+    // ------------------------------------------------------------ the Siege Machines ram
+
+    private static final net.minecraft.resources.ResourceLocation SM_RAM = new net.minecraft.resources.ResourceLocation("siegemachines", "battering_ram");
+    @Nullable private static java.lang.reflect.Method USE;
+
+    /** The Siege Machines battering ram, brought up before the gate facing it, if that mod is in the pack. */
+    static boolean raiseMachine(ServerLevel level, Campaign c, Site s) {
+        if (!net.minecraftforge.registries.ForgeRegistries.ENTITY_TYPES.containsKey(SM_RAM)) return false;
+        net.minecraft.world.entity.EntityType<?> type = net.minecraftforge.registries.ForgeRegistries.ENTITY_TYPES.getValue(SM_RAM);
+        if (type == null) return false;
+        Entity e;
+        try {
+            e = type.create(level);
+        } catch (Exception ex) {
+            return false;
+        }
+        if (e == null) return false;
+        BlockPos at = s.head().relative(s.in().getOpposite(), 3);
+        float yaw = s.in().toYRot();
+        e.moveTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, yaw, 0.0F);
+        e.setYHeadRot(yaw);
+        e.setYBodyRot(yaw);
+        if (e instanceof Mob mob) mob.setPersistenceRequired();
+        if (!level.addFreshEntity(e)) return false;
+        c.ramMachine = e.getUUID();
+        c.ramHead = s.head();
+        c.ramIn = s.in();
+        c.ramHits = 0;
+        level.playSound(null, at, SoundEvents.WOOD_PLACE, SoundSource.BLOCKS, 2.0F, 0.5F);
+        return true;
+    }
+
+    /** Swing it: its own blow and its own animation, worked by the nearest of the crew. */
+    static void useMachine(Entity machine, @Nullable LivingEntity by) {
+        if (by == null) return;
+        try {
+            if (USE == null || !USE.getDeclaringClass().isInstance(machine)) USE = machine.getClass().getMethod("use", LivingEntity.class);
+            USE.invoke(machine, by);
+        } catch (Throwable t) {
+            // a version of the mod without it: the blow still counts, it just doesn't swing
+        }
     }
 
     /** Anyone close to the ram, for the tests. */

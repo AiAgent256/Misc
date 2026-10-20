@@ -38,6 +38,13 @@ public final class Campaigns {
             return;
         }
         if (active(mgr, h.id, Campaign.Kind.RAID)) return;
+        // two days at least between attacks on a lord's places, whatever comes
+        long earliest = earliest(mgr, h.ownerPlayer());
+        if (h.nextRaid < earliest) {
+            h.nextRaid = earliest + level.random.nextInt(12000);
+            h.raidWarned = false;
+            mgr.setDirty();
+        }
         if (net.aiagent256.stormhold.house.Standing.friendly(mgr, h.houseId, h.ownerPlayer())) {
             // a friendly house doesn't march on you; check again tomorrow
             if (now >= h.nextRaid) h.nextRaid = now + 24000;
@@ -81,6 +88,21 @@ public final class Campaigns {
         }
     }
 
+    /** Ticks between any two attacks (a house's raid or an illager warband) on one lord's places: two days. */
+    public static final long GAP = 48000;
+
+    /** The soonest the next attack on this lord's places may come. */
+    public static long earliest(HoldingManager mgr, @Nullable UUID lord) {
+        Long t = lord == null ? null : mgr.lastAttack.get(lord);
+        return t == null ? 0 : t + GAP;
+    }
+
+    static void attacked(HoldingManager mgr, @Nullable UUID lord, long now) {
+        if (lord == null) return;
+        mgr.lastAttack.put(lord, now);
+        mgr.setDirty();
+    }
+
     public static boolean active(HoldingManager mgr, UUID holding, Campaign.Kind kind) {
         for (Campaign c : mgr.campaigns) {
             if (c.kind == kind && c.stage != Campaign.Stage.DONE
@@ -107,8 +129,10 @@ public final class Campaigns {
         c.add(Role.ARCHER, (int) Math.ceil(h.count(Role.ARCHER) * 0.4));
         Heirs.lead(h, c);
         c.spoils = c.total();
+        c.mustered = c.total();
         mgr.campaigns.add(c);
         h.lastRaidAt = level.getGameTime();
+        attacked(mgr, h.ownerPlayer(), level.getGameTime());
         String where = fromLord(level, h);
         HoldingEvents.tell(level, h.ownerPlayer(), Component.literal((c.heir.isEmpty() ? mgr.house(h.houseId).title() + " marches on " + h.name
                 : c.heir + " comes to take back his father's castle, " + h.name + ",") + " with " + c.total() + " men!" + (where.isEmpty() ? "" : " It lies " + where + ".")
@@ -529,10 +553,25 @@ public final class Campaigns {
                 }
             }
             syncProgress(level, c);
-            // held at the gate: a ram, then ladders, then axes (see SiegeWorks)
+            List<net.minecraft.world.entity.Mob> men = new java.util.ArrayList<>();
+            for (UUID id : c.live.keySet()) if (level.getEntity(id) instanceof net.minecraft.world.entity.Mob m && m.isAlive()) men.add(m);
+            SiegeWorks.hunt(level, h, men);
+            String who = HoldingEvents.ownerName(level, mgr, c.side) + "'s men";
+            if (SiegeWorks.rout(level, h, c, who)) {
+                Garrisons.discardLive(level, c.live, false);
+                c.counts.clear();
+                return;
+            }
+            // held at the gate: they ram it, and give it up when their rams are wrecked (see SiegeWorks)
             if (!c.live.isEmpty() && !c.rammed) {
                 if (c.siegeSeconds > 0) {
-                    SiegeWorks.tick(level, mgr, h, c);
+                    if (SiegeWorks.tick(level, mgr, h, c)) {
+                        HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("With their rams wrecked, " + who + " give up the attack on "
+                                + h.name + ".").withStyle(ChatFormatting.GREEN));
+                        Garrisons.discardLive(level, c.live, false);
+                        c.counts.clear();
+                        return;
+                    }
                 } else if (c.progress > c.lastProgress + 1e-4) {
                     c.lastProgress = c.progress;
                     c.stallSeconds = 0;
