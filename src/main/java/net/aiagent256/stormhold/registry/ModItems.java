@@ -38,6 +38,15 @@ public final class ModItems {
     public static final RegistryObject<Item> NOTICE_BOARD = ITEMS.register("notice_board",
             () -> new BlockItem(ModBlocks.NOTICE_BOARD.get(), new Item.Properties()));
 
+    public static final RegistryObject<Item> DIREWOLF_WHISTLE = ITEMS.register("direwolf_whistle",
+            () -> new net.aiagent256.stormhold.item.DirewolfWhistleItem(new Item.Properties().stacksTo(1)));
+    public static final RegistryObject<Item> BARDING_IRON = ITEMS.register("direwolf_barding_iron",
+            () -> new net.aiagent256.stormhold.item.DirewolfBardingItem(1, new Item.Properties().stacksTo(1)));
+    public static final RegistryObject<Item> BARDING_DIAMOND = ITEMS.register("direwolf_barding_diamond",
+            () -> new net.aiagent256.stormhold.item.DirewolfBardingItem(2, new Item.Properties().stacksTo(1)));
+    public static final RegistryObject<Item> BARDING_NETHERITE = ITEMS.register("direwolf_barding_netherite",
+            () -> new net.aiagent256.stormhold.item.DirewolfBardingItem(3, new Item.Properties().stacksTo(1).fireResistant()));
+
     public static final List<RegistryObject<Item>> EGGS = new ArrayList<>();
 
     static {
@@ -51,6 +60,7 @@ public final class ModItems {
         egg("retainer_archer", ModEntities.RETAINER_ARCHER, 0x2040a0, 0x2f6b2f);
         egg("retainer_crossbowman", ModEntities.RETAINER_CROSSBOWMAN, 0x2040a0, 0x7a4a1a);
         egg("courier", ModEntities.COURIER, 0x8a6a3a, 0xe0d0a0);
+        egg("direwolf", ModEntities.DIREWOLF, 0xe8e8ec, 0x9a2020);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -68,6 +78,10 @@ public final class ModItems {
                 out.accept(WAR_TABLE.get());
                 out.accept(PORTCULLIS.get());
                 out.accept(BANNER_STAND.get());
+                out.accept(DIREWOLF_WHISTLE.get());
+                out.accept(BARDING_IRON.get());
+                out.accept(BARDING_DIAMOND.get());
+                out.accept(BARDING_NETHERITE.get());
                 for (RegistryObject<Item> e : EGGS) out.accept(e.get());
             }).build());
 

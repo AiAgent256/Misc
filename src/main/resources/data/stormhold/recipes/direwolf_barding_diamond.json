@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "I I",
+    "ILI",
+    "I I"
+  ],
+  "key": {
+    "I": {
+      "item": "minecraft:diamond"
+    },
+    "L": {
+      "item": "minecraft:leather"
+    }
+  },
+  "result": {
+    "item": "stormhold:direwolf_barding_diamond"
+  }
+}

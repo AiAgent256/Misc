@@ -21,6 +21,7 @@ public final class ClientEvents {
         e.registerEntityRenderer(ModEntities.RETAINER_ARCHER.get(), GarrisonRenderer::new);
         e.registerEntityRenderer(ModEntities.RETAINER_CROSSBOWMAN.get(), GarrisonRenderer::new);
         e.registerEntityRenderer(ModEntities.COURIER.get(), GarrisonRenderer::new);
+        e.registerEntityRenderer(ModEntities.DIREWOLF.get(), DirewolfRenderer::new);
     }
 
     @SubscribeEvent

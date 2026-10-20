@@ -48,6 +48,8 @@ public class HoldingManager extends SavedData {
     public final List<Engines.Engine> engines = new ArrayList<>();
     /** Each lord's seat: where his rents and dues are paid, where his roads start, the castle the Realm map crowns. */
     public final Map<UUID, UUID> seats = new HashMap<>();
+    /** Each lord's direwolf, kept in the overworld's record (see {@link Direwolves}). */
+    public final Map<UUID, Direwolves.Record> direwolves = new HashMap<>();
     /** When each lord's places were last attacked (see {@link Campaigns#GAP}). */
     public final Map<UUID, Long> lastAttack = new HashMap<>();
     /** Truces bought from the houses: house id -> player -> the truce (see {@link Truces}). */
@@ -171,6 +173,7 @@ public class HoldingManager extends SavedData {
         seats.forEach((p, h) -> seatTag.putUUID(p.toString(), h));
         tag.put("Seats", seatTag);
         tag.put("Truces", Truces.save(truces));
+        if (!direwolves.isEmpty()) tag.put("Direwolves", Direwolves.save(direwolves));
         CompoundTag la = new CompoundTag();
         lastAttack.forEach((p, t) -> la.putLong(p.toString(), t));
         tag.put("LastAttack", la);
@@ -224,6 +227,7 @@ public class HoldingManager extends SavedData {
             }
         }
         Truces.load(tag.getList("Truces", Tag.TAG_COMPOUND), m.truces);
+        Direwolves.load(tag.getCompound("Direwolves"), m.direwolves);
         CompoundTag la = tag.getCompound("LastAttack");
         for (String k : la.getAllKeys()) {
             try {

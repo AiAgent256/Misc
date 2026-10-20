@@ -3308,6 +3308,96 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** A white pup: meat tames it (one to a lord), kills raise it, barding arms it, a fall wounds it, the whistle calls it and sends it off. */
+    @GameTest(template = "arena", timeoutTicks = 200)
+    public static void aDirewolfGrowsWearsBardingAndComesAtTheWhistle(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager book = HoldingManager.get(level.getServer().overworld());
+        var player = g.makeMockPlayer();
+        var at = g.absoluteVec(new net.minecraft.world.phys.Vec3(8, 2, 8));
+        player.moveTo(at.x, at.y, at.z);
+        List<Entity> spawned = new ArrayList<>();
+        try {
+            var pup = net.aiagent256.stormhold.holding.Direwolves.pup(level, g.absolutePos(new BlockPos(4, 2, 4)));
+            if (pup == null) throw new IllegalStateException("no pup");
+            spawned.add(pup);
+            if (pup.isTame() || pup.wolfLevel() != 1 || pup.getMaxHealth() != 40) throw new IllegalStateException("pup: tame " + pup.isTame()
+                    + ", level " + pup.wolfLevel() + ", health " + pup.getMaxHealth());
+            var r = net.aiagent256.stormhold.holding.Direwolves.tame(level, pup, player);
+            if (!pup.isTame() || !player.getUUID().equals(pup.getOwnerUUID())) throw new IllegalStateException("not tamed");
+            if (pup.getMaxHealth() != 40) throw new IllegalStateException("taming set its health to " + pup.getMaxHealth());
+            if (!player.getInventory().contains(new net.minecraft.world.item.ItemStack(net.aiagent256.stormhold.registry.ModItems.DIREWOLF_WHISTLE.get())))
+                throw new IllegalStateException("no whistle");
+            // one to a lord
+            var other = net.aiagent256.stormhold.holding.Direwolves.pup(level, g.absolutePos(new BlockPos(10, 2, 10)));
+            spawned.add(other);
+            var beef = new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BEEF, 16);
+            for (int i = 0; i < 8; i++)
+                net.aiagent256.stormhold.holding.Direwolves.interact(level, other, player, net.minecraft.world.InteractionHand.MAIN_HAND, beef);
+            if (other.isTame()) throw new IllegalStateException("a second pup came to a lord with one already");
+            // kills: a zombie is five; twenty to the second level
+            var zombie = net.minecraft.world.entity.EntityType.ZOMBIE.create(level);
+            for (int i = 0; i < 4; i++) net.aiagent256.stormhold.holding.Direwolves.kill(level, pup, zombie);
+            if (r.level != 2 || r.xp != 0) throw new IllegalStateException("after four zombies level " + r.level + ", " + r.xp + " learned");
+            if (pup.getMaxHealth() != 48 || pup.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE) != 7)
+                throw new IllegalStateException("level 2: health " + pup.getMaxHealth() + ", bite "
+                        + pup.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE));
+            if (Math.abs(pup.getBbWidth() - 0.6F * net.aiagent256.stormhold.entity.DirewolfEntity.scale(2)) > 0.01)
+                throw new IllegalStateException("level 2 width " + pup.getBbWidth());
+            for (int i = 0; i < 400 && r.level < 10; i++) net.aiagent256.stormhold.holding.Direwolves.kill(level, pup, zombie);
+            if (r.level != 10 || pup.wolfLevel() != 10) throw new IllegalStateException("never full grown: " + r.level);
+            // barding on, swapped, off
+            player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,
+                    new net.minecraft.world.item.ItemStack(net.aiagent256.stormhold.registry.ModItems.BARDING_IRON.get()));
+            net.aiagent256.stormhold.holding.Direwolves.interact(level, pup, player, net.minecraft.world.InteractionHand.MAIN_HAND, player.getMainHandItem());
+            if (pup.barding() != 1 || r.barding != 1 || pup.getArmorValue() != 8) throw new IllegalStateException("iron: " + pup.barding() + ", armour " + pup.getArmorValue());
+            player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,
+                    new net.minecraft.world.item.ItemStack(net.aiagent256.stormhold.registry.ModItems.BARDING_DIAMOND.get()));
+            net.aiagent256.stormhold.holding.Direwolves.interact(level, pup, player, net.minecraft.world.InteractionHand.MAIN_HAND, player.getMainHandItem());
+            if (pup.barding() != 2 || pup.getArmorValue() != 12) throw new IllegalStateException("diamond: armour " + pup.getArmorValue());
+            if (!player.getInventory().contains(new net.minecraft.world.item.ItemStack(net.aiagent256.stormhold.registry.ModItems.BARDING_IRON.get())))
+                throw new IllegalStateException("the iron barding wasn't given back");
+            player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, net.minecraft.world.item.ItemStack.EMPTY);
+            player.setShiftKeyDown(true);
+            net.aiagent256.stormhold.holding.Direwolves.interact(level, pup, player, net.minecraft.world.InteractionHand.MAIN_HAND, player.getMainHandItem());
+            player.setShiftKeyDown(false);
+            if (pup.barding() != 0 || pup.getArmorValue() != 0) throw new IllegalStateException("barding not off");
+            player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,
+                    new net.minecraft.world.item.ItemStack(net.aiagent256.stormhold.registry.ModItems.BARDING_DIAMOND.get()));
+            net.aiagent256.stormhold.holding.Direwolves.interact(level, pup, player, net.minecraft.world.InteractionHand.MAIN_HAND, player.getMainHandItem());
+            // saved and loaded, it keeps its level, barding and wounds
+            pup.setHealth(30);
+            CompoundTag saved = new CompoundTag();
+            pup.saveWithoutId(saved);
+            var copy = net.aiagent256.stormhold.registry.ModEntities.DIREWOLF.get().create(level);
+            copy.load(saved);
+            if (copy.wolfLevel() != 10 || copy.barding() != 2 || Math.abs(copy.getHealth() - 30) > 0.01 || copy.getMaxHealth() != 112)
+                throw new IllegalStateException("loaded: level " + copy.wolfLevel() + ", barding " + copy.barding() + ", health " + copy.getHealth()
+                        + " of " + copy.getMaxHealth());
+            if (net.aiagent256.stormhold.holding.Direwolves.stale(level, copy)) throw new IllegalStateException("its own record calls it stale");
+            // brought down: wounded, not dead, and the whistle won't call it yet
+            pup.hurt(level.damageSources().generic(), 10000);
+            if (!pup.isRemoved()) throw new IllegalStateException("still standing");
+            if (r.entity != null || r.out || r.woundedUntil <= level.getGameTime()) throw new IllegalStateException("not wounded: " + r.woundedUntil);
+            if (r.level != 10 || r.barding != 2) throw new IllegalStateException("the fall cost it its learning");
+            net.aiagent256.stormhold.holding.Direwolves.whistle(level, player);
+            if (r.entity != null) throw new IllegalStateException("came while wounded");
+            r.woundedUntil = 0;
+            net.aiagent256.stormhold.holding.Direwolves.whistle(level, player);
+            if (r.entity == null || !r.out || !(level.getEntity(r.entity) instanceof net.aiagent256.stormhold.entity.DirewolfEntity back))
+                throw new IllegalStateException("the whistle didn't call it");
+            spawned.add(back);
+            if (back.wolfLevel() != 10 || back.barding() != 2 || !back.isTame()) throw new IllegalStateException("came back as level " + back.wolfLevel());
+            if (back.distanceToSqr(player) > 9 * 9) throw new IllegalStateException("came to " + back.blockPosition() + ", not the lord");
+            net.aiagent256.stormhold.holding.Direwolves.whistle(level, player);
+            if (!back.isRemoved() || r.out) throw new IllegalStateException("the whistle at its side didn't send it off");
+        } finally {
+            book.direwolves.remove(player.getUUID());
+            for (Entity e : spawned) if (!e.isRemoved()) e.discard();
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

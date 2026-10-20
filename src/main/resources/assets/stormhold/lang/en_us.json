@@ -34,5 +34,11 @@
   "item.stormhold.marshal_baton.tip3": "Point at the sky: follow / aggressive. Sneak: fall in.",
   "item.stormhold.marshal_baton.tip4": "Point at one of your men: he holds where he stands (or comes with you while the rest hold).",
   "key.stormhold.realm": "Realm map",
-  "key.categories.stormhold": "Stormhold"
+  "key.categories.stormhold": "Stormhold",
+  "entity.stormhold.direwolf": "Direwolf",
+  "item.stormhold.direwolf_spawn_egg": "Direwolf Spawn Egg",
+  "item.stormhold.direwolf_whistle": "Direwolf Whistle",
+  "item.stormhold.direwolf_barding_iron": "Iron Direwolf Barding",
+  "item.stormhold.direwolf_barding_diamond": "Diamond Direwolf Barding",
+  "item.stormhold.direwolf_barding_netherite": "Netherite Direwolf Barding"
 }

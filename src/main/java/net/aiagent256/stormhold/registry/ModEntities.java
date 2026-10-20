@@ -29,6 +29,10 @@ public final class ModEntities {
     public static final RegistryObject<EntityType<RetainerEntity>> RETAINER_CROSSBOWMAN = retainer("retainer_crossbowman", Role.CROSSBOWMAN);
     public static final RegistryObject<EntityType<RetainerEntity>> COURIER = retainer("courier", Role.COURIER);
 
+    public static final RegistryObject<EntityType<net.aiagent256.stormhold.entity.DirewolfEntity>> DIREWOLF = ENTITIES.register("direwolf",
+            () -> EntityType.Builder.<net.aiagent256.stormhold.entity.DirewolfEntity>of(net.aiagent256.stormhold.entity.DirewolfEntity::new, MobCategory.CREATURE)
+                    .sized(0.6F, 0.85F).clientTrackingRange(10).build(Stormhold.MODID + ":direwolf"));
+
     private static RegistryObject<EntityType<HouseSoldierEntity>> house(String name, Role role) {
         ROLE_BY_NAME.put(name, role);
         return ENTITIES.register(name, () -> EntityType.Builder.<HouseSoldierEntity>of(HouseSoldierEntity::new, MobCategory.MISC)

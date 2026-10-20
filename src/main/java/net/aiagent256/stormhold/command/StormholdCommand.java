@@ -27,6 +27,20 @@ public final class StormholdCommand {
                     c.getSource().sendSuccess(() -> net.minecraft.network.chat.Component.literal("Stormhold build " + Stormhold.buildId()), false);
                     return 1;
                 }))
+                .then(Commands.literal("direwolf").executes(c -> {
+                            var p = c.getSource().getPlayerOrException();
+                            var r = net.aiagent256.stormhold.holding.Direwolves.of(p.server, p.getUUID());
+                            p.sendSystemMessage(Component.literal(r == null ? "You have no direwolf. A Dire Hound Leader sometimes leaves a white pup "
+                                    + "by its body (one in three; a Dread Hound one in forty): feed it raw meat."
+                                    : net.aiagent256.stormhold.holding.Direwolves.stats(r)));
+                            return 1;
+                        })
+                        .then(Commands.literal("pup").requires(s -> s.hasPermission(2)).executes(c -> {
+                            var p = c.getSource().getPlayerOrException();
+                            var w = net.aiagent256.stormhold.holding.Direwolves.pup(p.serverLevel(), p.blockPosition().relative(p.getDirection(), 2));
+                            c.getSource().sendSuccess(() -> Component.literal(w == null ? "No pup." : "A white pup. Feed it raw meat."), false);
+                            return w == null ? 0 : 1;
+                        })))
                 .then(Commands.literal("list").executes(StormholdCommand::list))
                 .then(Commands.literal("council").executes(c -> {
                             var p = c.getSource().getPlayerOrException();

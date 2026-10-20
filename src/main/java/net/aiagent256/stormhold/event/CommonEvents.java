@@ -78,6 +78,13 @@ public final class CommonEvents {
             e.setCanceled(true);
     }
 
+    /** A direwolf's kills, and the hound packs' pups. */
+    @SubscribeEvent
+    public static void died(net.minecraftforge.event.entity.living.LivingDeathEvent e) {
+        if (e.getEntity().level() instanceof ServerLevel level)
+            net.aiagent256.stormhold.holding.Direwolves.onDeath(level, e.getEntity(), e.getSource());
+    }
+
     /** In the lists a man brought low yields instead of dying. */
     @SubscribeEvent
     public static void damaged(net.minecraftforge.event.entity.living.LivingDamageEvent e) {
@@ -90,6 +97,11 @@ public final class CommonEvents {
         if (!(e.getLevel() instanceof ServerLevel level) || !(e.getEntity() instanceof net.minecraft.world.entity.Mob mob)) return;
         if (net.aiagent256.stormhold.holding.Warbands.stray(level, mob)) {
             e.setCanceled(true);                        // a warband man saved with the world: his warband brings him up itself
+            return;
+        }
+        if (e.loadedFromDisk() && mob instanceof net.aiagent256.stormhold.entity.DirewolfEntity w
+                && net.aiagent256.stormhold.holding.Direwolves.stale(level, w)) {
+            e.setCanceled(true);                        // called away elsewhere since: the record answers for another
             return;
         }
         if (e.loadedFromDisk() && mob instanceof GarrisonEntity g && !net.aiagent256.stormhold.holding.Garrisons.belongs(level, g)) {

@@ -22,6 +22,7 @@ public final class ModBusEvents {
         e.put(ModEntities.RETAINER_ARCHER.get(), GarrisonEntity.attributes(Role.ARCHER).build());
         e.put(ModEntities.RETAINER_CROSSBOWMAN.get(), GarrisonEntity.attributes(Role.CROSSBOWMAN).build());
         e.put(ModEntities.COURIER.get(), GarrisonEntity.attributes(Role.COURIER).build());
+        e.put(ModEntities.DIREWOLF.get(), net.aiagent256.stormhold.entity.DirewolfEntity.attributes().build());
     }
 
     private ModBusEvents() {
