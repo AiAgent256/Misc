@@ -3594,16 +3594,16 @@ public class StormholdGameTests {
         Holding h = sample(g);
         h.owner = Sides.player(UUID.randomUUID());
         h.builderName = "Testwright";
-        h.warTablePos = g.absolutePos(new BlockPos(3, 2, 3));
+        h.warTablePos = g.absolutePos(new BlockPos(3, 3, 3));
         var m = net.minecraft.world.entity.EntityType.VILLAGER.create(level);
         if (m == null) throw new IllegalStateException("no villager");
-        var at = g.absoluteVec(new net.minecraft.world.phys.Vec3(3.5, 2, 3.5));
+        var at = g.absoluteVec(new net.minecraft.world.phys.Vec3(3.5, 3, 3.5));
         m.moveTo(at.x, at.y, at.z);
         m.setCustomName(net.minecraft.network.chat.Component.literal("Master Builder Testwright"));
         level.addFreshEntity(m);
         try {
             if (net.aiagent256.stormhold.holding.Builder.master(level, h) != m) throw new IllegalStateException("the builder isn't known by his name");
-            BlockPos near = g.absolutePos(new BlockPos(6, 2, 6));
+            BlockPos near = g.absolutePos(new BlockPos(6, 3, 6));
             BlockPos far = near.offset(60, 0, 0);
             h.work = net.aiagent256.stormhold.holding.Builder.REPAIR;
             h.workQueue = new java.util.ArrayDeque<>();
@@ -3620,7 +3620,7 @@ public class StormholdGameTests {
             if (m.getBrain().getMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET).isEmpty())
                 throw new IllegalStateException("he didn't set off for the far work");
             // the smiths' anvil
-            BlockPos anvil = g.absolutePos(new BlockPos(9, 2, 9));
+            BlockPos anvil = g.absolutePos(new BlockPos(9, 3, 9));
             level.setBlock(anvil, net.minecraft.world.level.block.Blocks.ANVIL.defaultBlockState(), 3);
             BlockPos found = net.aiagent256.stormhold.holding.Work.forge(level, h, level.getGameTime());
             if (!anvil.equals(found)) throw new IllegalStateException("the smiths looked for the anvil and found " + found);
