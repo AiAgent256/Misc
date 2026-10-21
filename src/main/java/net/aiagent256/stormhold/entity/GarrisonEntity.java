@@ -164,6 +164,15 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
                 protected net.minecraft.world.phys.AABB getTargetSearchArea(double d) {
                     return this.mob.getBoundingBox().inflate(d, r.ranged ? Math.min(d, 32.0) : 4.0, d);
                 }
+
+                // not simply the nearest: the nearest with room on him (see Engagement), so a fight spreads into pairs
+                @Override
+                protected void findTarget() {
+                    var mob = GarrisonEntity.this;
+                    var foes = mob.level().getEntitiesOfClass(LivingEntity.class, this.getTargetSearchArea(this.getFollowDistance()),
+                            e -> this.targetConditions.test(mob, e));
+                    this.target = net.aiagent256.stormhold.entity.ai.Engagement.pick(mob, foes);
+                }
             });
         }
     }
@@ -811,8 +820,27 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
                 }
                 if (foe != null && foe != this && !isAlly(foe) && !net.aiagent256.stormhold.holding.Tourney.is(foe)
                         && !(foe instanceof Player fp && (fp.isCreative() || fp.isSpectator()))) {
-                    this.setTarget(foe);
+                    // two of his own on the man fighting his lord is enough: the rest take the foes around him
+                    var friends = net.aiagent256.stormhold.entity.ai.Engagement.friends(this);
+                    if (net.aiagent256.stormhold.entity.ai.Engagement.on(friends, foe) < net.aiagent256.stormhold.entity.ai.Engagement.most(this)) {
+                        this.setTarget(foe);
+                    } else {
+                        var around = this.level().getEntitiesOfClass(LivingEntity.class, p.getBoundingBox().inflate(16, 6, 16),
+                                e -> e != foe && e.isAlive() && this.isHostileTo(e));
+                        LivingEntity other = net.aiagent256.stormhold.entity.ai.Engagement.pick(this, around);
+                        this.setTarget(other != null ? other : foe);
+                    }
                 }
+            }
+        }
+        // in a fight: one too many on his foe and he finds his own; and room at his elbow
+        if (role() != Role.COURIER && role() != Role.LORD && this.getTarget() != null) {
+            var order = owner() != null ? net.aiagent256.stormhold.holding.Orders.peek(owner()) : null;
+            if ((this.tickCount + this.getId()) % 25 == 0 && (order == null || order.target == null))
+                net.aiagent256.stormhold.entity.ai.Engagement.rebalance(this);
+            if (!role().ranged && this.onGround() && !climbing && !this.onClimbable() && !this.isInWater() && !holdsPosition()) {
+                var push = net.aiagent256.stormhold.entity.ai.Engagement.elbowRoom(this);
+                if (push != Vec3.ZERO) this.setDeltaMovement(this.getDeltaMovement().add(push));
             }
         }
         if (!role().ranged && role() != Role.COURIER) {

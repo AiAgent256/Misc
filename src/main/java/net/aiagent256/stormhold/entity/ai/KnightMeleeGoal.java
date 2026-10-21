@@ -18,6 +18,31 @@ public class KnightMeleeGoal extends MeleeAttackGoal {
         this.knight = mob;
     }
 
+    /** Which way he circles between blows, and how long before he thinks again. */
+    private int side = 1, sideTicks;
+
+    /**
+     * Between blows a knight in reach doesn't stand pressed against his man: he gives a little ground and circles,
+     * sword up, the way two men fight rather than a mob, and steps in again when his arm is ready.
+     */
+    @Override
+    public void tick() {
+        super.tick();
+        LivingEntity t = this.mob.getTarget();
+        if (t == null || !t.isAlive()) return;
+        if (knight.holdsPosition() || knight.climbing || knight.onClimbable() || knight.isInWater() || !knight.onGround()) return;
+        if (this.getTicksUntilNextAttack() <= 6) return;
+        double dx = t.getX() - knight.getX(), dz = t.getZ() - knight.getZ(), d2 = dx * dx + dz * dz;
+        if (d2 > getAttackReachSqr(t) || Math.abs(t.getY() - knight.getY()) > 1.5) return;
+        if (--sideTicks <= 0) {
+            sideTicks = 25 + knight.getRandom().nextInt(40);
+            if (knight.getRandom().nextFloat() < 0.6F) side = -side;
+        }
+        knight.getNavigation().stop();
+        knight.getMoveControl().strafe(d2 < 2.0 * 2.0 ? -0.6F : 0.0F, 0.7F * side);
+        knight.getLookControl().setLookAt(t, 30.0F, 30.0F);
+    }
+
     @Override
     protected double getAttackReachSqr(LivingEntity target) {
         double r = REACH + target.getBbWidth() * 0.5;

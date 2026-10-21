@@ -3547,6 +3547,45 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** Ten men don't all go for the same two: each takes the nearest foe with room on him, a third man finds his own, friends give elbow room. */
+    @GameTest(template = "arena", timeoutTicks = 100)
+    public static void aFightSpreadsIntoPairs(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        List<GarrisonEntity> a = new ArrayList<>(), b = new ArrayList<>();
+        try {
+            for (int i = 0; i < 4; i++) {
+                for (int s = 0; s < 2; s++) {
+                    GarrisonEntity e = net.aiagent256.stormhold.registry.ModEntities.typeFor(Role.KNIGHT, true).create(level);
+                    if (e == null) throw new IllegalStateException("no knight");
+                    var at = g.absoluteVec(new net.minecraft.world.phys.Vec3(4.5 + i * 2, 2, s == 0 ? 3.5 : 12.5));
+                    e.moveTo(at.x, at.y, at.z, s == 0 ? 0 : 180, 0);
+                    e.setup(s == 0 ? "house:duel_a" : "house:duel_b", null, 1, net.minecraft.world.item.DyeColor.RED, null, false);
+                    level.addFreshEntity(e);
+                    (s == 0 ? a : b).add(e);
+                }
+            }
+            if (!a.get(0).isHostileTo(b.get(0))) throw new IllegalStateException("the two sides aren't enemies");
+            for (GarrisonEntity e : a) e.setTarget(net.aiagent256.stormhold.entity.ai.Engagement.pick(e, b));
+            java.util.Map<GarrisonEntity, Integer> on = new java.util.HashMap<>();
+            for (GarrisonEntity e : a) if (e.getTarget() instanceof GarrisonEntity t) on.merge(t, 1, Integer::sum);
+            int most = on.values().stream().max(Integer::compare).orElse(0);
+            if (most > net.aiagent256.stormhold.entity.ai.Engagement.MOST) throw new IllegalStateException(most + " men on one foe");
+            if (on.size() < 3) throw new IllegalStateException("four men took only " + on.size() + " foes");
+            // three on one, a foe standing free: the third goes for the free one
+            for (int i = 0; i < 3; i++) a.get(i).setTarget(b.get(0));
+            a.get(3).setTarget(b.get(1));
+            net.aiagent256.stormhold.entity.ai.Engagement.rebalance(a.get(2));
+            if (a.get(2).getTarget() == b.get(0)) throw new IllegalStateException("the third man stayed on the crowded foe");
+            // two friends on one spot step apart
+            a.get(1).setPos(a.get(0).getX() + 0.2, a.get(0).getY(), a.get(0).getZ());
+            if (net.aiagent256.stormhold.entity.ai.Engagement.elbowRoom(a.get(0)).lengthSqr() <= 0) throw new IllegalStateException("no elbow room");
+        } finally {
+            for (GarrisonEntity e : a) e.discard();
+            for (GarrisonEntity e : b) e.discard();
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

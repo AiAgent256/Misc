@@ -130,16 +130,10 @@ public final class SiegeWorks {
             if (!(level.getEntity(id) instanceof GarrisonEntity g) || !g.isAlive() || g.role() == net.aiagent256.stormhold.entity.Role.COURIER) continue;
             LivingEntity t = g.getTarget();
             if (t != null && t.isAlive() && theirs.contains(t.getUUID())) continue;
-            Mob best = null;
-            double bd = 48.0 * 48.0;
-            for (Mob r : raiders) {
-                if (!r.isAlive()) continue;
-                double d = r.distanceToSqr(g);
-                if (d < bd) {
-                    bd = d;
-                    best = r;
-                }
-            }
+            // the nearest raider with room on him, so the garrison meets them man to man rather than all on the first
+            List<Mob> near = new java.util.ArrayList<>();
+            for (Mob r : raiders) if (r.isAlive() && r.distanceToSqr(g) < 48.0 * 48.0) near.add(r);
+            LivingEntity best = net.aiagent256.stormhold.entity.ai.Engagement.pick(g, near);
             if (best == null) continue;
             g.setTarget(best);
             set++;
