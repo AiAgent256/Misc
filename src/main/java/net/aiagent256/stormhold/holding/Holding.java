@@ -179,6 +179,8 @@ public class Holding {
     public int workDone;
     public String builderName = "";
     @Nullable public UUID builder;
+    /** Where the castle's waystone was set (see WaystonesCompat); null until it has one. */
+    @Nullable public BlockPos waystone;
     @Nullable public java.util.ArrayDeque<Builder.Job> workQueue;
     /** The steward's name, and what he's done since the morning's account (not saved). */
     public String stewardName = "";
@@ -506,6 +508,7 @@ public class Holding {
         if (!relief.isEmpty()) t.put("Relief", Relief.save(this));
         t.putString("BuilderName", builderName);
         if (builder != null) t.putUUID("Builder", builder);
+        if (waystone != null) t.put("Waystone", NbtUtils.writeBlockPos(waystone));
         t.putString("FiefReport", fiefReport);
         t.putInt("FiefPop", fiefPop);
         t.putInt("FiefHerd", fiefHerd);
@@ -664,6 +667,7 @@ public class Holding {
         }
         h.builderName = t.getString("BuilderName");
         if (t.hasUUID("Builder")) h.builder = t.getUUID("Builder");
+        if (t.contains("Waystone")) h.waystone = NbtUtils.readBlockPos(t.getCompound("Waystone"));
         h.fiefReport = t.getString("FiefReport");
         h.fiefPop = t.getInt("FiefPop");
         h.fiefHerd = t.getInt("FiefHerd");

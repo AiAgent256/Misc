@@ -87,6 +87,7 @@ public final class HoldingTicker {
         Produce.tick(level, mgr, h, now);
         if (now % 60 == 20) Dragons.watch(level, mgr, h, now);
         if (now % 200 == 0) Builder.ensureBuilder(level, h);
+        if (now % 200 == 140 && h.scanned && h.waystone == null && net.aiagent256.stormhold.compat.WaystonesCompat.ensure(level, h)) mgr.setDirty();
         greet(level, mgr, h);
         if (!h.villagersSpawned) Garrisons.spawnVillagers(level, h);
         if (now % 200 == 100) Labour.tick(level, mgr, h);
