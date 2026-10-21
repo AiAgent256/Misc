@@ -3611,7 +3611,8 @@ public class StormholdGameTests {
             h.workQueue.add(new net.aiagent256.stormhold.holding.Builder.Job(near, net.minecraft.world.level.block.Blocks.STONE_BRICKS.defaultBlockState(), true));
             int placed = net.aiagent256.stormhold.holding.Builder.beside(level, mgr, h, m, 8);
             if (placed != 1 || !level.getBlockState(near).is(net.minecraft.world.level.block.Blocks.STONE_BRICKS))
-                throw new IllegalStateException("the block beside him wasn't set (" + placed + ")");
+                throw new IllegalStateException("the block beside him wasn't set (" + placed + "): he's at " + m.blockPosition() + ", the block at "
+                        + near + " is " + level.getBlockState(near) + ", " + h.workQueue.size() + " jobs left, work " + h.work);
             if (level.getBlockState(far).is(net.minecraft.world.level.block.Blocks.STONE_BRICKS)) throw new IllegalStateException("a block 60 off was set");
             if (!m.getMainHandItem().is(net.minecraft.world.item.Items.STONE_BRICKS)) throw new IllegalStateException("no stone in his hand");
             if (h.workQueue.size() != 1) throw new IllegalStateException(h.workQueue.size() + " jobs left, not 1");

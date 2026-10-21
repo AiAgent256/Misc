@@ -300,7 +300,7 @@ public final class Builder {
         if (h.work.equals(CLEAR)) rate = CLEAR_RATE;
         if (Council.has(h.ownerPlayer(), Council.Seat.WORKS)) rate *= 2;
         Villager master = h.isPlayerOwned() ? master(level, h) : null;
-        if (master != null && master.level() == level) {
+        if (master != null && master.level() == level && watched(level, master)) {
             // you're near: the work goes on where he is, and he walks from one stretch of it to the next
             if (beside(level, mgr, h, master, Math.max(4, rate / 2)) < 0) return;
             if (h.workQueue != null && h.workQueue.isEmpty()) finish(level, mgr, h);
@@ -409,6 +409,12 @@ public final class Builder {
             WAY.remove(h.id);
         }
         return 0;
+    }
+
+    /** Someone (not a spectator) within sight of the Master Builder: the work then goes on where he is. */
+    static boolean watched(ServerLevel level, Villager m) {
+        for (var p : level.players()) if (!p.isSpectator() && p.distanceToSqr(m) < 96.0 * 96.0) return true;
+        return false;
     }
 
     /** Somewhere to stand near a block of the work: below it if it's up a wall, else beside it, else the ground over it. */
