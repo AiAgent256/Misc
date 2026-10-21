@@ -825,8 +825,9 @@ public abstract class GarrisonEntity extends PathfinderMob implements RangedAtta
                     if (net.aiagent256.stormhold.entity.ai.Engagement.on(friends, foe) < net.aiagent256.stormhold.entity.ai.Engagement.most(this)) {
                         this.setTarget(foe);
                     } else {
+                        LivingEntity taken = foe;
                         var around = this.level().getEntitiesOfClass(LivingEntity.class, p.getBoundingBox().inflate(16, 6, 16),
-                                e -> e != foe && e.isAlive() && this.isHostileTo(e));
+                                e -> e != taken && e.isAlive() && this.isHostileTo(e));
                         LivingEntity other = net.aiagent256.stormhold.entity.ai.Engagement.pick(this, around);
                         this.setTarget(other != null ? other : foe);
                     }

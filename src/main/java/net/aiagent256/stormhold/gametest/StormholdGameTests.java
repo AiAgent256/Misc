@@ -3586,6 +3586,49 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** The Master Builder sets the work within reach of where he stands, tool in hand, and walks to the rest; the smiths find the anvil. */
+    @GameTest(template = "arena")
+    public static void theBuilderWorksWhereHeStandsAndTheSmithsFindTheAnvil(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = sample(g);
+        h.owner = Sides.player(UUID.randomUUID());
+        h.builderName = "Testwright";
+        h.warTablePos = g.absolutePos(new BlockPos(3, 2, 3));
+        var m = net.minecraft.world.entity.EntityType.VILLAGER.create(level);
+        if (m == null) throw new IllegalStateException("no villager");
+        var at = g.absoluteVec(new net.minecraft.world.phys.Vec3(3.5, 2, 3.5));
+        m.moveTo(at.x, at.y, at.z);
+        m.setCustomName(net.minecraft.network.chat.Component.literal("Master Builder Testwright"));
+        level.addFreshEntity(m);
+        try {
+            if (net.aiagent256.stormhold.holding.Builder.master(level, h) != m) throw new IllegalStateException("the builder isn't known by his name");
+            BlockPos near = g.absolutePos(new BlockPos(6, 2, 6));
+            BlockPos far = near.offset(60, 0, 0);
+            h.work = net.aiagent256.stormhold.holding.Builder.REPAIR;
+            h.workQueue = new java.util.ArrayDeque<>();
+            h.workQueue.add(new net.aiagent256.stormhold.holding.Builder.Job(far, net.minecraft.world.level.block.Blocks.STONE_BRICKS.defaultBlockState(), true));
+            h.workQueue.add(new net.aiagent256.stormhold.holding.Builder.Job(near, net.minecraft.world.level.block.Blocks.STONE_BRICKS.defaultBlockState(), true));
+            int placed = net.aiagent256.stormhold.holding.Builder.beside(level, mgr, h, m, 8);
+            if (placed != 1 || !level.getBlockState(near).is(net.minecraft.world.level.block.Blocks.STONE_BRICKS))
+                throw new IllegalStateException("the block beside him wasn't set (" + placed + ")");
+            if (level.getBlockState(far).is(net.minecraft.world.level.block.Blocks.STONE_BRICKS)) throw new IllegalStateException("a block 60 off was set");
+            if (!m.getMainHandItem().is(net.minecraft.world.item.Items.STONE_BRICKS)) throw new IllegalStateException("no stone in his hand");
+            if (h.workQueue.size() != 1) throw new IllegalStateException(h.workQueue.size() + " jobs left, not 1");
+            net.aiagent256.stormhold.holding.Builder.beside(level, mgr, h, m, 8);
+            if (m.getBrain().getMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET).isEmpty())
+                throw new IllegalStateException("he didn't set off for the far work");
+            // the smiths' anvil
+            BlockPos anvil = g.absolutePos(new BlockPos(9, 2, 9));
+            level.setBlock(anvil, net.minecraft.world.level.block.Blocks.ANVIL.defaultBlockState(), 3);
+            BlockPos found = net.aiagent256.stormhold.holding.Work.forge(level, h, level.getGameTime());
+            if (!anvil.equals(found)) throw new IllegalStateException("the smiths looked for the anvil and found " + found);
+        } finally {
+            m.discard();
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

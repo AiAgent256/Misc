@@ -70,6 +70,7 @@ public final class Builder {
     public static void ensureBuilder(ServerLevel level, Holding h) {
         if (!h.isPlayerOwned() || h.warTablePos.equals(BlockPos.ZERO) || !level.isLoaded(h.warTablePos)) return;
         if (h.builder != null && !Garrisons.gone(level, h.builder)) return;      // out of sight isn't gone
+        if (master(level, h) != null) return;                                     // known by his name: a new body, the same man
         if (h.builderName.isEmpty()) h.builderName = NameGen.first(level.random);
         BlockPos at = Garrisons.standable(level, h.warTablePos.east());
         if (at == null) at = Garrisons.standable(level, h.warTablePos);
@@ -86,6 +87,23 @@ public final class Builder {
         level.addFreshEntity(v);
         Garrisons.seen(v);
         h.builder = v.getUUID();
+    }
+
+    /**
+     * The Master Builder himself, if he's about: by his id, else by his name near the castle (a villager mod may swap
+     * the body the game made for one of its own, name and all), whose id is then remembered.
+     */
+    @Nullable
+    public static Villager master(ServerLevel level, Holding h) {
+        if (h.builder != null && level.getEntity(h.builder) instanceof Villager v && v.isAlive()) return v;
+        if (h.builderName.isEmpty()) return null;
+        String name = "Master Builder " + h.builderName;
+        for (Villager v : level.getEntitiesOfClass(Villager.class, new net.minecraft.world.phys.AABB(h.center()).inflate(96, 48, 96),
+                v -> v.isAlive() && v.hasCustomName() && v.getCustomName().getString().equals(name))) {
+            h.builder = v.getUUID();
+            return v;
+        }
+        return null;
     }
 
     // ------------------------------------------------------------ orders
@@ -281,6 +299,14 @@ public final class Builder {
         }
         if (h.work.equals(CLEAR)) rate = CLEAR_RATE;
         if (Council.has(h.ownerPlayer(), Council.Seat.WORKS)) rate *= 2;
+        Villager master = h.isPlayerOwned() ? master(level, h) : null;
+        if (master != null && master.level() == level) {
+            // you're near: the work goes on where he is, and he walks from one stretch of it to the next
+            if (beside(level, mgr, h, master, Math.max(4, rate / 2)) < 0) return;
+            if (h.workQueue != null && h.workQueue.isEmpty()) finish(level, mgr, h);
+            mgr.setDirty();
+            return;
+        }
         int placed = 0;
         while (placed < rate && !h.workQueue.isEmpty()) {
             Job j = h.workQueue.poll();
@@ -289,30 +315,109 @@ public final class Builder {
                 if (++placed > 1) break;
                 continue;
             }
-            BlockState now = level.getBlockState(j.pos);
-            if (j.expect != null && !now.is(j.expect)) continue;   // someone's been at it since the survey
-            if (j.onlyIfAir && !(now.isAir() || now.is(CommonEvents.SIEGE_PLACEABLE) || !now.getFluidState().isEmpty()
-                    || now.is(Blocks.FIRE) || now.canBeReplaced() || (h.work.equals(REPAIR) && now.is(BlockTags.LEAVES)))) continue;
-            if (h.work.equals(LIGHT) && h.workDone % TORCHES_PER_COAL == 0 && !takeCoal(mgr, h)) {
-                tell(level, h, "Master Builder " + h.builderName + " has run out of coal at " + h.name + " with " + (h.workQueue.size() + 1)
-                        + " dark spots left. Bring more and order it again.");
-                h.work = NONE;
-                h.workQueue = null;
-                mgr.setDirty();
-                return;
-            }
-            if (j.expect != null && now.is(BlockTags.LOGS)) {
-                ResourceLocation id = net.minecraftforge.registries.ForgeRegistries.BLOCKS.getKey(now.getBlock());
-                if (id != null) h.addStock(id, 1);
-            }
-            level.setBlock(j.pos, j.state, 3);
-            placed++;
-            h.workDone++;
+            int r = place(level, mgr, h, j);
+            if (r < 0) return;
+            placed += r;
         }
         if (placed > 0) level.playSound(null, h.warTablePos, h.work.equals(CLEAR) ? SoundEvents.WOOD_BREAK : SoundEvents.STONE_PLACE,
                 SoundSource.BLOCKS, 0.6F, 0.8F);
         if (h.workQueue.isEmpty()) finish(level, mgr, h);
         mgr.setDirty();
+    }
+
+    /** One block of the work: 1 if it was set, 0 if there was nothing to do there, -1 if the work had to stop (out of coal). */
+    private static int place(ServerLevel level, HoldingManager mgr, Holding h, Job j) {
+        BlockState now = level.getBlockState(j.pos);
+        if (j.expect != null && !now.is(j.expect)) return 0;   // someone's been at it since the survey
+        if (j.onlyIfAir && !(now.isAir() || now.is(CommonEvents.SIEGE_PLACEABLE) || !now.getFluidState().isEmpty()
+                || now.is(Blocks.FIRE) || now.canBeReplaced() || (h.work.equals(REPAIR) && now.is(BlockTags.LEAVES)))) return 0;
+        if (h.work.equals(LIGHT) && h.workDone % TORCHES_PER_COAL == 0 && !takeCoal(mgr, h)) {
+            tell(level, h, "Master Builder " + h.builderName + " has run out of coal at " + h.name + " with " + (h.workQueue.size() + 1)
+                    + " dark spots left. Bring more and order it again.");
+            h.work = NONE;
+            h.workQueue = null;
+            Villager m = master(level, h);
+            if (m != null) Work.undress(m);
+            mgr.setDirty();
+            return -1;
+        }
+        if (j.expect != null && now.is(BlockTags.LOGS)) {
+            ResourceLocation id = net.minecraftforge.registries.ForgeRegistries.BLOCKS.getKey(now.getBlock());
+            if (id != null) h.addStock(id, 1);
+        }
+        level.setBlock(j.pos, j.state, 3);
+        h.workDone++;
+        return 1;
+    }
+
+    /** How far from where he stands the Master Builder's crew sets blocks: he walks to the next stretch when it's further. */
+    public static final int BESIDE = 10;
+    /** The nearest stretch of work, and how long he's been trying to get to it, by holding: a builder who can't find his way is fetched. */
+    private static final Map<java.util.UUID, double[]> WAY = new java.util.HashMap<>();
+
+    /**
+     * The work where the Master Builder stands: blocks within {@link #BESIDE} of him go up at {@code rate} a second,
+     * he works his tool and the blocks sound as they're set; with none in reach he walks to the nearest, and if he
+     * can't get nearer for fifteen seconds (a wall-walk with no stair, a moat) he's there the next moment.
+     */
+    public static int beside(ServerLevel level, HoldingManager mgr, Holding h, Villager m, int rate) {
+        int placed = 0;
+        BlockPos first = null;
+        Job nearest = null;
+        double nd = Double.MAX_VALUE;
+        int n = Math.min(h.workQueue.size(), 600);
+        for (int k = 0; k < n && placed < rate; k++) {
+            Job j = h.workQueue.poll();
+            if (j == null) break;
+            double dx = j.pos.getX() + 0.5 - m.getX(), dz = j.pos.getZ() + 0.5 - m.getZ(), d2 = dx * dx + dz * dz;
+            if (d2 <= (double) BESIDE * BESIDE && level.isLoaded(j.pos)) {
+                int r = place(level, mgr, h, j);
+                if (r < 0) return -1;
+                if (r > 0 && first == null) first = j.pos;
+                placed += r;
+                continue;
+            }
+            if (d2 < nd) {
+                nd = d2;
+                nearest = j;
+            }
+            h.workQueue.addLast(j);
+        }
+        Work.dress(m, h.work.equals(CLEAR) ? net.minecraft.world.item.Items.IRON_AXE : h.work.equals(LIGHT) ? net.minecraft.world.item.Items.TORCH
+                : net.minecraft.world.item.Items.STONE_BRICKS);
+        if (first != null) {
+            WAY.remove(h.id);
+            m.getNavigation().stop();
+            m.getBrain().eraseMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET);
+            m.getLookControl().setLookAt(net.minecraft.world.phys.Vec3.atCenterOf(first));
+            m.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+            BlockState s = level.getBlockState(first);
+            level.playSound(null, first, h.work.equals(CLEAR) ? SoundEvents.WOOD_BREAK : s.getSoundType().getPlaceSound(), SoundSource.BLOCKS,
+                    0.7F, 0.9F + level.random.nextFloat() * 0.2F);
+            return placed;
+        }
+        if (nearest == null) return 0;
+        BlockPos goal = ground(level, nearest.pos);
+        Work.walk(m, goal, 3);
+        double[] way = WAY.get(h.id);
+        long now = level.getGameTime();
+        if (way == null || nd < way[0] - 1.0) {
+            WAY.put(h.id, new double[]{nd, now});
+        } else if (now - (long) way[1] > 300) {
+            m.teleportTo(goal.getX() + 0.5, goal.getY(), goal.getZ() + 0.5);
+            m.getNavigation().stop();
+            WAY.remove(h.id);
+        }
+        return 0;
+    }
+
+    /** Somewhere to stand near a block of the work: below it if it's up a wall, else beside it, else the ground over it. */
+    private static BlockPos ground(ServerLevel level, BlockPos p) {
+        for (int k = 0; k <= 14; k++) {
+            BlockPos s = Garrisons.standable(level, p.below(k));
+            if (s != null) return s;
+        }
+        return level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p);
     }
 
     private static void finish(ServerLevel level, HoldingManager mgr, Holding h) {
@@ -334,6 +439,14 @@ public final class Builder {
         }
         h.work = NONE;
         h.workQueue = null;
+        WAY.remove(h.id);
+        Villager m = master(level, h);
+        if (m != null) {
+            // the work's done: tools away, back to his table
+            Work.undress(m);
+            BlockPos home = h.warTablePos.equals(BlockPos.ZERO) ? null : Garrisons.standable(level, h.warTablePos.east());
+            if (home != null) Work.walk(m, home, 1);
+        }
         mgr.setDirty();
     }
 

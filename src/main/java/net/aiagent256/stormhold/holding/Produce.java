@@ -100,7 +100,8 @@ public final class Produce {
         if (h.fief.isEmpty()) return;
         if (now % DIG_EVERY == 0) {
             for (Holding.FiefBuilding b : h.fief) {
-                if (!b.piece().equals("mine") || !watched(level, b.box())) continue;
+                // with the castle's miners at the face, the tunnel moves by their picks (see Work), not on its own
+                if (!b.piece().equals("mine") || !watched(level, b.box()) || Work.atTheFace(h)) continue;
                 Dig d = dig(level, h, b);
                 if (d != null && !d.done) {
                     Map<String, Integer> made = new HashMap<>();

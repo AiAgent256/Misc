@@ -17,8 +17,12 @@ public final class HoldingTicker {
         if (t % 10 == 5) {
             for (Holding h : mgr.holdings.values()) {
                 if (!level.isLoaded(h.center())) continue;
-                if (near(level, h)) Gates.tick(level, mgr, h);
-                else Gates.idle(level, h);
+                if (near(level, h)) {
+                    Gates.tick(level, mgr, h);
+                    Work.tick(level, mgr, h, t);
+                } else {
+                    Gates.idle(level, h);
+                }
             }
         }
         if (t % 20 != 0) return;
