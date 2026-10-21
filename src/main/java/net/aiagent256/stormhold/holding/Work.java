@@ -44,6 +44,8 @@ public final class Work {
     static final int FORGE_LOOK = 32;
     /** Persistent tag on a villager holding a tool we gave him. */
     static final String TOOL = "StormholdTool";
+    /** Persistent tag on a miner who went down the mine: he comes up the same way, however far the tunnel has run. */
+    static final String BELOW = "StormholdBelow";
 
     /** Strokes on the face of each holding's mine so far, by holding. */
     private static final Map<UUID, Integer> STROKES = new HashMap<>();
@@ -60,7 +62,9 @@ public final class Work {
         for (Villager v : level.getEntitiesOfClass(Villager.class, area, v -> v.isAlive() && !v.isBaby())) {
             var d = v.getPersistentData();
             if (!d.contains(Labour.TAG) || !d.hasUUID(Labour.HOLDING_TAG) || !h.id.equals(d.getUUID(Labour.HOLDING_TAG))) {
-                if (d.getBoolean(TOOL)) undress(v);
+                // let go from the work: up from the mine if he's down it, tools away
+                if (d.getBoolean(BELOW)) surface(level, v, mine(h));
+                else if (d.getBoolean(TOOL)) undress(v);
                 continue;
             }
             if (Labour.MINER.equals(d.getString(Labour.TAG))) miners.add(v);
@@ -104,7 +108,7 @@ public final class Work {
         Produce.Dig d = mine == null ? null : Produce.dig(level, h, mine);
         if (men.isEmpty() || d == null || d.done || !level.isLoaded(d.next)) {
             STROKES.remove(h.id);
-            for (Villager v : men) if (v.getPersistentData().getBoolean(TOOL)) surface(level, v, mine);
+            for (Villager v : men) if (v.getPersistentData().getBoolean(TOOL) || v.getPersistentData().getBoolean(BELOW)) surface(level, v, mine);
             return;
         }
         // where a man stands to swing: the tunnel floor behind the face, the two columns, up to three deep
@@ -119,17 +123,18 @@ public final class Work {
         for (Villager v : men) {
             if (!day || i >= spots.size()) {
                 // night, or no room at the face: up the ladder and home
-                if (v.getPersistentData().getBoolean(TOOL)) surface(level, v, mine);
+                if (v.getPersistentData().getBoolean(TOOL) || v.getPersistentData().getBoolean(BELOW)) surface(level, v, mine);
                 continue;
             }
             BlockPos spot = spots.get(i++);
             Vec3 at = Vec3.atBottomCenterOf(spot);
             if (v.distanceToSqr(at) > 3.0 * 3.0) {
                 double dx = v.getX() - mine.box().getCenter().getX(), dz = v.getZ() - mine.box().getCenter().getZ();
-                if (v.getPersistentData().getBoolean(TOOL) || dx * dx + dz * dz < GO_DOWN * GO_DOWN) {
+                if (v.getPersistentData().getBoolean(BELOW) || dx * dx + dz * dz < GO_DOWN * GO_DOWN) {
                     // at the head of the shaft (or already below and wandered off the face): down to his place
                     v.teleportTo(at.x, at.y, at.z);
                     v.getNavigation().stop();
+                    v.getPersistentData().putBoolean(BELOW, true);
                 } else {
                     walk(v, head(level, mine), 2);
                 }
@@ -169,10 +174,11 @@ public final class Work {
 
     /** Up from the mine to its head, tool put away, free to go home. */
     static void surface(ServerLevel level, Villager v, @Nullable Holding.FiefBuilding mine) {
-        if (mine != null && mine.box().isInside(v.blockPosition()) && v.getY() < mine.box().maxY() - 4) {
+        if (mine != null && v.getPersistentData().getBoolean(BELOW)) {
             BlockPos up = head(level, mine);
             v.teleportTo(up.getX() + 0.5, up.getY(), up.getZ() + 0.5);
         }
+        v.getPersistentData().remove(BELOW);
         undress(v);
         v.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
     }
