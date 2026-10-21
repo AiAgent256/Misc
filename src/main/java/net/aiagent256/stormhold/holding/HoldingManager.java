@@ -190,9 +190,9 @@ public class HoldingManager extends SavedData {
         ListTag el = new ListTag();
         for (Engines.Engine e : engines) el.add(e.save());
         tag.put("Engines", el);
-        ListTag rl = new ListTag();
-        for (Rams.Ram r : rams) rl.add(r.save());
-        if (!rl.isEmpty()) tag.put("Rams", rl);
+        ListTag ramList = new ListTag();
+        for (Rams.Ram r : rams) ramList.add(r.save());
+        if (!ramList.isEmpty()) tag.put("Rams", ramList);
         if (!lastPlot.isEmpty() || !leaderless.isEmpty()) tag.put("Spies", Spies.save(lastPlot, leaderless));
         ListTag cl = new ListTag();
         for (Campaign c : campaigns) cl.add(c.save());
@@ -258,10 +258,10 @@ public class HoldingManager extends SavedData {
         ListTag el = tag.getList("Engines", Tag.TAG_COMPOUND);
         for (int i = 0; i < el.size(); i++) m.engines.add(Engines.Engine.load(el.getCompound(i)));
         Spies.load(tag.getCompound("Spies"), m.lastPlot, m.leaderless);
-        ListTag rl = tag.getList("Rams", Tag.TAG_COMPOUND);
-        for (int i = 0; i < rl.size(); i++) {
+        ListTag ramList = tag.getList("Rams", Tag.TAG_COMPOUND);
+        for (int i = 0; i < ramList.size(); i++) {
             try {
-                m.rams.add(Rams.Ram.load(rl.getCompound(i)));
+                m.rams.add(Rams.Ram.load(ramList.getCompound(i)));
             } catch (Exception ignored) {
             }
         }

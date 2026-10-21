@@ -155,7 +155,7 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
         List<HouseMark> houses = new ArrayList<>(n);
         for (int i = 0; i < n; i++) {
             String id = b.readUtf(), name = b.readUtf();
-            int color = b.readVarInt(), standing = b.readVarInt(), castles = b.readVarInt();
+            int color = b.readVarInt(), standing = b.readVarInt(), held = b.readVarInt();
             String war = b.readUtf();
             boolean seat = b.readBoolean();
             String truce = b.readUtf();
@@ -165,7 +165,7 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
             List<net.aiagent256.stormhold.holding.Spies.Plot> plots = new ArrayList<>(np);
             for (int k = 0; k < np; k++)
                 plots.add(new net.aiagent256.stormhold.holding.Spies.Plot(b.readVarInt(), b.readUtf(), b.readUtf(), b.readBoolean()));
-            houses.add(new HouseMark(id, name, color, standing, castles, war, seat, truce, price, no, claims, plots));
+            houses.add(new HouseMark(id, name, color, standing, held, war, seat, truce, price, no, claims, plots));
         }
         n = b.readVarInt();
         List<Own> own = new ArrayList<>(n);

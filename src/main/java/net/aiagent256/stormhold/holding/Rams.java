@@ -156,7 +156,8 @@ public final class Rams {
 
     /** Where the crew stands: by the machine, or in the shed. */
     static Vec3 crewSpot(ServerLevel level, Ram r) {
-        if (r.machine != null && level.getEntity(r.machine) instanceof Entity m) return m.position();
+        Entity m = r.machine != null ? level.getEntity(r.machine) : null;
+        if (m != null) return m.position();
         return Vec3.atCenterOf(r.head.relative(r.in.getOpposite(), 2));
     }
 
