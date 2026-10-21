@@ -51,6 +51,8 @@ public final class Engines {
         public int shots = SHOTS;
         public long next;
         public boolean idleWarned;
+        /** The Siege Machines trebuchet standing for it, when that mod is in the pack (the stones are still ours). */
+        @Nullable public UUID machine;
 
         public CompoundTag save() {
             CompoundTag t = new CompoundTag();
@@ -59,6 +61,7 @@ public final class Engines {
             if (owner != null) t.putUUID("Owner", owner);
             if (target != null) t.putUUID("Target", target);
             t.putInt("Shots", shots);
+            if (machine != null) t.putUUID("Machine", machine);
             return t;
         }
 
@@ -69,6 +72,7 @@ public final class Engines {
             if (t.hasUUID("Owner")) e.owner = t.getUUID("Owner");
             if (t.hasUUID("Target")) e.target = t.getUUID("Target");
             e.shots = t.getInt("Shots");
+            if (t.hasUUID("Machine")) e.machine = t.getUUID("Machine");
             return e;
         }
     }
@@ -125,7 +129,9 @@ public final class Engines {
             if (owed > 0) Stores.takeFromPackThenRealm(mgr, null, player, Items.DARK_OAK_PLANKS, owed);
             Stores.takeFromPackThenRealm(mgr, null, player, Items.IRON_INGOT, IRON);
         }
-        build(level, base, toward);
+        // the Siege Machines trebuchet where that mod is in the pack, else our own timber frame
+        net.minecraft.world.entity.Entity machine = SiegeWorks.machine(level, SiegeWorks.SM_TREBUCHET, base, toward.toYRot());
+        if (machine == null) build(level, base, toward);
         if (target.isHouseOwned() && Truces.active(mgr, target.houseId, player.getUUID()))
             Truces.broken(level, mgr, target.houseId, player.getUUID(), "you set a trebuchet against " + target.name);
         if (target.isHouseOwned()) net.aiagent256.stormhold.house.Standing.change(level, mgr, target.houseId, player.getUUID(), -10,
@@ -135,6 +141,7 @@ public final class Engines {
         e.owner = player.getUUID();
         e.target = target.id;
         e.next = level.getGameTime() + 20L * RELOAD;
+        if (machine != null) e.machine = machine.getUUID();
         mgr.engines.add(e);
         mgr.setDirty();
         level.playSound(null, base, SoundEvents.WOOD_PLACE, SoundSource.BLOCKS, 1.5F, 0.6F);
@@ -191,6 +198,16 @@ public final class Engines {
                 it.remove();
                 mgr.setDirty();
                 continue;
+            }
+            if (e.machine != null) {
+                var m = level.getEntity(e.machine);
+                if (m == null ? level.isPositionEntityTicking(e.pos.below(5)) : !m.isAlive()) {
+                    if (lord != null) lord.sendSystemMessage(Component.literal("Your trebuchet before " + target.name + " is wrecked.")
+                            .withStyle(ChatFormatting.RED));
+                    it.remove();
+                    mgr.setDirty();
+                    continue;
+                }
             }
             if (lord == null || lord.level() != level || lord.distanceToSqr(Vec3.atCenterOf(e.pos)) > 200.0 * 200.0) continue;
             int crew = 0;

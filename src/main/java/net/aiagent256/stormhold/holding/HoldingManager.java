@@ -46,6 +46,11 @@ public class HoldingManager extends SavedData {
     public long lastDawn = -1, lastPolitics, lastMend;
     /** Siege engines standing before castles. */
     public final List<Engines.Engine> engines = new ArrayList<>();
+    /** When each lord's Spymaster last worked, and houses whose captain he killed, until when (see {@link Spies}). */
+    public final Map<UUID, Long> lastPlot = new HashMap<>();
+    public final Map<String, Long> leaderless = new HashMap<>();
+    /** Players' rams standing before gates (see {@link Rams}). */
+    public final List<Rams.Ram> rams = new ArrayList<>();
     /** Each lord's seat: where his rents and dues are paid, where his roads start, the castle the Realm map crowns. */
     public final Map<UUID, UUID> seats = new HashMap<>();
     /** Each lord's direwolf, kept in the overworld's record (see {@link Direwolves}). */
@@ -185,6 +190,10 @@ public class HoldingManager extends SavedData {
         ListTag el = new ListTag();
         for (Engines.Engine e : engines) el.add(e.save());
         tag.put("Engines", el);
+        ListTag rl = new ListTag();
+        for (Rams.Ram r : rams) rl.add(r.save());
+        if (!rl.isEmpty()) tag.put("Rams", rl);
+        if (!lastPlot.isEmpty() || !leaderless.isEmpty()) tag.put("Spies", Spies.save(lastPlot, leaderless));
         ListTag cl = new ListTag();
         for (Campaign c : campaigns) cl.add(c.save());
         tag.put("Campaigns", cl);
@@ -248,6 +257,14 @@ public class HoldingManager extends SavedData {
         }
         ListTag el = tag.getList("Engines", Tag.TAG_COMPOUND);
         for (int i = 0; i < el.size(); i++) m.engines.add(Engines.Engine.load(el.getCompound(i)));
+        Spies.load(tag.getCompound("Spies"), m.lastPlot, m.leaderless);
+        ListTag rl = tag.getList("Rams", Tag.TAG_COMPOUND);
+        for (int i = 0; i < rl.size(); i++) {
+            try {
+                m.rams.add(Rams.Ram.load(rl.getCompound(i)));
+            } catch (Exception ignored) {
+            }
+        }
         if (tag.contains("FrontierX")) {
             m.frontierSet = true;
             m.frontierX = tag.getInt("FrontierX");

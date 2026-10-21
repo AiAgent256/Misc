@@ -252,6 +252,15 @@ public final class SiegeWorks {
 
     /** The shed and its beam, drawn back. False (and nothing left standing) if the beam won't fit. */
     public static boolean raise(ServerLevel level, Campaign c, Site s) {
+        if (!raiseShed(level, s)) return false;
+        c.ramHead = s.head();
+        c.ramIn = s.in();
+        c.ramHits = 0;
+        return true;
+    }
+
+    /** The shed and its beam before a gate, whoever's. False if the beam won't fit. */
+    static boolean raiseShed(ServerLevel level, Site s) {
         for (int k = 1; k <= BEAM; k++) {
             BlockState here = level.getBlockState(cell(s, k, 0, 1));
             if (!here.isAir() && !here.canBeReplaced()) return false;
@@ -268,9 +277,6 @@ public final class SiegeWorks {
         for (int k = 1; k <= BEAM; k++) put(level, cell(s, k, 0, 1), log(s));
         // the head shod in iron
         level.playSound(null, s.head(), SoundEvents.WOOD_PLACE, SoundSource.BLOCKS, 2.0F, 0.5F);
-        c.ramHead = s.head();
-        c.ramIn = s.in();
-        c.ramHits = 0;
         return true;
     }
 
@@ -296,7 +302,7 @@ public final class SiegeWorks {
         level.setBlock(from, Blocks.AIR.defaultBlockState(), 3);
     }
 
-    private static void strike(ServerLevel level, Holding h, Site s) {
+    static void strike(ServerLevel level, Holding h, Site s) {
         BlockPos gate = s.head().relative(s.in());
         level.playSound(null, gate, SoundEvents.ZOMBIE_ATTACK_IRON_DOOR, SoundSource.HOSTILE, 3.0F, 0.6F);
         level.playSound(null, gate, SoundEvents.ANVIL_LAND, SoundSource.HOSTILE, 0.8F, 0.5F);
@@ -320,7 +326,12 @@ public final class SiegeWorks {
             c.ramMachine = null;
         }
         if (c.ramHead == null) return;
-        Site s = new Site(c.ramHead, c.ramIn);
+        clearShed(level, new Site(c.ramHead, c.ramIn));
+        c.ramHead = null;
+    }
+
+    /** What's left of a shed and beam before a gate. */
+    static void clearShed(ServerLevel level, Site s) {
         if (!level.isLoaded(s.head())) return;
         for (int k = 0; k < SHED; k++) {
             for (int side = -1; side <= 1; side++) {
@@ -332,7 +343,6 @@ public final class SiegeWorks {
                 }
             }
         }
-        c.ramHead = null;
     }
 
     // ------------------------------------------------------------ the Siege Machines ram
@@ -342,29 +352,40 @@ public final class SiegeWorks {
 
     /** The Siege Machines battering ram, brought up before the gate facing it, if that mod is in the pack. */
     static boolean raiseMachine(ServerLevel level, Campaign c, Site s) {
-        if (!net.minecraftforge.registries.ForgeRegistries.ENTITY_TYPES.containsKey(SM_RAM)) return false;
-        net.minecraft.world.entity.EntityType<?> type = net.minecraftforge.registries.ForgeRegistries.ENTITY_TYPES.getValue(SM_RAM);
-        if (type == null) return false;
-        Entity e;
-        try {
-            e = type.create(level);
-        } catch (Exception ex) {
-            return false;
-        }
+        Entity e = machine(level, SM_RAM, s.head().relative(s.in().getOpposite(), 3), s.in().toYRot());
         if (e == null) return false;
-        BlockPos at = s.head().relative(s.in().getOpposite(), 3);
-        float yaw = s.in().toYRot();
-        e.moveTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, yaw, 0.0F);
-        e.setYHeadRot(yaw);
-        e.setYBodyRot(yaw);
-        if (e instanceof Mob mob) mob.setPersistenceRequired();
-        if (!level.addFreshEntity(e)) return false;
         c.ramMachine = e.getUUID();
         c.ramHead = s.head();
         c.ramIn = s.in();
         c.ramHits = 0;
-        level.playSound(null, at, SoundEvents.WOOD_PLACE, SoundSource.BLOCKS, 2.0F, 0.5F);
         return true;
+    }
+
+    /** A Siege Machines engine of this kind set down at {@code at} facing {@code yaw}; null if the mod isn't in the pack. */
+    @Nullable
+    static Entity machine(ServerLevel level, net.minecraft.resources.ResourceLocation id, BlockPos at, float yaw) {
+        if (!net.minecraftforge.registries.ForgeRegistries.ENTITY_TYPES.containsKey(id)) return null;
+        net.minecraft.world.entity.EntityType<?> type = net.minecraftforge.registries.ForgeRegistries.ENTITY_TYPES.getValue(id);
+        if (type == null) return null;
+        Entity e;
+        try {
+            e = type.create(level);
+        } catch (Exception ex) {
+            return null;
+        }
+        if (e == null) return null;
+        e.moveTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5, yaw, 0.0F);
+        e.setYHeadRot(yaw);
+        e.setYBodyRot(yaw);
+        if (e instanceof Mob mob) mob.setPersistenceRequired();
+        if (!level.addFreshEntity(e)) return null;
+        level.playSound(null, at, SoundEvents.WOOD_PLACE, SoundSource.BLOCKS, 2.0F, 0.5F);
+        return e;
+    }
+
+    static final net.minecraft.resources.ResourceLocation SM_TREBUCHET = new net.minecraft.resources.ResourceLocation("siegemachines", "trebuchet");
+    static net.minecraft.resources.ResourceLocation smRam() {
+        return SM_RAM;
     }
 
     /** Swing it: its own blow and its own animation, worked by the nearest of the crew. */

@@ -30,8 +30,9 @@ public final class Council {
     public enum Seat {
         MARSHAL("Marshal", 6, "every garrison holds 15% more men, and raids and warbands fought out while you're away meet 20% more resistance",
                 "Garrisons 15% bigger; raids fought while you're away meet 20% more resistance"),
-        SPYMASTER("Spymaster", 5, "raids and warbands are reported three days ahead instead of one, and scouts ride half again as fast at half the risk",
-                "Raids reported 3 days ahead, not 1; scouts 50% faster at half the risk"),
+        SPYMASTER("Spymaster", 5, "raids and warbands are reported three days ahead instead of one, scouts ride half again as fast at half the risk, "
+                + "and every two days he'll work against a house for you (Realm map, Houses): kill a captain, buy a castellan, or set it on its neighbour",
+                "Raids 3 days ahead; scouts faster; plots against the houses (Realm map)"),
         TREASURER("Treasurer", 4, "rents come in 20% higher, and every shop knocks another 10% off for you",
                 "Rents 20% higher; every shop 10% cheaper for you"),
         WORKS("Master of Works", 4, "the Master Builders work twice as fast, fortifying costs a quarter less and roads half",

@@ -3630,6 +3630,107 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** Your ram before their gate: planks and iron paid, ten blows and the gate is down, the ram taken away. */
+    @GameTest(template = "arena")
+    public static void yourRamBreaksTheirGate(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        Holding h = sample(g);
+        var me = net.minecraftforge.common.util.FakePlayerFactory.get(level, new com.mojang.authlib.GameProfile(UUID.randomUUID(), "ram_test"));
+        var pc = net.aiagent256.stormhold.registry.ModBlocks.PORTCULLIS.get().defaultBlockState();
+        var air = net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+        for (int x = 4; x <= 10; x++) for (int y = 2; y <= 5; y++) for (int z = 9; z <= 14; z++) g.setBlock(new BlockPos(x, y, z), air);
+        for (int x = 6; x <= 8; x++) for (int y = 2; y <= 4; y++) g.setBlock(new BlockPos(x, y, 8), pc);
+        h.gates = new ArrayList<>(List.of(net.aiagent256.stormhold.holding.Gates.planeAt(level, g.absolutePos(new BlockPos(7, 2, 8)))));
+        mgr.holdings.put(h.id, h);
+        try {
+            me.getInventory().add(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.OAK_PLANKS, 40));
+            me.getInventory().add(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.IRON_INGOT, 8));
+            if (!net.aiagent256.stormhold.holding.Rams.raise(level, mgr, me, h)) throw new IllegalStateException("no ram raised");
+            if (me.getInventory().countItem(net.minecraft.world.item.Items.OAK_PLANKS) != 40 - net.aiagent256.stormhold.holding.Rams.PLANKS)
+                throw new IllegalStateException("planks not paid");
+            net.aiagent256.stormhold.holding.Rams.Ram r = null;
+            for (var x : net.aiagent256.stormhold.holding.Rams.all(mgr)) if (x.target.equals(h.id)) r = x;
+            if (r == null) throw new IllegalStateException("the ram isn't on the list");
+            if (net.aiagent256.stormhold.holding.Rams.raise(level, mgr, me, h)) throw new IllegalStateException("a second ram at one gate");
+            var saved = net.aiagent256.stormhold.holding.Rams.Ram.load(r.save());
+            if (!saved.head.equals(r.head) || saved.in != r.in) throw new IllegalStateException("the ram didn't save");
+            boolean down = false;
+            for (int i = 0; i < net.aiagent256.stormhold.holding.SiegeWorks.RAM_HITS && !down; i++)
+                down = net.aiagent256.stormhold.holding.Rams.blow(level, mgr, r, h, null);
+            if (!down || r.hits != net.aiagent256.stormhold.holding.SiegeWorks.RAM_HITS) throw new IllegalStateException("the gate stands after " + r.hits);
+            if (level.getBlockState(g.absolutePos(new BlockPos(7, 2, 8))).is(pc.getBlock())) throw new IllegalStateException("the portcullis is still there");
+            if (net.aiagent256.stormhold.holding.SiegeWorks.beam(level, r.site()) != 0) throw new IllegalStateException("the ram wasn't taken away");
+        } finally {
+            mgr.holdings.remove(h.id);
+            mgr.rams.removeIf(x -> x.owner.equals(me.getUUID()));
+        }
+        g.succeed();
+    }
+
+    /** The Spymaster: a captain killed (their raids come leaderless), a castellan bought, a spy caught, and two days between. */
+    @GameTest(template = "arena")
+    public static void theSpymasterKillsBuysAndIsSometimesCaught(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var me = net.minecraftforge.common.util.FakePlayerFactory.get(level, new com.mojang.authlib.GameProfile(UUID.randomUUID(), "spy_test"));
+        Holding mine = sample(g), theirs = sample(g), seat = sample(g);
+        theirs.key = mine.key + "/t";
+        seat.key = mine.key + "/s";
+        theirs.name = "Bribehold";
+        mine.owner = Sides.player(me.getUUID());
+        for (Holding x : List.of(theirs, seat)) {
+            x.owner = Sides.house("spyhouse");
+            x.houseId = "spyhouse";
+        }
+        theirs.greeted.add(me.getUUID());
+        seat.greeted.add(me.getUUID());
+        for (Holding x : List.of(mine, theirs, seat)) mgr.holdings.put(x.id, x);
+        mgr.house("spyhouse").capital = seat.id;
+        mgr.house("spyhouse").disposition = 0;
+        try {
+            for (int i = 0; i < 5; i++) me.getInventory().add(new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.EMERALD, 64));
+            if (!net.aiagent256.stormhold.holding.Spies.plots(level, mgr, "spyhouse", me.getUUID()).isEmpty())
+                throw new IllegalStateException("plots without a Spymaster");
+            if (!net.aiagent256.stormhold.holding.Council.appoint(level, me, net.aiagent256.stormhold.holding.Council.Seat.SPYMASTER))
+                throw new IllegalStateException("no Spymaster appointed");
+            var plots = net.aiagent256.stormhold.holding.Spies.plots(level, mgr, "spyhouse", me.getUUID());
+            if (plots.stream().noneMatch(p -> p.kind() == net.aiagent256.stormhold.holding.Spies.KILL)) throw new IllegalStateException("no killing offered");
+            if (plots.stream().noneMatch(p -> p.kind() == net.aiagent256.stormhold.holding.Spies.TURN && p.label().contains("Bribehold")))
+                throw new IllegalStateException("not offered the castle that isn't their seat: " + plots);
+            // a captain killed: their raids come without one, and a quarter fewer knights
+            if (!net.aiagent256.stormhold.holding.Spies.act(level, mgr, me, "spyhouse", net.aiagent256.stormhold.holding.Spies.KILL, 0))
+                throw new IllegalStateException("the killing failed on a sure roll");
+            Campaign c = new Campaign();
+            c.add(Role.CAPTAIN, 1);
+            c.add(Role.KNIGHT, 8);
+            net.aiagent256.stormhold.holding.Spies.behead(mgr, c, "spyhouse", level.getGameTime());
+            if (c.counts.getOrDefault(Role.CAPTAIN, 0) != 0 || c.counts.getOrDefault(Role.KNIGHT, 0) != 6)
+                throw new IllegalStateException("the raid wasn't beheaded: " + c.counts);
+            if (net.aiagent256.stormhold.holding.Spies.act(level, mgr, me, "spyhouse", net.aiagent256.stormhold.holding.Spies.KILL, 0))
+                throw new IllegalStateException("the Spymaster worked twice in a day");
+            // a castellan bought
+            mgr.lastPlot.remove(me.getUUID());
+            if (!net.aiagent256.stormhold.holding.Spies.act(level, mgr, me, "spyhouse", net.aiagent256.stormhold.holding.Spies.TURN, 0))
+                throw new IllegalStateException("the bribe failed on a sure roll");
+            if (!me.getUUID().equals(theirs.ownerPlayer())) throw new IllegalStateException("the bought castle isn't yours");
+            // a spy caught
+            mgr.lastPlot.remove(me.getUUID());
+            int before = net.aiagent256.stormhold.house.Standing.get(mgr, "spyhouse", me.getUUID());
+            net.aiagent256.stormhold.holding.Spies.act(level, mgr, me, "spyhouse", net.aiagent256.stormhold.holding.Spies.KILL, 99);
+            int after = net.aiagent256.stormhold.house.Standing.get(mgr, "spyhouse", me.getUUID());
+            if (after > before - 15) throw new IllegalStateException("a caught spy cost nothing: " + before + " to " + after);
+        } finally {
+            for (Holding x : List.of(mine, theirs, seat)) mgr.holdings.remove(x.id);
+            net.aiagent256.stormhold.holding.Council.dismiss(level, me, net.aiagent256.stormhold.holding.Council.Seat.SPYMASTER);
+            mgr.councils.remove(me.getUUID());
+            mgr.lastPlot.remove(me.getUUID());
+            mgr.leaderless.remove("spyhouse");
+            mgr.seats.remove(me.getUUID());
+        }
+        g.succeed();
+    }
+
     private static Holding sample(GameTestHelper g) {
         BlockPos o = g.absolutePos(BlockPos.ZERO);
         Holding h = new Holding();

@@ -234,6 +234,7 @@ public final class Politics {
         c.add(Role.KNIGHT, knights);
         c.add(Role.CROSSBOWMAN, Math.max(2, (int) Math.ceil(want * 0.15 / Role.CROSSBOWMAN.strength())));
         c.add(Role.ARCHER, Math.max(2, (int) Math.ceil(want * 0.15 / Role.ARCHER.strength())));
+        net.aiagent256.stormhold.holding.Spies.behead(mgr, c, house.id, now);
         mgr.campaigns.add(c);
         target.lastRaidAt = now;
         shift(mgr, house.id, target.houseId, -15);

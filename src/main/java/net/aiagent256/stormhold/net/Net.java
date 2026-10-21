@@ -31,7 +31,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 public final class Net {
-    private static final String VERSION = "10";
+    private static final String VERSION = "11";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(Stormhold.id("main"),
             () -> VERSION, VERSION::equals, VERSION::equals);
 
@@ -40,7 +40,7 @@ public final class Net {
             SET_MINERS = 20, SET_SMITHS = 21, PROJECT = 22, SCOUT = 23, TREASURY = 24, VASSAL = 25, REVOKE = 26, COUNCIL = 27,
             COUNCIL_APPOINT = 28, COUNCIL_DISMISS = 29, MATTER_CHOOSE = 30, MARCH_ALL = 31, TIDY = 32, TARGET_ALL = 33,
             SET_SEAT = 34, RUSH = 35, BUY_CLAIM = 36, TOURNEY = 37, TRUCE = 38, SEND_HOME = 39, ATTACK_ALL = 40,
-            BANNERS = 41, SURPLUS = 42;
+            BANNERS = 41, SURPLUS = 42, PLOT = 43;
 
     public static void register() {
         CHANNEL.registerMessage(0, WarTableData.class, WarTableData::write, WarTableData::read, WarTableData::handle,
@@ -353,6 +353,16 @@ public final class Net {
         if (a.action() == SEND_HOME) {
             net.aiagent256.stormhold.holding.Company.sendHome(player.serverLevel(), HoldingManager.get(player.serverLevel()), player);
             openWarTable(player);
+            return;
+        }
+        if (a.action() == PLOT) {
+            // from the Realm page: the house by its id's hash, the plot by its kind
+            ServerLevel level = player.serverLevel();
+            HoldingManager mgr = HoldingManager.get(level);
+            String house = null;
+            for (String id : mgr.houses.keySet()) if (id.hashCode() == a.amount()) house = id;
+            if (house != null) net.aiagent256.stormhold.holding.Spies.act(level, mgr, player, house, a.pos().getX());
+            openRealm(player);
             return;
         }
         if (a.action() == TRUCE) {

@@ -128,6 +128,7 @@ public final class Campaigns {
         c.add(Role.CROSSBOWMAN, Math.max(1, (int) Math.ceil(h.count(Role.CROSSBOWMAN) * 0.7)));
         c.add(Role.ARCHER, (int) Math.ceil(h.count(Role.ARCHER) * 0.4));
         Heirs.lead(h, c);
+        Spies.behead(mgr, c, h.houseId, level.getGameTime());
         c.spoils = c.total();
         c.mustered = c.total();
         mgr.campaigns.add(c);

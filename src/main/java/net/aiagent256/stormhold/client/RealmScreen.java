@@ -316,6 +316,12 @@ public class RealmScreen extends Screen {
                 g.drawString(this.font, h.truceNo(), rx, y, 0x9C8C6C, false);
                 y += 10;
             }
+            // the Spymaster's plots against this house, a chip a line
+            for (var pl : h.plots()) {
+                if (pl.ready()) chip(g, pl.label(), rx, y, h.id(), 10 + pl.kind(), pl.tip());
+                else g.drawString(this.font, pl.label(), rx, y, 0x7C6C5C, false);
+                y += 10;
+            }
             y += 5;
         }
         return y;
@@ -415,7 +421,9 @@ public class RealmScreen extends Screen {
         if (tab == 1 && mouseX >= x0 + MAP_W + 8 && mouseY >= y0 + 42 && mouseY < y0 + H - 6) {
             for (int[] c : chips) {
                 if (mouseX >= c[0] && mouseX < c[2] && mouseY >= c[1] && mouseY < c[3]) {
-                    Net.sendAction(new java.util.UUID(0, 0), Net.TRUCE, new BlockPos(c[5], 0, 0), c[4]);
+                    // a truce (0 paid, 1 a hostage) or a plot (10 + its kind)
+                    if (c[5] >= 10) Net.sendAction(new java.util.UUID(0, 0), Net.PLOT, new BlockPos(c[5] - 10, 0, 0), c[4]);
+                    else Net.sendAction(new java.util.UUID(0, 0), Net.TRUCE, new BlockPos(c[5], 0, 0), c[4]);
                     return true;
                 }
             }

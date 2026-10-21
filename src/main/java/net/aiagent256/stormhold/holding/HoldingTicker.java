@@ -28,6 +28,7 @@ public final class HoldingTicker {
         if (t % 20 != 0) return;
         Orders.tick(level);
         Engines.tick(level, mgr);
+        Rams.tick(level, mgr);
         for (Holding h : mgr.holdings.values()) tickHolding(level, mgr, h, t);
         if (t - mgr.lastStandingDrift >= 24000) {
             mgr.lastStandingDrift = t;

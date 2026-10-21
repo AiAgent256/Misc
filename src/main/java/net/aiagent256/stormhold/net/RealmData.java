@@ -35,7 +35,7 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
      * is in truceNo), claims the castles of yours its heirs want back.
      */
     public record HouseMark(String id, String name, int color, int standing, int castles, String atWar, boolean seatKnown,
-                            String truce, int trucePrice, String truceNo, String claims) {
+                            String truce, int trucePrice, String truceNo, String claims, List<net.aiagent256.stormhold.holding.Spies.Plot> plots) {
     }
 
     public record Own(UUID id, String name, int tier, int troops, int capacity, int fiefPop, String builder, int raidDays,
@@ -87,6 +87,13 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
             b.writeVarInt(h.trucePrice);
             b.writeUtf(h.truceNo);
             b.writeUtf(h.claims);
+            b.writeVarInt(h.plots.size());
+            for (var pl : h.plots) {
+                b.writeVarInt(pl.kind());
+                b.writeUtf(pl.label());
+                b.writeUtf(pl.tip());
+                b.writeBoolean(pl.ready());
+            }
         }
         b.writeVarInt(own.size());
         for (Own o : own) {
@@ -147,8 +154,18 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
         n = b.readVarInt();
         List<HouseMark> houses = new ArrayList<>(n);
         for (int i = 0; i < n; i++) {
-            houses.add(new HouseMark(b.readUtf(), b.readUtf(), b.readVarInt(), b.readVarInt(), b.readVarInt(), b.readUtf(), b.readBoolean(),
-                    b.readUtf(), b.readVarInt(), b.readUtf(), b.readUtf()));
+            String id = b.readUtf(), name = b.readUtf();
+            int color = b.readVarInt(), standing = b.readVarInt(), castles = b.readVarInt();
+            String war = b.readUtf();
+            boolean seat = b.readBoolean();
+            String truce = b.readUtf();
+            int price = b.readVarInt();
+            String no = b.readUtf(), claims = b.readUtf();
+            int np = b.readVarInt();
+            List<net.aiagent256.stormhold.holding.Spies.Plot> plots = new ArrayList<>(np);
+            for (int k = 0; k < np; k++)
+                plots.add(new net.aiagent256.stormhold.holding.Spies.Plot(b.readVarInt(), b.readUtf(), b.readUtf(), b.readBoolean()));
+            houses.add(new HouseMark(id, name, color, standing, castles, war, seat, truce, price, no, claims, plots));
         }
         n = b.readVarInt();
         List<Own> own = new ArrayList<>(n);
@@ -248,7 +265,8 @@ public record RealmData(long day, int px, int pz, List<Castle> castles, List<Hou
                     war.toString(), house.capital != null && known.contains(house.capital),
                     truce == null ? "" : "Truce, " + net.aiagent256.stormhold.holding.Truces.daysLeft(level, truce) + " days left"
                             + (truce.hostage.isEmpty() ? "" : " (" + truce.hostage + " their hostage)") + ".",
-                    no == null ? net.aiagent256.stormhold.holding.Truces.price(mgr, id, me) : -1, no == null ? "" : no, claims.toString()));
+                    no == null ? net.aiagent256.stormhold.holding.Truces.price(mgr, id, me) : -1, no == null ? "" : no, claims.toString(),
+                    net.aiagent256.stormhold.holding.Spies.plots(level, mgr, id, me)));
         }
         houses.sort((a, b) -> b.standing - a.standing);
         List<Note> notes = new ArrayList<>();
