@@ -261,10 +261,17 @@ public final class SiegeWorks {
 
     /** The shed and its beam before a gate, whoever's. False if the beam won't fit. */
     static boolean raiseShed(ServerLevel level, Site s) {
+        // a bank of earth or snow where the beam swings is dug out; stone, timber or anything built is not
+        List<BlockPos> dig = new ArrayList<>();
         for (int k = 1; k <= BEAM; k++) {
-            BlockState here = level.getBlockState(cell(s, k, 0, 1));
-            if (!here.isAir() && !here.canBeReplaced()) return false;
+            BlockPos p = cell(s, k, 0, 1);
+            BlockState here = level.getBlockState(p);
+            if (here.isAir() || here.canBeReplaced()) continue;
+            if (here.is(net.minecraft.tags.BlockTags.DIRT) || here.is(net.minecraft.tags.BlockTags.SAND) || here.is(Blocks.GRAVEL)
+                    || here.is(Blocks.SNOW_BLOCK) || here.is(Blocks.CLAY) || here.is(Blocks.DIRT_PATH)) dig.add(p);
+            else return false;
         }
+        for (BlockPos p : dig) level.destroyBlock(p, false);
         BlockState fence = Blocks.SPRUCE_FENCE.defaultBlockState();
         BlockState roof = Blocks.SPRUCE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.BOTTOM);
         for (int k = 0; k < SHED; k++) {
