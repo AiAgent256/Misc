@@ -2426,7 +2426,8 @@ public class StormholdGameTests {
             for (int z = cz - 88; z <= cz + 88; z++) {
                 for (int yy = y - 3; yy < y - 1; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), 2);
                 level.setBlock(new BlockPos(x, y - 1, z), net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(), 2);
-                for (int yy = y; yy < y + 26; yy++) {
+                int topY = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x, z);
+                for (int yy = y; yy < Math.max(y + 26, topY + 1); yy++) {
                     if (!level.getBlockState(new BlockPos(x, yy, z)).isAir()) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
                 }
             }
@@ -2471,7 +2472,8 @@ public class StormholdGameTests {
             p.pending = 14;
             h.fiefJobs.put("farmer", 7);
             h.fiefJobs.put("butcher", 3);
-            for (int i = 0; i < 120 && p.pending > 0; i++) net.aiagent256.stormhold.holding.Town.tick(level, mgr, h);
+            for (int i = 0; i < 300 && (p.pending > 0 || net.aiagent256.stormhold.holding.Fields.wantsField(h)
+                    || net.aiagent256.stormhold.holding.Fields.wantsPen(h)); i++) net.aiagent256.stormhold.holding.Town.tick(level, mgr, h);
             String about = p.houses + " built, " + p.streets.size() + " streets, " + p.lots.size() + " lots, " + p.pending + " waiting, failed " + p.failed;
             Stormhold.LOGGER.info("Town test: {}", about);
             // and one of each kind in each country, for the picture
@@ -2619,7 +2621,8 @@ public class StormholdGameTests {
             for (int z = cz - 60; z <= cz + 60; z++) {
                 for (int yy = y - 4; yy < y - 1; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), 2);
                 level.setBlock(new BlockPos(x, y - 1, z), net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(), 2);
-                for (int yy = y; yy < y + 22; yy++)
+                int topY = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, x, z);
+                for (int yy = y; yy < Math.max(y + 22, topY + 1); yy++)
                     if (!level.getBlockState(new BlockPos(x, yy, z)).isAir()) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
                 // a gentle rise to the north-east, so the works have to follow the land
                 int rise = Math.max(0, Math.min(3, (x - cx + z - cz - 40) / 8));

@@ -77,11 +77,11 @@ public final class Fields {
         return out.isEmpty() ? "" : " " + String.join(", ", out) + " (half work till the land's laid out; it's done while you're there).";
     }
 
-    static boolean wantsField(Holding h) {
+    public static boolean wantsField(Holding h) {
         return h.fiefJobs.getOrDefault("farmer", 0) > farmerRoom(h) && fields(h) < MOST_FIELDS;
     }
 
-    static boolean wantsPen(Holding h) {
+    public static boolean wantsPen(Holding h) {
         return h.fiefJobs.getOrDefault("butcher", 0) > butcherRoom(h) && Town.count(h, "pasture") < MOST_PENS;
     }
 
