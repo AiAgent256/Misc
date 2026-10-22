@@ -447,8 +447,13 @@ public final class Net {
                     var bread = new net.minecraft.resources.ResourceLocation("minecraft", "bread");
                     var iron = new net.minecraft.resources.ResourceLocation("minecraft", "iron_ingot");
                     if (h.fiefPlan == null) net.aiagent256.stormhold.holding.Fief.plan(level, h);
-                    if (h.fiefPlan.size() >= 3) {
-                        player.sendSystemMessage(Component.literal("The builders at " + h.name + " already have their hands full."));
+                    String next = net.aiagent256.stormhold.holding.Fief.nextExtra(h);
+                    boolean town = next.startsWith("cottage") && net.aiagent256.stormhold.holding.Town.grows(level, h);
+                    if (h.fiefPlan.size() >= 3 || town && !net.aiagent256.stormhold.holding.Town.room(h)) {
+                        var plan = net.aiagent256.stormhold.holding.Town.plan(h);
+                        player.sendSystemMessage(Component.literal(town && plan.houses + plan.pending >= net.aiagent256.stormhold.holding.Town.cap(h)
+                                ? "The town outside " + h.name + " has grown as big as a " + h.kindName().toLowerCase() + "'s can."
+                                : "The builders at " + h.name + " already have their hands full."));
                     } else if (net.aiagent256.stormhold.holding.Stores.stockWithChests(mgr, h, player.getUUID(), bread) < 32
                             || net.aiagent256.stormhold.holding.Stores.stockWithChests(mgr, h, player.getUUID(), iron) < 8) {
                         player.sendSystemMessage(Component.literal("Raising a building takes 32 bread and 8 iron from the realm's stores or this castle's chests.")
@@ -456,9 +461,13 @@ public final class Net {
                     } else {
                         net.aiagent256.stormhold.holding.Stores.takeWithChests(mgr, h, player.getUUID(), bread, 32);
                         net.aiagent256.stormhold.holding.Stores.takeWithChests(mgr, h, player.getUUID(), iron, 8);
-                        String next = net.aiagent256.stormhold.holding.Fief.nextExtra(h);
-                        h.fiefPlan.add(next);
-                        player.sendSystemMessage(HoldingEvents.gold("The people of " + h.name + " will raise a " + next.replace('_', ' ') + "."));
+                        if (town) {
+                            net.aiagent256.stormhold.holding.Town.ask(h);
+                            player.sendSystemMessage(HoldingEvents.gold("The people of " + h.name + " will build along the street: whatever the town needs next."));
+                        } else {
+                            h.fiefPlan.add(next);
+                            player.sendSystemMessage(HoldingEvents.gold("The people of " + h.name + " will raise a " + next.replace('_', ' ') + "."));
+                        }
                     }
                 }
                 case SET_MINERS -> player.sendSystemMessage(net.aiagent256.stormhold.holding.Labour.set(h,

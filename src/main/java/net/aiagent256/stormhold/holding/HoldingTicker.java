@@ -82,6 +82,7 @@ public final class HoldingTicker {
         if (h.surroundingsDone && Config.FIEFS_ENABLED.get()) {
             if (h.fiefPlan == null) Fief.plan(level, h);
             if (!h.fiefPlan.isEmpty() && now % 40 == 0) Fief.buildNext(level, mgr, h);
+            else if (h.fiefPlan.isEmpty() && now % 40 == 20) Town.tick(level, mgr, h);
         }
         Builder.tick(level, mgr, h);
         Produce.tick(level, mgr, h, now);

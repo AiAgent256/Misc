@@ -5,14 +5,14 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 
 /**
- * A realm that is fed and at peace grows on its own, a little each day: the fief raises a new building
- * every few days up to the castle's size, the Master Builder adds a stage of fortification every twelve,
+ * A realm that is fed and at peace grows on its own, a little each day: every two or three days the fief raises
+ * a working building it lacks or the town outside the walls a new one along its streets (see {@link Town}), the Master Builder adds a stage of fortification every twelve,
  * the garrison trains up to capacity from the stores (see Economy). A raid sets the clock back.
  */
 public final class Growth {
     private static final ResourceLocation BREAD = new ResourceLocation("minecraft", "bread");
     private static final ResourceLocation IRON = new ResourceLocation("minecraft", "iron_ingot");
-    public static final int BUILDING_EVERY = 3, FORTIFY_EVERY = 12;
+    public static final int FORTIFY_EVERY = 12;
 
     /** How many buildings (fields aside) a fief of this tier grows to on its own. */
     public static int fiefCap(int tier) {
@@ -33,15 +33,24 @@ public final class Growth {
         int buildings = 0;
         for (Holding.FiefBuilding b : h.fief) if (!b.piece().equals("field") && !b.piece().equals("orchard")) buildings++;
         boolean planned = h.fiefPlan != null && !h.fiefPlan.isEmpty();
-        if (h.growth % BUILDING_EVERY == 0 && !planned && buildings < fiefCap(h.tier) && h.fiefPlan != null
-                && Stores.realmStock(mgr, h, owner, BREAD) >= 32 && Stores.realmStock(mgr, h, owner, IRON) >= 8) {
-            Stores.take(mgr, h, owner, BREAD, 32);
-            Stores.take(mgr, h, owner, IRON, 8);
+        // every two or three days: the fief's working buildings first (pens, a mine, a mill), then the town along its streets
+        boolean due = h.growth % 5 == 0 || h.growth % 5 == 2;
+        if (due && !planned && h.fiefPlan != null && Stores.realmStock(mgr, h, owner, BREAD) >= 32 && Stores.realmStock(mgr, h, owner, IRON) >= 8) {
             String next = Fief.nextExtra(h);
-            h.fiefPlan.add(next);
-            HoldingEvents.tell(level, owner, HoldingEvents.gold("The people of " + h.name + " are raising a " + next.replace('_', ' ')
-                    + "; the " + h.fiefName().toLowerCase() + " grows."));
-            Chronicle.log(level, mgr, Chronicle.GROWTH, "The people of " + h.name + " are raising a " + next.replace('_', ' ') + ".", owner);
+            if (!next.startsWith("cottage") && buildings < fiefCap(h.tier)) {
+                Stores.take(mgr, h, owner, BREAD, 32);
+                Stores.take(mgr, h, owner, IRON, 8);
+                h.fiefPlan.add(next);
+                HoldingEvents.tell(level, owner, HoldingEvents.gold("The people of " + h.name + " are raising a " + next.replace('_', ' ')
+                        + "; the " + h.fiefName().toLowerCase() + " grows."));
+                Chronicle.log(level, mgr, Chronicle.GROWTH, "The people of " + h.name + " are raising a " + next.replace('_', ' ') + ".", owner);
+            } else if (Town.grows(level, h) && Town.ask(h)) {
+                Stores.take(mgr, h, owner, BREAD, 32);
+                Stores.take(mgr, h, owner, IRON, 8);
+                HoldingEvents.tell(level, owner, HoldingEvents.gold("The people of " + h.name + " have the timber and the stone to build again; "
+                        + "it goes up along the street next time you're there."));
+                Chronicle.log(level, mgr, Chronicle.GROWTH, "The town outside " + h.name + " grows.", owner);
+            }
         }
         if (h.growth % FORTIFY_EVERY == 0 && h.fortify < Builder.MAX_FORTIFY && h.work.equals(Builder.NONE)) {
             int[] cost = Builder.fortifyCost(h.fortify + 1);

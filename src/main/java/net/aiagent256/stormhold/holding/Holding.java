@@ -183,6 +183,8 @@ public class Holding {
     @Nullable public UUID builder;
     /** Where the castle's waystone was set (see WaystonesCompat); null until it has one. */
     @Nullable public BlockPos waystone;
+    /** The town growing outside the walls: its streets, lots and steps waiting (see {@link Town}); null until it starts. */
+    @Nullable public Town.Plan town;
     @Nullable public java.util.ArrayDeque<Builder.Job> workQueue;
     /** The steward's name, and what he's done since the morning's account (not saved). */
     public String stewardName = "";
@@ -225,9 +227,9 @@ public class Holding {
     public int[] reliefAfter = {0, 0};
 
     public int fiefLevel() {
-        int cottages = 0;
-        for (FiefBuilding b : fief) if (b.piece().startsWith("cottage")) cottages++;
-        return fief.isEmpty() ? 0 : cottages >= 6 ? 3 : cottages >= 4 ? 2 : 1;
+        int homes = 0;
+        for (FiefBuilding b : fief) if (Town.isHome(b.piece())) homes++;
+        return fief.isEmpty() ? 0 : homes >= 6 ? 3 : homes >= 4 ? 2 : 1;
     }
 
     public String fiefName() {
@@ -511,6 +513,7 @@ public class Holding {
         t.putString("BuilderName", builderName);
         if (builder != null) t.putUUID("Builder", builder);
         if (waystone != null) t.put("Waystone", NbtUtils.writeBlockPos(waystone));
+        if (town != null) t.put("Town", town.save());
         t.putString("FiefReport", fiefReport);
         t.putInt("FiefPop", fiefPop);
         t.putInt("FiefHerd", fiefHerd);
@@ -673,6 +676,7 @@ public class Holding {
         h.builderName = t.getString("BuilderName");
         if (t.hasUUID("Builder")) h.builder = t.getUUID("Builder");
         if (t.contains("Waystone")) h.waystone = NbtUtils.readBlockPos(t.getCompound("Waystone"));
+        if (t.contains("Town")) h.town = Town.Plan.load(t.getCompound("Town"));
         h.fiefReport = t.getString("FiefReport");
         h.fiefPop = t.getInt("FiefPop");
         h.fiefHerd = t.getInt("FiefHerd");

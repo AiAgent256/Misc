@@ -441,8 +441,9 @@ public class WarTableScreen extends Screen {
                 () -> Net.sendAction(h.id(), Net.SURPLUS, BlockPos.ZERO, 0)));
         peopleY = layDown(row, mx, contentTop() + 12, mw) + 6;
         this.addRenderableWidget(Button.builder(Component.literal("Expand fief"), b -> Net.sendAction(h.id(), Net.EXPAND_FIEF, BlockPos.ZERO, 0))
-                .tooltip(Tooltip.create(Component.literal("The people raise one more building (a pasture, a mine, a mill, then more cottages) for "
-                        + "32 bread and 8 iron from the stores or the castle's chests. More folk, more produce."))).bounds(mx + mw - 70, peopleY - 4, 70, 16).build());
+                .tooltip(Tooltip.create(Component.literal("The people raise one more building for 32 bread and 8 iron from the stores or the castle's chests: a pasture, a mine "
+                        + "or a mill if the fief lacks one, else whatever the town along the street needs next (homes, farms, a bakery, a smithy, "
+                        + "an inn, stalls). It also grows by itself every two or three days while fed and at peace."))).bounds(mx + mw - 70, peopleY - 4, 70, 16).build());
         stepY = peopleY + 16;
         stepper(mx + 34, stepY, h.miners(), Labour.MAX, v -> Net.sendAction(h.id(), Net.SET_MINERS, BlockPos.ZERO, v),
                 "person at the mine. Each brings up a day's ore, smelted, into the stores: coal, iron, copper, gold, now and then redstone, "

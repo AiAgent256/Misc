@@ -2394,6 +2394,212 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /**
+     * A town grows out from the gate along streets of its own: the streets all join up, no two buildings overlap, every
+     * one has its door by a street and its people, the old cottage is tied in by a path, and a bakery bakes more bread.
+     * The whole place is written to the log as blocks for rendering.
+     */
+    @GameTest(template = "arena", timeoutTicks = 600)
+    public static void aTownGrowsAlongItsStreets(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        int cx = 8000 + (int) Math.floorMod(g.absolutePos(BlockPos.ZERO).asLong(), 7L) * 400, cz = 8000;
+        int cc = cx >> 4, ccz = cz >> 4;
+        for (int dx = -8; dx <= 8; dx++) {
+            for (int dz = -8; dz <= 8; dz++) {
+                level.setChunkForced(cc + dx, ccz + dz, true);
+                level.getChunk(cc + dx, ccz + dz);
+            }
+        }
+        int y = 70;
+        for (int x = cx - 88; x <= cx + 88; x++) {
+            for (int z = cz - 88; z <= cz + 88; z++) {
+                for (int yy = y - 3; yy < y - 1; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), 2);
+                level.setBlock(new BlockPos(x, y - 1, z), net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(), 2);
+                for (int yy = y; yy < y + 26; yy++) {
+                    if (!level.getBlockState(new BlockPos(x, yy, z)).isAir()) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
+                }
+            }
+        }
+        // the lie of the land: a pond, a low hill, some trees, so the streets have something to go round
+        for (int x = cx + 18; x <= cx + 26; x++) for (int z = cz + 30; z <= cz + 37; z++)
+            level.setBlock(new BlockPos(x, y - 1, z), net.minecraft.world.level.block.Blocks.WATER.defaultBlockState(), 2);
+        for (int x = cx - 32; x <= cx - 20; x++) {
+            for (int z = cz + 42; z <= cz + 52; z++) {
+                int rise = 3 - Math.max(Math.abs(x - (cx - 26)), Math.abs(z - (cz + 47))) / 2;
+                for (int k = 0; k < rise; k++) {
+                    level.setBlock(new BlockPos(x, y - 1 + k, z), net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), 2);
+                    level.setBlock(new BlockPos(x, y + k, z), net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(), 2);
+                }
+            }
+        }
+        for (int[] t : new int[][]{{10, 22}, {-12, 28}, {5, 50}, {-18, 62}, {30, 56}, {-6, 76}, {16, 70}}) {
+            int tx = cx + t[0], tz = cz + t[1];
+            for (int k = 0; k < 5; k++) level.setBlock(new BlockPos(tx, y + k, tz), net.minecraft.world.level.block.Blocks.OAK_LOG.defaultBlockState(), 2);
+            for (int dx = -2; dx <= 2; dx++) for (int dz = -2; dz <= 2; dz++) for (int k = 3; k <= 4; k++)
+                if ((dx != 0 || dz != 0) && level.getBlockState(new BlockPos(tx + dx, y + k, tz + dz)).isAir())
+                    level.setBlock(new BlockPos(tx + dx, y + k, tz + dz), net.minecraft.world.level.block.Blocks.OAK_LEAVES.defaultBlockState(), 2);
+            for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++)
+                level.setBlock(new BlockPos(tx + dx, y + 5, tz + dz), net.minecraft.world.level.block.Blocks.OAK_LEAVES.defaultBlockState(), 2);
+        }
+        // an old cottage of the fief's, from before the streets
+        BoundingBox oldBox = new BoundingBox(cx - 40, y - 1, cz + 20, cx - 34, y + 5, cz + 26);
+        for (int x = oldBox.minX(); x <= oldBox.maxX(); x++) for (int z = oldBox.minZ(); z <= oldBox.maxZ(); z++) for (int yy = y; yy < y + 4; yy++)
+            level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.COBBLESTONE.defaultBlockState(), 2);
+        Holding h = sample(g);
+        h.box = new BoundingBox(cx - 8, y, cz - 8, cx + 7, y + 7, cz + 7);
+        h.gatePos = new BlockPos(cx, y, cz + 8);
+        h.owner = Sides.player(g.makeMockPlayer().getUUID());
+        h.tier = 2;
+        h.theme = "north";
+        h.fiefPlan = new ArrayList<>();
+        h.fief.add(new Holding.FiefBuilding("cottage_a", oldBox));
+        mgr.add(h);
+        List<net.minecraft.world.entity.npc.Villager> folk = new ArrayList<>();
+        try {
+            var p = net.aiagent256.stormhold.holding.Town.plan(h);
+            p.pending = 14;
+            for (int i = 0; i < 120 && p.pending > 0; i++) net.aiagent256.stormhold.holding.Town.tick(level, mgr, h);
+            String about = p.houses + " built, " + p.streets.size() + " streets, " + p.lots.size() + " lots, " + p.pending + " waiting, failed " + p.failed;
+            Stormhold.LOGGER.info("Town test: {}", about);
+            if (p.houses < 12) throw new IllegalStateException("the town only grew to " + about);
+            // the streets all join up
+            java.util.Set<Long> street = new java.util.HashSet<>();
+            for (var s : p.streets) for (BlockPos q : s.cells()) street.add(q.asLong());
+            java.util.Set<Long> seen = new java.util.HashSet<>();
+            java.util.ArrayDeque<BlockPos> open = new java.util.ArrayDeque<>();
+            open.add(p.streets.get(0).a.atY(0));
+            seen.add(p.streets.get(0).a.atY(0).asLong());
+            while (!open.isEmpty()) {
+                BlockPos q = open.poll();
+                for (var d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                    BlockPos n = q.relative(d);
+                    if (street.contains(n.asLong()) && seen.add(n.asLong())) open.add(n);
+                }
+            }
+            if (seen.size() != street.size()) throw new IllegalStateException("streets don't join: " + seen.size() + " of " + street.size() + " cells reached");
+            // the buildings: apart, each with its door near a street, its people's beds, and some variety
+            List<Holding.FiefBuilding> made = new ArrayList<>();
+            for (var b : h.fief) if (net.aiagent256.stormhold.holding.Town.isGenerated(b.piece())) made.add(b);
+            java.util.Map<String, Integer> kinds = new java.util.TreeMap<>();
+            for (var b : made) kinds.merge(b.piece(), 1, Integer::sum);
+            Stormhold.LOGGER.info("Town test kinds: {}", kinds);
+            if (kinds.size() < 3) throw new IllegalStateException("not much variety: " + kinds);
+            for (int i = 0; i < made.size(); i++) {
+                BoundingBox a = made.get(i).box();
+                if (a.intersects(h.box)) throw new IllegalStateException(made.get(i).piece() + " at " + a + " is in the castle");
+                if (a.intersects(oldBox)) throw new IllegalStateException(made.get(i).piece() + " at " + a + " is on the old cottage");
+                for (int j = i + 1; j < made.size(); j++) {
+                    BoundingBox b = made.get(j).box();
+                    if (a.minX() <= b.maxX() && b.minX() <= a.maxX() && a.minZ() <= b.maxZ() && b.minZ() <= a.maxZ())
+                        throw new IllegalStateException(made.get(i).piece() + " " + a + " overlaps " + made.get(j).piece() + " " + b);
+                }
+                int doors = 0, beds = 0;
+                boolean byStreet = false;
+                for (int x = a.minX(); x <= a.maxX(); x++) {
+                    for (int yy = a.minY(); yy <= a.maxY(); yy++) {
+                        for (int z = a.minZ(); z <= a.maxZ(); z++) {
+                            var st = level.getBlockState(new BlockPos(x, yy, z));
+                            if (st.getBlock() instanceof net.minecraft.world.level.block.BedBlock) beds++;
+                            if (st.getBlock() instanceof net.minecraft.world.level.block.DoorBlock
+                                    && st.getValue(net.minecraft.world.level.block.DoorBlock.HALF) == net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER) {
+                                doors++;
+                                for (int dx = -4; dx <= 4 && !byStreet; dx++)
+                                    for (int dz = -4; dz <= 4 && !byStreet; dz++) if (street.contains(new BlockPos(x + dx, 0, z + dz).asLong())) byStreet = true;
+                            }
+                        }
+                    }
+                }
+                String k = made.get(i).piece();
+                if (!k.equals("smithy") && !k.equals("stall")) {
+                    if (doors == 0) throw new IllegalStateException("the " + k + " at " + a + " has no door");
+                    if (!byStreet) throw new IllegalStateException("the " + k + " at " + a + " doesn't open on a street");
+                }
+                if ((k.equals("house") || k.equals("farmhouse") || k.equals("inn")) && beds < 2) throw new IllegalStateException("the " + k + " at " + a + " has no bed");
+            }
+            // the old cottage's footpath
+            if (!p.linked.contains(new BlockPos(oldBox.minX(), oldBox.minY(), oldBox.minZ()).asLong())) throw new IllegalStateException("the old cottage wasn't tied in");
+            int path = 0;
+            for (int x = oldBox.minX() - 1; x <= oldBox.maxX() + 1; x++)
+                for (int z = oldBox.minZ() - 1; z <= oldBox.maxZ() + 1; z++)
+                    if (level.getBlockState(new BlockPos(x, y - 1, z)).is(net.minecraft.world.level.block.Blocks.DIRT_PATH)) path++;
+            if (path == 0) throw new IllegalStateException("no path from the old cottage");
+            folk = level.getEntitiesOfClass(net.minecraft.world.entity.npc.Villager.class, new net.minecraft.world.phys.AABB(new BlockPos(cx, y, cz)).inflate(130, 40, 130));
+            if (folk.size() < 14) throw new IllegalStateException("only " + folk.size() + " folk in a town of " + p.houses);
+            // a bakery bakes two wheat to the loaf
+            if (net.aiagent256.stormhold.holding.Town.count(h, "bakery") > 0) {
+                var wheat = new net.minecraft.resources.ResourceLocation("minecraft", "wheat");
+                h.addStock(wheat, 52 - h.stock(wheat));
+                int baked = net.aiagent256.stormhold.holding.Fief.bake(h);
+                if (baked != 10) throw new IllegalStateException("the bakery baked " + baked + " from 20 wheat, not 10");
+            }
+            // it keeps
+            var q = net.aiagent256.stormhold.holding.Town.Plan.load(p.save());
+            if (q.streets.size() != p.streets.size() || q.lots.size() != p.lots.size() || q.houses != p.houses || !q.linked.equals(p.linked))
+                throw new IllegalStateException("the town didn't save and load");
+            // and one of each kind in each country, for the picture
+            String[] themes = {"north", "riverlands", "reach", "stormlands", "dorne"};
+            net.aiagent256.stormhold.holding.HouseGen.Kind[] row = {net.aiagent256.stormhold.holding.HouseGen.Kind.HOUSE,
+                    net.aiagent256.stormhold.holding.HouseGen.Kind.FARMHOUSE, net.aiagent256.stormhold.holding.HouseGen.Kind.INN,
+                    net.aiagent256.stormhold.holding.HouseGen.Kind.SMITHY, net.aiagent256.stormhold.holding.HouseGen.Kind.BAKERY};
+            for (int ti = 0; ti < themes.length; ti++) {
+                for (int ki = 0; ki < row.length; ki++) {
+                    int x0 = cx - 70 + ki * 13, z0 = cz - 26 - ti * 13;
+                    BoundingBox lot = new BoundingBox(x0 - 1, -64, z0 - 1, x0 + 10, 320, z0 + 11);
+                    boolean free = true;
+                    for (var b : h.fief) if (b.box().intersects(new BoundingBox(lot.minX(), b.box().minY(), lot.minZ(), lot.maxX(), b.box().maxY(), lot.maxZ()))) free = false;
+                    for (var s : p.streets) if (s.box(1).intersects(lot)) free = false;
+                    if (!free) continue;
+                    var front = ki % 2 == 0 ? net.minecraft.core.Direction.NORTH : net.minecraft.core.Direction.WEST;
+                    net.aiagent256.stormhold.holding.HouseGen.build(level, new net.aiagent256.stormhold.holding.HouseGen.Lot(x0, z0, 9 + ki % 2, 10, y - 1, front),
+                            row[ki], themes[ti], level.random);
+                }
+            }
+            dumpTown(level, cx - 88, y - 1, cz - 88, cx + 88, y + 24, cz + 88);
+            folk = level.getEntitiesOfClass(net.minecraft.world.entity.npc.Villager.class, new net.minecraft.world.phys.AABB(new BlockPos(cx, y, cz)).inflate(130, 40, 130));
+        } finally {
+            for (var v : folk) v.discard();
+            mgr.holdings.remove(h.id);
+            mgr.byKey.remove(h.key);
+            for (int dx = -8; dx <= 8; dx++) for (int dz = -8; dz <= 8; dz++) level.setChunkForced(cc + dx, ccz + dz, false);
+        }
+        g.succeed();
+    }
+
+    /** The blocks of a region to the log, a column a line (bare grass left out), for tools/castlegen to draw. */
+    private static void dumpTown(ServerLevel level, int x0, int y0, int z0, int x1, int y1, int z1) {
+        java.util.Map<String, Integer> pal = new java.util.LinkedHashMap<>();
+        pal.put("minecraft:air", 0);
+        java.util.Map<net.minecraft.world.level.block.state.BlockState, Integer> known = new java.util.IdentityHashMap<>();
+        StringBuilder out = new StringBuilder();
+        int cols = 0;
+        for (int x = x0; x <= x1; x++) {
+            for (int z = z0; z <= z1; z++) {
+                int top = y0 - 1;
+                String[] ids = new String[y1 - y0 + 1];
+                for (int yy = y0; yy <= y1; yy++) {
+                    var st = level.getBlockState(new BlockPos(x, yy, z));
+                    Integer id = known.get(st);
+                    if (id == null) {
+                        String key = net.minecraft.commands.arguments.blocks.BlockStateParser.serialize(st);
+                        id = pal.computeIfAbsent(key, k -> pal.size());
+                        known.put(st, id);
+                    }
+                    ids[yy - y0] = Integer.toString(id);
+                    if (!st.isAir()) top = yy;
+                }
+                if (top < y0) continue;
+                if (top == y0 && level.getBlockState(new BlockPos(x, y0, z)).is(net.minecraft.world.level.block.Blocks.GRASS_BLOCK)) continue;
+                out.append("TOWNDUMP C ").append(x - x0).append(' ').append(z - z0).append(' ')
+                        .append(String.join(",", java.util.Arrays.copyOf(ids, top - y0 + 1))).append('\n');
+                cols++;
+            }
+        }
+        StringBuilder head = new StringBuilder("TOWNDUMP H " + (x1 - x0 + 1) + " " + (y1 - y0 + 1) + " " + (z1 - z0 + 1) + "\n");
+        for (var e : pal.entrySet()) head.append("TOWNDUMP P ").append(e.getValue()).append(' ').append(e.getKey()).append('\n');
+        Stormhold.LOGGER.info("Town dump: {} columns\n{}{}TOWNDUMP END", cols, head, out);
+    }
+
     /** A column rides to the player on the clock and the men fall in on arrival. */
     @GameTest(template = "arena")
     public static void columnRidesToPlayer(GameTestHelper g) {

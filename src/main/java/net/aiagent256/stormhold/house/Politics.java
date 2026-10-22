@@ -254,14 +254,21 @@ public final class Politics {
             if (h.fiefPlan == null || !h.fiefPlan.isEmpty()) continue;
             int buildings = 0;
             for (Holding.FiefBuilding b : h.fief) if (!b.piece().equals("field") && !b.piece().equals("orchard")) buildings++;
-            if (buildings < Growth.fiefCap(h.tier)) can.add(h);
+            boolean works = !Fief.nextExtra(h).startsWith("cottage") && buildings < Growth.fiefCap(h.tier);
+            if (works || net.aiagent256.stormhold.holding.Town.grows(level, h) && net.aiagent256.stormhold.holding.Town.room(h)) can.add(h);
         }
         if (can.isEmpty()) return;
         Holding h = can.get(level.random.nextInt(can.size()));
         String next = Fief.nextExtra(h);
-        h.fiefPlan.add(next);
-        Chronicle.log(level, mgr, Chronicle.GROWTH, "The people of " + h.name + " (" + house.title() + ") are raising a "
-                + next.replace('_', ' ') + ".");
+        int buildings = 0;
+        for (Holding.FiefBuilding b : h.fief) if (!b.piece().equals("field") && !b.piece().equals("orchard")) buildings++;
+        if (!next.startsWith("cottage") && buildings < Growth.fiefCap(h.tier)) {
+            h.fiefPlan.add(next);
+            Chronicle.log(level, mgr, Chronicle.GROWTH, "The people of " + h.name + " (" + house.title() + ") are raising a "
+                    + next.replace('_', ' ') + ".");
+        } else if (net.aiagent256.stormhold.holding.Town.ask(h)) {
+            Chronicle.log(level, mgr, Chronicle.GROWTH, "The town outside " + h.name + " (" + house.title() + ") grows.");
+        }
         mgr.setDirty();
     }
 

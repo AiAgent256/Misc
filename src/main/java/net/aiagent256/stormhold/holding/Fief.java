@@ -142,6 +142,7 @@ public final class Fief {
                 || !level.isLoaded(new BlockPos(x0 - 1, 64, z0 + d)) || !level.isLoaded(new BlockPos(x0 + w, 64, z0 - 1))) return null;
         if (h.box.inflatedBy(8).intersects(foot)) return null;
         for (Holding.FiefBuilding b : h.fief) if (b.box().inflatedBy(3).intersects(foot)) return null;
+        if (Town.blocks(h, foot)) return null;
         // heights
         int[] hs = new int[9];
         int k = 0, water = 0;
@@ -446,12 +447,13 @@ public final class Fief {
     /** Wheat kept back from the ovens in each castle's stores. */
     public static final int WHEAT_KEPT = 32;
 
-    /** The day's baking: every three wheat past {@link #WHEAT_KEPT} make a loaf. How many loaves. */
+    /** The day's baking: every three wheat past {@link #WHEAT_KEPT} make a loaf, every two where the town has a bakery. How many loaves. */
     public static int bake(Holding h) {
         ResourceLocation wheat = new ResourceLocation("minecraft", "wheat"), bread = new ResourceLocation("minecraft", "bread");
-        int loaves = (h.stock(wheat) - WHEAT_KEPT) / 3;
+        int per = Town.count(h, "bakery") > 0 ? 2 : 3;
+        int loaves = (h.stock(wheat) - WHEAT_KEPT) / per;
         if (loaves <= 0) return 0;
-        h.addStock(wheat, -3 * loaves);
+        h.addStock(wheat, -per * loaves);
         h.addStock(bread, loaves);
         return loaves;
     }
