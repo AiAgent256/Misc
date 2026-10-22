@@ -263,7 +263,7 @@ public final class SiegeWorks {
     static boolean raiseShed(ServerLevel level, Site s) {
         // a bank of earth or snow where the beam swings is dug out; stone, timber or anything built is not
         List<BlockPos> dig = new ArrayList<>();
-        for (int k = 1; k <= BEAM; k++) {
+        for (int k = 0; k <= BEAM; k++) {                   // the head's cell too: the beam swings into it
             BlockPos p = cell(s, k, 0, 1);
             BlockState here = level.getBlockState(p);
             if (here.isAir() || here.canBeReplaced()) continue;
