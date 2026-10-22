@@ -106,7 +106,7 @@ public final class Fields {
             w = d;
             d = t;
         }
-        BoundingBox at = site(level, h, p, w, d, r);
+        BoundingBox at = site(level, h, p, w, d, r, !field);
         if (at == null) {
             p.landWait = 30;
             return false;
@@ -133,9 +133,40 @@ public final class Fields {
         return true;
     }
 
+    /** A field the town has grown over: its crops, fences and scarecrow taken up, the farmland and channels turned back to grass, and it's gone from the fief. */
+    static void reclaim(ServerLevel level, Holding h, Holding.FiefBuilding f) {
+        BoundingBox b = f.box();
+        int y0 = b.minY() - 1, y1 = b.maxY() + 3;
+        // the channels first, while there's farmland beside them to know them by
+        for (int x = b.minX(); x <= b.maxX(); x++) {
+            for (int z = b.minZ(); z <= b.maxZ(); z++) {
+                for (int y = y0; y <= y1; y++) {
+                    BlockPos q = new BlockPos(x, y, z);
+                    if (!level.isLoaded(q) || !level.getBlockState(q).is(Blocks.WATER)) continue;
+                    boolean channel = false;
+                    for (Direction d : Direction.Plane.HORIZONTAL) if (level.getBlockState(q.relative(d)).is(Blocks.FARMLAND)) channel = true;
+                    if (channel) level.setBlock(q, Blocks.GRASS_BLOCK.defaultBlockState(), 2);
+                }
+            }
+        }
+        for (int x = b.minX(); x <= b.maxX(); x++) {
+            for (int z = b.minZ(); z <= b.maxZ(); z++) {
+                for (int y = y1; y >= y0; y--) {
+                    BlockPos q = new BlockPos(x, y, z);
+                    if (!level.isLoaded(q)) continue;
+                    BlockState s = level.getBlockState(q);
+                    if (s.is(net.minecraft.tags.BlockTags.CROPS) || s.is(net.minecraft.tags.BlockTags.FENCES) || s.is(net.minecraft.tags.BlockTags.FENCE_GATES)
+                            || s.is(Blocks.HAY_BLOCK) || s.is(Blocks.CARVED_PUMPKIN) || s.is(Blocks.WATER_CAULDRON)) level.setBlock(q, Blocks.AIR.defaultBlockState(), 2);
+                    else if (s.is(Blocks.FARMLAND)) level.setBlock(q, Blocks.GRASS_BLOCK.defaultBlockState(), 2);
+                }
+            }
+        }
+        h.fief.remove(f);
+    }
+
     /** Open, dry, fairly level ground for a w by d plot near the town, clear of everything; its box at the land's height, or null. */
     @Nullable
-    static BoundingBox site(ServerLevel level, Holding h, Town.Plan p, int w, int d, RandomSource r) {
+    static BoundingBox site(ServerLevel level, Holding h, Town.Plan p, int w, int d, RandomSource r, boolean pen) {
         BlockPos c = h.center();
         int half = Math.max(h.box.getXSpan(), h.box.getZSpan()) / 2;
         for (int attempt = 0; attempt < 40; attempt++) {
@@ -145,7 +176,7 @@ public final class Fields {
                 Town.Street s = p.streets.get(r.nextInt(p.streets.size()));
                 BlockPos q = s.a.relative(s.dir, r.nextInt(s.len));
                 double ang = r.nextDouble() * Math.PI * 2;
-                int dist = 12 + Math.max(w, d) / 2 + r.nextInt(8 + attempt / 2);
+                int dist = (pen ? 24 : 12) + Math.max(w, d) / 2 + r.nextInt(8 + attempt / 2);
                 ax = q.getX() + (int) (Math.cos(ang) * dist);
                 az = q.getZ() + (int) (Math.sin(ang) * dist);
             } else {
@@ -162,6 +193,8 @@ public final class Fields {
                     || !level.isLoaded(new BlockPos(x0 - 1, 64, z1 + 1)) || !level.isLoaded(new BlockPos(x1 + 1, 64, z0 - 1))) continue;
             if (h.box.inflatedBy(Town.FORT + 2).intersects(foot)) continue;
             if (Town.blocks(h, foot.inflatedBy(1))) continue;
+            // a paddock stays out of the way the high street will grow (a field the town just grows over)
+            if (pen && ahead(p, foot)) continue;
             boolean clear = true;
             for (Holding.FiefBuilding b : h.fief) {
                 if (Town.flat(b.box().inflatedBy(2)).intersects(foot)) {
@@ -189,6 +222,19 @@ public final class Fields {
             return new BoundingBox(x0, y, z0, x1, y + 1, z1);
         }
         return null;
+    }
+
+    /** Within thirty blocks ahead of where the high street ends, and fifteen either side of its line. */
+    static boolean ahead(Town.Plan p, BoundingBox foot) {
+        Town.Street last = null;
+        for (Town.Street s : p.streets) if (s.main) last = s;
+        if (last == null) return false;
+        BlockPos e = last.end(), f = e.relative(last.dir, 30);
+        Direction side = last.dir.getClockWise();
+        BlockPos a = e.relative(side, -15), b = f.relative(side, 15);
+        BoundingBox lane = new BoundingBox(Math.min(a.getX(), b.getX()), -64, Math.min(a.getZ(), b.getZ()), Math.max(a.getX(), b.getX()), 320,
+                Math.max(a.getZ(), b.getZ()));
+        return lane.intersects(foot);
     }
 
     /** The ground of a plot made level at its height: cleared above, filled below. */

@@ -313,12 +313,49 @@ public final class Town {
 
     /** Pave it and take it into the plan, with its lots. */
     static void lay(ServerLevel level, Holding h, Plan p, Plot c) {
+        // the town grows over its fields: those in the way are given up, and the farmers break new ground further out
+        List<BoundingBox> taken = new ArrayList<>();
+        taken.add(c.street().box(1));
+        for (Lot l : c.lots()) taken.add(l.box(1));
+        for (Holding.FiefBuilding f : new ArrayList<>(h.fief)) {
+            if (!f.piece().equals("field") || inBuiltLot(p, f)) continue;
+            for (BoundingBox t : taken) {
+                if (flat(f.box()).intersects(t)) {
+                    Fields.reclaim(level, h, f);
+                    break;
+                }
+            }
+        }
         pave(level, h, p, c.street());
         p.streets.add(c.street());
         for (Lot l : c.lots()) {
             l.street = p.streets.size() - 1;
             p.lots.add(l);
         }
+    }
+
+    /** A farmhouse's own garden: it goes with its house. */
+    static boolean inBuiltLot(Plan p, Holding.FiefBuilding f) {
+        BlockPos mid = f.box().getCenter();
+        for (Lot l : p.lots) if (l.built && l.box(0).isInside(mid.atY(0))) return true;
+        return false;
+    }
+
+    /** A field the town may grow over (not a farmhouse's garden). */
+    static boolean reclaimable(Plan p, Holding.FiefBuilding f) {
+        return f.piece().equals("field") && !inBuiltLot(p, f);
+    }
+
+    /** The land under a field's crops: its farmland, channel or verge. */
+    static int fieldGround(ServerLevel level, int x, int z) {
+        int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+        for (int g = 0; g < 8; g++, y--) {
+            BlockState s = level.getBlockState(new BlockPos(x, y, z));
+            if (s.isAir() || s.is(BlockTags.CROPS) || s.is(BlockTags.FENCES) || s.is(BlockTags.FENCE_GATES) || s.is(Blocks.HAY_BLOCK)
+                    || s.is(Blocks.CARVED_PUMPKIN) || s.canBeReplaced() && s.getFluidState().isEmpty()) continue;
+            return y;
+        }
+        return y;
     }
 
     // ------------------------------------------------------------ the streets
@@ -432,14 +469,16 @@ public final class Town {
         if (h.box.inflatedBy(FORT).intersects(mine)) return false;
         for (Street o : p.streets) if (o.box(0).intersects(mine)) return false;
         for (Lot l : p.lots) if (l.box(0).intersects(mine)) return false;
-        for (Holding.FiefBuilding b : h.fief) if (flat(b.box().inflatedBy(1)).intersects(mine)) return false;
+        for (Holding.FiefBuilding b : h.fief) if (!reclaimable(p, b) && flat(b.box().inflatedBy(1)).intersects(mine)) return false;
         int prev = Integer.MIN_VALUE;
         for (int i = 0; i < s.len; i++) {
             BlockPos q = s.a.relative(s.dir, i);
-            int y = surface(level, q.getX(), q.getZ());
+            boolean field = false;
+            for (Holding.FiefBuilding b : h.fief) if (reclaimable(p, b) && flat(b.box()).isInside(q.atY(0))) field = true;
+            int y = field ? fieldGround(level, q.getX(), q.getZ()) : surface(level, q.getX(), q.getZ());
             if (y == Integer.MIN_VALUE) return false;
             BlockState top = level.getBlockState(new BlockPos(q.getX(), y, q.getZ()));
-            if (!natural(top) && !road(top)) return false;
+            if (!field && !natural(top) && !road(top)) return false;
             if (prev != Integer.MIN_VALUE && Math.abs(y - prev) > 1) return false;
             prev = y;
         }
@@ -603,7 +642,7 @@ public final class Town {
         if (h.box.inflatedBy(FORT + 1).intersects(b)) return false;
         for (Street s : p.streets) if (s.box(0).intersects(b)) return false;
         for (Lot o : p.lots) if (o != l && o.box(0).intersects(b)) return false;
-        for (Holding.FiefBuilding f : h.fief) if (flat(f.box().inflatedBy(1)).intersects(b)) return false;
+        for (Holding.FiefBuilding f : h.fief) if (!reclaimable(p, f) && flat(f.box().inflatedBy(1)).intersects(b)) return false;
         double reach = Fief.REACH + Math.max(h.box.getXSpan(), h.box.getZSpan()) / 2.0;
         double dx = l.x0 + l.w / 2.0 - h.center().getX(), dz = l.z0 + l.d / 2.0 - h.center().getZ();
         return Math.sqrt(dx * dx + dz * dz) <= reach;
