@@ -40,7 +40,7 @@ public final class Rewards {
         for (Holding h : seat == fallback || fallback == null ? new Holding[]{seat} : new Holding[]{seat, fallback}) {
             if (h == null || h.warTablePos.equals(BlockPos.ZERO) || !level.isLoaded(h.warTablePos)) continue;
             BlockPos at = Steward.treasuryChest(level, h);
-            if (at == null) at = treasury(level, h);
+            if (at == null) at = coffer(level, h);
             net.minecraft.world.Container chest = at == null ? null : Steward.container(level, at);
             if (chest == null) continue;
             int left = emeralds;
@@ -69,7 +69,7 @@ public final class Rewards {
 
     /** A chest beside the War Table with a "Treasury" sign on it, the first time there's coin to put in it. */
     @Nullable
-    static BlockPos treasury(ServerLevel level, Holding h) {
+    static BlockPos coffer(ServerLevel level, Holding h) {
         BlockPos table = h.warTablePos;
         if (table.equals(BlockPos.ZERO) || !level.isLoaded(table)) return null;
         for (int r = 1; r <= 4; r++) {
