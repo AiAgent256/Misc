@@ -191,15 +191,25 @@ public final class Labour {
         if (!h.isPlayerOwned()) return;
         List<String> said = new ArrayList<>();
         int miners = Math.min(h.minersAt, h.miners), smiths = Math.min(h.smithsAt, h.smiths);
+        needMine(level, h);
         if (miners > 0) said.add(mine(level, h, miners));
         if (smiths > 0) said.add(forge(level, mgr, h, smiths));
         h.labourReport = String.join(" ", said);
         mgr.setDirty();
     }
 
-    /** One day's ore from n miners, by the zone the castle stands in. Into the stores; returns the report. */
+    /** Miners set and no mine: the fief sinks one first, ahead of anything else it's building. */
+    public static void needMine(ServerLevel level, Holding h) {
+        if (h.miners <= 0 || Work.mine(h) != null || level.dimension() != net.minecraft.world.level.Level.OVERWORLD) return;
+        if (h.fiefPlan == null) Fief.plan(level, h);
+        if (!h.fiefPlan.contains("mine")) h.fiefPlan.add(0, "mine");
+    }
+
+    /** One day's ore from n miners, by the zone the castle stands in (half of it scratched from the hillside while there's no mine yet). Into the stores; returns the report. */
     public static String mine(ServerLevel level, Holding h, int n) {
         var r = level.random;
+        boolean shaft = Work.mine(h) != null;
+        if (!shaft) n = Math.max(1, n / 2);
         int zone = Frontier.zone(level, h.center());
         Map<String, Integer> haul = new LinkedHashMap<>();
         for (int i = 0; i < n; i++) {
@@ -218,7 +228,7 @@ public final class Labour {
             h.addStock(new ResourceLocation("minecraft", e.getKey()), e.getValue());
             parts.add(e.getValue() + " " + e.getKey().replace("_ingot", "").replace("_lazuli", "").replace('_', ' '));
         }
-        return "Miners " + n + " brought up " + String.join(", ", parts) + ".";
+        return (shaft ? "Miners " + n : "With no mine yet, miners scratched at the hillside: " + n + " men's worth") + " brought up " + String.join(", ", parts) + ".";
     }
 
     /** The metal one level of kit costs, as {iron, diamonds, netherite}. */

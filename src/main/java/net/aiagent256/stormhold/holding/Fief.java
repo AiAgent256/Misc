@@ -387,8 +387,9 @@ public final class Fief {
         double mult = !h.isPlayerOwned() ? 0 : h.mode == Holding.Mode.PRODUCE ? 1.5 : h.mode == Holding.Mode.ATTACK ? 0.75 : 1.0;
         if (mult > 0) {
             for (String[] row : YIELD) {
-                int n = jobs.getOrDefault(row[0], 0);
-                if (n == 0) continue;
+                // hands without land to work (a farmer with no field, a butcher with no beasts) make half
+                double n = Fields.worked(h, row[0], jobs.getOrDefault(row[0], 0));
+                if (n <= 0) continue;
                 for (int i = 1; i < row.length; i++) {
                     String[] kv = row[i].split(":");
                     int q = (int) Math.round(Integer.parseInt(kv[1]) * n * mult);
@@ -429,6 +430,7 @@ public final class Fief {
         if (herd > 0) sb.append(", herd of ").append(herd);
         if (dug > 0) sb.append(", mine ").append(dug).append(" blocks deep");
         sb.append(".");
+        sb.append(Fields.shortfall(h, jobs));
         if (!made.isEmpty()) {
             sb.append(" Yesterday:");
             int i = 0;

@@ -278,6 +278,14 @@ public class StormholdGameTests {
             var iron = new net.minecraft.resources.ResourceLocation("minecraft", "iron_ingot");
             int c0 = h.stock(coal), i0 = h.stock(iron);
             net.aiagent256.stormhold.holding.Labour.mine(level, h, 2);
+            if (h.stock(coal) - c0 != 6 || h.stock(iron) - i0 != 3)
+                throw new IllegalStateException("two miners with no mine brought up " + (h.stock(coal) - c0) + " coal, " + (h.stock(iron) - i0) + " iron, not half");
+            var shaft = new Holding.FiefBuilding("mine", new BoundingBox(0, -60, 0, 4, -56, 4));
+            h.fief.add(shaft);
+            c0 = h.stock(coal);
+            i0 = h.stock(iron);
+            net.aiagent256.stormhold.holding.Labour.mine(level, h, 2);
+            h.fief.remove(shaft);
             if (h.stock(coal) - c0 != 12 || h.stock(iron) - i0 != 6)
                 throw new IllegalStateException("two miners brought up " + (h.stock(coal) - c0) + " coal, " + (h.stock(iron) - i0) + " iron");
 
@@ -2459,6 +2467,8 @@ public class StormholdGameTests {
         try {
             var p = net.aiagent256.stormhold.holding.Town.plan(h);
             p.pending = 14;
+            h.fiefJobs.put("farmer", 7);
+            h.fiefJobs.put("butcher", 3);
             for (int i = 0; i < 120 && p.pending > 0; i++) net.aiagent256.stormhold.holding.Town.tick(level, mgr, h);
             String about = p.houses + " built, " + p.streets.size() + " streets, " + p.lots.size() + " lots, " + p.pending + " waiting, failed " + p.failed;
             Stormhold.LOGGER.info("Town test: {}", about);
@@ -2536,6 +2546,26 @@ public class StormholdGameTests {
                 }
                 if ((k.equals("house") || k.equals("farmhouse") || k.equals("inn")) && beds < 2) throw new IllegalStateException("the " + k + " at " + a + " has no bed");
             }
+            // land for the hands: fields for seven farmers, paddocks for three butchers, with real beasts in them; a stable with horses
+            int farmRoom = net.aiagent256.stormhold.holding.Fields.farmerRoom(h), penRoom = net.aiagent256.stormhold.holding.Fields.butcherRoom(h);
+            if (farmRoom < 7 || penRoom < 3) throw new IllegalStateException("land for " + farmRoom + " farmers and " + penRoom + " butchers, not 7 and 3");
+            if (net.aiagent256.stormhold.holding.Fields.worked(h, "farmer", 9) != 8.0 && farmRoom == 7)
+                throw new IllegalStateException("two farmers without fields didn't work at half");
+            int cows = 0, pigs = 0;
+            for (var b : h.fief) {
+                if (!b.piece().equals("pasture")) continue;
+                var box = net.minecraft.world.phys.AABB.of(b.box()).inflate(1, 2, 1);
+                cows += level.getEntitiesOfClass(net.minecraft.world.entity.animal.Cow.class, box).size();
+                pigs += level.getEntitiesOfClass(net.minecraft.world.entity.animal.Pig.class, box).size();
+            }
+            if (cows < 3 || pigs < 3) throw new IllegalStateException(cows + " cows and " + pigs + " pigs in the paddocks");
+            if (net.aiagent256.stormhold.holding.Town.count(h, "stable") > 0) {
+                var st = h.fief.stream().filter(b -> b.piece().equals("stable")).findFirst().orElseThrow();
+                int horses = level.getEntitiesOfClass(net.minecraft.world.entity.animal.horse.Horse.class, net.minecraft.world.phys.AABB.of(st.box()).inflate(1)).size();
+                if (horses < 1) throw new IllegalStateException("a stable with no horses");
+            } else {
+                throw new IllegalStateException("no stable in a town of " + p.houses);
+            }
             // the old cottage's footpath
             if (!p.linked.contains(new BlockPos(oldBox.minX(), oldBox.minY(), oldBox.minZ()).asLong())) throw new IllegalStateException("the old cottage wasn't tied in");
             int path = 0;
@@ -2559,6 +2589,8 @@ public class StormholdGameTests {
             folk = level.getEntitiesOfClass(net.minecraft.world.entity.npc.Villager.class, new net.minecraft.world.phys.AABB(new BlockPos(cx, y, cz)).inflate(130, 40, 130));
         } finally {
             for (var v : folk) v.discard();
+            for (var a : level.getEntitiesOfClass(net.minecraft.world.entity.animal.Animal.class,
+                    new net.minecraft.world.phys.AABB(new BlockPos(cx, y, cz)).inflate(130, 40, 130))) a.discard();
             mgr.holdings.remove(h.id);
             mgr.byKey.remove(h.key);
             for (int dx = -8; dx <= 8; dx++) for (int dz = -8; dz <= 8; dz++) level.setChunkForced(cc + dx, ccz + dz, false);

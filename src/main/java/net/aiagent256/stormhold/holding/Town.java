@@ -165,6 +165,8 @@ public final class Town {
         public int houses, pending, failed;
         /** The buildings that stood before the streets and have their footpath now (by their corner). */
         public final Set<Long> linked = new HashSet<>();
+        /** Not saved: ticks to wait before looking for ground for a field or paddock again, after finding none. */
+        public int landWait;
 
         public CompoundTag save() {
             CompoundTag t = new CompoundTag();
@@ -245,14 +247,18 @@ public final class Town {
     public static void tick(ServerLevel level, HoldingManager mgr, Holding h) {
         if (!grows(level, h)) return;
         Plan p = plan(h);
-        if (p.pending <= 0 && p.streets.isEmpty()) return;
-        if (p.streets.isEmpty()) {
+        // the high street's laid when there's first something to build
+        if (p.streets.isEmpty() && p.pending > 0) {
             if (!seed(level, h, p)) {
                 if (++p.failed > 40) give(h, p);
                 return;
             }
             mgr.setDirty();
+            return;
         }
+        // the working land: fields for farmers who have none, paddocks for butchers without beasts
+        if (Fields.tick(level, mgr, h, p)) return;
+        if (p.streets.isEmpty()) return;
         if (link(level, h, p)) {
             mgr.setDirty();
             return;
@@ -549,7 +555,7 @@ public final class Town {
         Direction side = s.dir.getClockWise();
         for (int sgn : new int[]{1, -1}) {
             Direction toward = sgn > 0 ? side : side.getOpposite();
-            int off = (sgn > 0 ? s.right() : s.left()) + 2;       // the street's half and a verge
+            int off = (sgn > 0 ? s.right() : s.left()) + (s.main ? 3 : 2);       // the street's half and a verge, wider on the high street
             int t = 0, since = 0;
             while (t <= s.len - 5) {
                 Lot got = null;
@@ -567,7 +573,7 @@ public final class Town {
                     continue;
                 }
                 out.add(got);
-                t += (got.front.getAxis() == Direction.Axis.Z ? got.w : got.d) + 2;   // room between for both roofs' eaves
+                t += (got.front.getAxis() == Direction.Axis.Z ? got.w : got.d) + 3;   // room between for both roofs' eaves and a way through
                 // every couple of lots, a gap a lane could come through
                 if (++since >= 2 + r.nextInt(2)) {
                     t += 3;
@@ -607,6 +613,7 @@ public final class Town {
     static HouseGen.Kind next(Holding h, Plan p, RandomSource r, Lot l) {
         int bakeries = count(h, "bakery"), smithies = count(h, "smithy"), inns = count(h, "inn"), stalls = count(h, "stall");
         if (p.houses >= 3 && bakeries == 0) return HouseGen.Kind.BAKERY;
+        if (p.houses >= 4 && count(h, "stable") == 0 && Math.min(l.w, l.d) >= 7) return HouseGen.Kind.STABLE;
         if (p.houses >= 5 && smithies == 0) return HouseGen.Kind.SMITHY;
         if (p.houses >= 8 && inns == 0 && Math.min(l.w, l.d) >= 7) return HouseGen.Kind.INN;
         if (p.houses >= 6 && stalls < p.houses / 6 && l.street == 0 && r.nextBoolean()) return HouseGen.Kind.STALL;
@@ -656,6 +663,7 @@ public final class Town {
             case INN -> "an inn";
             case STALL -> "a market stall";
             case WORKSHOP -> "a workshop";
+            case STABLE -> "a stable, with horses in its stalls";
             default -> "a house";
         };
     }
@@ -706,13 +714,21 @@ public final class Town {
     static void people(ServerLevel level, HouseGen.Kind kind, HouseGen.Built b, RandomSource r) {
         String prof = switch (kind) {
             case FARMHOUSE -> "farmer";
-            case BAKERY -> "butcher";
             case SMITHY -> r.nextBoolean() ? "armorer" : "weaponsmith";
             case HOUSE -> r.nextInt(3) == 0 ? "farmer" : null;
             default -> null;
         };
         VillagerProfession job = prof == null ? null : ForgeRegistries.VILLAGER_PROFESSIONS.getValue(new ResourceLocation("minecraft", prof));
-        int souls = kind == HouseGen.Kind.STALL ? 1 : Math.max(kind == HouseGen.Kind.SMITHY || kind == HouseGen.Kind.BAKERY ? 1 : 2, b.beds().size());
+        int souls = kind == HouseGen.Kind.STALL || kind == HouseGen.Kind.STABLE ? 1
+                : Math.max(kind == HouseGen.Kind.SMITHY || kind == HouseGen.Kind.BAKERY ? 1 : 2, b.beds().size());
+        for (BlockPos stall : b.stalls()) {
+            net.minecraft.world.entity.animal.horse.Horse horse = net.minecraft.world.entity.EntityType.HORSE.create(level);
+            if (horse == null) continue;
+            horse.moveTo(stall.getX() + 0.5, stall.getY(), stall.getZ() + 0.5, r.nextFloat() * 360F, 0);
+            horse.finalizeSpawn(level, level.getCurrentDifficultyAt(stall), net.minecraft.world.entity.MobSpawnType.STRUCTURE, null, null);
+            horse.setPersistenceRequired();
+            level.addFreshEntity(horse);
+        }
         for (int i = 0; i < souls; i++) {
             BlockPos at = i < b.beds().size() ? b.beds().get(i) : b.door();
             BlockPos stand = Garrisons.standable(level, at);
@@ -721,6 +737,23 @@ public final class Town {
     }
 
     // ------------------------------------------------------------ the old buildings
+
+    /** The street cell nearest a spot, or null with no streets yet. */
+    @Nullable
+    static BlockPos nearestStreet(Plan p, BlockPos at) {
+        BlockPos best = null;
+        double bd = Double.MAX_VALUE;
+        for (Street s : p.streets) {
+            for (BlockPos q : s.cells()) {
+                double d = q.distSqr(at.atY(0));
+                if (d < bd) {
+                    bd = d;
+                    best = q;
+                }
+            }
+        }
+        return best;
+    }
 
     /** One building that stood before the streets, tied in: a footpath from its nearest side to the nearest street. True if one was dealt with. */
     static boolean link(ServerLevel level, Holding h, Plan p) {

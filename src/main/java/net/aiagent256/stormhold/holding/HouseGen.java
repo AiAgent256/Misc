@@ -41,7 +41,7 @@ import java.util.Map;
  * garden of wheat behind a farmhouse. No two come out alike, and every one faces its street.
  */
 public final class HouseGen {
-    public enum Kind { HOUSE, FARMHOUSE, BAKERY, SMITHY, INN, STALL, WORKSHOP }
+    public enum Kind { HOUSE, FARMHOUSE, BAKERY, SMITHY, INN, STALL, WORKSHOP, STABLE }
 
     /** A lot: its min corner, its size along x and z, and the side that faces the street. The floor goes at {@code y}. */
     public record Lot(int x0, int z0, int w, int d, int y, Direction front) {
@@ -50,8 +50,8 @@ public final class HouseGen {
         }
     }
 
-    /** What went up: its walls' box, the step outside its door, its beds, and its garden if it has one. */
-    public record Built(BoundingBox box, BlockPos door, List<BlockPos> beds, @Nullable BoundingBox garden, int blocks) {
+    /** What went up: its walls' box, the step outside its door, its beds, its garden if it has one, and where its beasts stand (a stable's stalls). */
+    public record Built(BoundingBox box, BlockPos door, List<BlockPos> beds, @Nullable BoundingBox garden, int blocks, List<BlockPos> stalls) {
     }
 
     /** A country's way of building: materials for each part, rolled once per house. */
@@ -203,22 +203,30 @@ public final class HouseGen {
         Palette p = palette(theme, r);
         Slate s = new Slate();
         if (kind == Kind.STALL) return stall(level, lot, p, r, s);
-        // the house's own footprint: the lot, or the front of it for a farmhouse with its garden behind
-        int gardenDepth = kind == Kind.FARMHOUSE ? Math.min(5, depthOf(lot) - 5) : 0;
+        // the house's own footprint: the front of the lot, with a farmhouse's garden or a fenced yard behind (an inn takes it all)
+        int depth = depthOf(lot);
+        int keep = switch (kind) {
+            case FARMHOUSE -> depth - Math.min(5, depth - 5);
+            case INN, STABLE -> depth;
+            case BAKERY, SMITHY -> 6 + r.nextInt(2);
+            default -> 5 + r.nextInt(3);
+        };
+        int behind = depth - Math.max(5, keep);
         int x0 = lot.x0(), z0 = lot.z0(), x1 = lot.x0() + lot.w() - 1, z1 = lot.z0() + lot.d() - 1;
-        BoundingBox garden = null;
-        if (gardenDepth >= 3) {
+        BoundingBox back0 = null;
+        if (behind >= (kind == Kind.FARMHOUSE ? 3 : 2)) {
             switch (lot.front()) {
-                case NORTH -> { garden = new BoundingBox(x0, lot.y(), z1 - gardenDepth + 1, x1, lot.y() + 1, z1); z1 -= gardenDepth; }
-                case SOUTH -> { garden = new BoundingBox(x0, lot.y(), z0, x1, lot.y() + 1, z0 + gardenDepth - 1); z0 += gardenDepth; }
-                case WEST -> { garden = new BoundingBox(x1 - gardenDepth + 1, lot.y(), z0, x1, lot.y() + 1, z1); x1 -= gardenDepth; }
-                default -> { garden = new BoundingBox(x0, lot.y(), z0, x0 + gardenDepth - 1, lot.y() + 1, z1); x0 += gardenDepth; }
+                case NORTH -> { back0 = new BoundingBox(x0, lot.y(), z1 - behind + 1, x1, lot.y() + 1, z1); z1 -= behind; }
+                case SOUTH -> { back0 = new BoundingBox(x0, lot.y(), z0, x1, lot.y() + 1, z0 + behind - 1); z0 += behind; }
+                case WEST -> { back0 = new BoundingBox(x1 - behind + 1, lot.y(), z0, x1, lot.y() + 1, z1); x1 -= behind; }
+                default -> { back0 = new BoundingBox(x0, lot.y(), z0, x0 + behind - 1, lot.y() + 1, z1); x0 += behind; }
             }
         }
+        BoundingBox garden = kind == Kind.FARMHOUSE ? back0 : null, yard = kind == Kind.FARMHOUSE ? null : back0;
         int w = x1 - x0 + 1, d = z1 - z0 + 1;
         int floors = switch (kind) {
             case INN -> 2 + (Math.min(w, d) >= 8 && r.nextBoolean() ? 1 : 0);
-            case SMITHY, BAKERY, STALL -> 1;
+            case SMITHY, BAKERY, STALL, STABLE -> 1;
             default -> Math.min(w, d) >= 6 && r.nextInt(5) < 2 ? 2 : 1;
         };
         int y = lot.y();
@@ -300,6 +308,14 @@ public final class HouseGen {
                     for (int h = 1; h <= 3; h++) s.put(x, y + h, z, Blocks.AIR);
                 }
             }
+        } else if (kind == Kind.STABLE) {
+            // a stable's wide way in: three across, under a lintel
+            for (int x = x0; x <= x1; x++) {
+                for (int z = z0; z <= z1; z++) {
+                    if (!onSide(x, z, x0, z0, x1, z1, front) || Math.abs(x - door.getX()) + Math.abs(z - door.getZ()) > 1) continue;
+                    for (int h = 1; h <= 2; h++) s.put(x, y + h, z, Blocks.AIR);
+                }
+            }
         } else {
             BlockState dl = p.door.defaultBlockState().setValue(DoorBlock.FACING, front.getOpposite()).setValue(DoorBlock.HALF, DoubleBlockHalf.LOWER);
             s.put(door, dl);
@@ -312,18 +328,19 @@ public final class HouseGen {
         if (p.flat) ridgeTop = flatRoof(s, x0, z0, x1, z1, wallTop, p, r);
         else ridgeTop = gableRoof(s, x0, z0, x1, z1, wallTop, ridgeX, p, r);
         // a chimney on some, always on the bakery and the smithy
-        boolean chimney = kind == Kind.BAKERY || kind == Kind.SMITHY || kind == Kind.INN || r.nextInt(3) == 0;
+        boolean chimney = kind == Kind.BAKERY || kind == Kind.SMITHY || kind == Kind.INN || kind != Kind.STABLE && r.nextInt(3) == 0;
         if (chimney) {
             int cx = ridgeX ? (r.nextBoolean() ? x0 + 1 : x1 - 1) : (x0 + x1) / 2;
             int cz = ridgeX ? (z0 + z1) / 2 : (r.nextBoolean() ? z0 + 1 : z1 - 1);
             for (int yy = y + 1; yy <= ridgeTop + 1; yy++) s.put(cx, yy, cz, p.chimney);
             s.put(cx, ridgeTop + 2, cz, Blocks.CAMPFIRE.defaultBlockState().setValue(CampfireBlock.SIGNAL_FIRE, false));
-            if (kind != Kind.SMITHY) s.put(cx, y + 1, cz, Blocks.FURNACE.defaultBlockState());
+            if (kind != Kind.SMITHY && kind != Kind.BAKERY) s.put(cx, y + 1, cz, Blocks.FURNACE.defaultBlockState());
         }
         // inside: beds against the back wall, the tools of the trade by the door, a light, a way up
         List<BlockPos> beds = new ArrayList<>();
         Direction back = front.getOpposite();
-        int bedsPerFloor = kind == Kind.INN ? Math.max(2, (Math.max(w, d) - 3) / 2) : kind == Kind.SMITHY || kind == Kind.BAKERY ? 1 : 2;
+        int bedsPerFloor = kind == Kind.INN ? Math.max(2, (Math.max(w, d) - 3) / 2) : kind == Kind.STABLE ? 0 : kind == Kind.SMITHY || kind == Kind.BAKERY ? 1 : 2;
+        List<BlockPos> stalls = kind == Kind.STABLE ? stalls(s, x0, z0, x1, z1, y, front) : List.of();
         for (int f = 0; f < floors; f++) {
             int base = y + 4 * f;
             if (kind == Kind.SMITHY && f == 0) continue;
@@ -365,7 +382,8 @@ public final class HouseGen {
         switch (kind) {
             case FARMHOUSE -> place(s, x0, z0, x1, z1, door, back, work, Blocks.COMPOSTER.defaultBlockState());
             case BAKERY -> {
-                place(s, x0, z0, x1, z1, door, back, work, Blocks.SMOKER.defaultBlockState().setValue(net.minecraft.world.level.block.AbstractFurnaceBlock.FACING, front));
+                // the oven: a furnace in a stone breast, and the flour and the wood by it
+                place(s, x0, z0, x1, z1, door, back, work, Blocks.FURNACE.defaultBlockState().setValue(net.minecraft.world.level.block.AbstractFurnaceBlock.FACING, front));
                 place(s, x0, z0, x1, z1, door, back, other, Blocks.BARREL.defaultBlockState());
                 place(s, x0, z0, x1, z1, door, back, work.relative(back), Blocks.HAY_BLOCK.defaultBlockState());
             }
@@ -379,6 +397,7 @@ public final class HouseGen {
                 place(s, x0, z0, x1, z1, door, back, work.relative(back), Blocks.BARREL.defaultBlockState());
                 place(s, x0, z0, x1, z1, door, back, other, Blocks.CRAFTING_TABLE.defaultBlockState());
             }
+            case STABLE -> place(s, x0, z0, x1, z1, door, back, other, Blocks.CAULDRON.defaultBlockState());
             case WORKSHOP -> place(s, x0, z0, x1, z1, door, back, work, pick(r, List.of(Blocks.LOOM, Blocks.FLETCHING_TABLE, Blocks.CARTOGRAPHY_TABLE,
                     Blocks.STONECUTTER, Blocks.LECTERN, Blocks.CAULDRON, Blocks.BARREL)).defaultBlockState());
             default -> place(s, x0, z0, x1, z1, door, back, work, pick(r, List.of(Blocks.CRAFTING_TABLE, Blocks.BARREL, Blocks.COMPOSTER)).defaultBlockState());
@@ -387,12 +406,13 @@ public final class HouseGen {
         if (!p.flat && r.nextBoolean()) shutters(s, x0, z0, x1, z1, y, floors, p);
         // the garden: wheat in rows with a channel of water, fenced
         if (garden != null) gardenPlot(s, garden, front, p);
+        if (yard != null) yardPlot(level, s, yard, front, p, r);
         // a trodden step before the door
         s.put(step.below(), Blocks.DIRT_PATH.defaultBlockState());
         int n = s.flush(level);
         BoundingBox box = new BoundingBox(Math.min(x0, lot.x0()), y - 1, Math.min(z0, lot.z0()),
                 Math.max(x1, lot.x0() + lot.w() - 1), ridgeTop + 2, Math.max(z1, lot.z0() + lot.d() - 1));
-        return new Built(box, step, beds, garden, n);
+        return new Built(box, step, beds, garden, n, stalls);
     }
 
     /** Something solid set at this cell already? */
@@ -418,6 +438,29 @@ public final class HouseGen {
             }
         }
         if (best != null) s.put(best, st);
+    }
+
+    /**
+     * A stable's stalls along its back wall: fence partitions every third block reaching two blocks out, hay and a water
+     * trough at the back of each. Where a horse stands in each.
+     */
+    private static List<BlockPos> stalls(Slate s, int x0, int z0, int x1, int z1, int y, Direction front) {
+        Direction back = front.getOpposite();
+        int across = front.getAxis() == Direction.Axis.Z ? x1 - x0 + 1 : z1 - z0 + 1;
+        int deep = front.getAxis() == Direction.Axis.Z ? z1 - z0 + 1 : x1 - x0 + 1;
+        int reach = Math.min(2, deep - 4);
+        List<BlockPos> spots = new ArrayList<>();
+        for (int i = 1; i <= across - 2; i++) {
+            BlockPos rear = backCell(x0, z0, x1, z1, y + 1, back, i);
+            if (i % 3 == 0) {
+                for (int k = 0; k <= reach; k++) s.put(rear.relative(front, k), Blocks.OAK_FENCE.defaultBlockState());
+                continue;
+            }
+            s.put(rear, i % 3 == 1 ? Blocks.HAY_BLOCK.defaultBlockState()
+                    : Blocks.WATER_CAULDRON.defaultBlockState().setValue(net.minecraft.world.level.block.LayeredCauldronBlock.LEVEL, 3));
+            if (i % 3 == 2 && reach >= 1) spots.add(rear.relative(front, 1));
+        }
+        return spots;
     }
 
     private static int depthOf(Lot lot) {
@@ -591,6 +634,65 @@ public final class HouseGen {
         }
     }
 
+    /** A yard behind a house: levelled, fenced round its three outer sides, with a vegetable patch, a woodpile, hay, or a flower bed and a barrel. */
+    private static void yardPlot(ServerLevel level, Slate s, BoundingBox g, Direction front, Palette p, RandomSource r) {
+        int y = g.minY();
+        int kind = r.nextInt(4);
+        Block crop = pick(r, List.of(Blocks.CARROTS, Blocks.POTATOES, Blocks.BEETROOTS));
+        Block logs = p.frame.defaultBlockState().hasProperty(RotatedPillarBlock.AXIS) ? p.frame : Blocks.ACACIA_LOG;
+        for (int x = g.minX(); x <= g.maxX(); x++) {
+            for (int z = g.minZ(); z <= g.maxZ(); z++) {
+                // level ground under it
+                for (int k = 1; k <= 6; k++) {
+                    BlockState below = level.getBlockState(new BlockPos(x, y - k, z));
+                    if (!below.isAir() && below.getFluidState().isEmpty() && !below.canBeReplaced()) break;
+                    s.put(x, y - k, z, Blocks.DIRT);
+                }
+                s.put(x, y, z, Blocks.GRASS_BLOCK);
+                boolean edge = x == g.minX() || x == g.maxX() || z == g.minZ() || z == g.maxZ();
+                boolean houseSide = switch (front) {
+                    case NORTH -> z == g.minZ();
+                    case SOUTH -> z == g.maxZ();
+                    case WEST -> x == g.minX();
+                    default -> x == g.maxX();
+                };
+                if (edge && !houseSide) {
+                    s.put(x, y + 1, z, p.fence);
+                    continue;
+                }
+                if (edge || houseSide) continue;
+                switch (kind) {
+                    case 0 -> {
+                        s.put(x, y, z, Blocks.FARMLAND.defaultBlockState());
+                        s.put(x, y + 1, z, ((net.minecraft.world.level.block.CropBlock) crop).getStateForAge(Math.floorMod(x * 7 + z, 4)));
+                    }
+                    case 1 -> {
+                        if (Math.floorMod(x + z, 3) == 0) s.put(x, y + 1, z, axis(logs, front.getClockWise().getAxis()));
+                    }
+                    case 2 -> {
+                        if (Math.floorMod(x * 3 + z, 4) == 0) s.put(x, y + 1, z, Blocks.HAY_BLOCK.defaultBlockState());
+                    }
+                    default -> {
+                        if (Math.floorMod(x + 2 * z, 5) == 0) s.put(x, y + 1, z, pick(r, List.of(Blocks.POPPY, Blocks.DANDELION, Blocks.CORNFLOWER, Blocks.OXEYE_DAISY)).defaultBlockState());
+                        else if (Math.floorMod(x + 2 * z, 7) == 0) s.put(x, y + 1, z, Blocks.BARREL.defaultBlockState());
+                    }
+                }
+            }
+        }
+        // a gate in the back fence
+        int mx = (g.minX() + g.maxX()) / 2, mz = (g.minZ() + g.maxZ()) / 2;
+        Direction out = front.getOpposite();
+        BlockPos gate = switch (out) {
+            case NORTH -> new BlockPos(mx, y + 1, g.minZ());
+            case SOUTH -> new BlockPos(mx, y + 1, g.maxZ());
+            case WEST -> new BlockPos(g.minX(), y + 1, mz);
+            default -> new BlockPos(g.maxX(), y + 1, mz);
+        };
+        Block fenceGate = p.fence == Blocks.SPRUCE_FENCE ? Blocks.SPRUCE_FENCE_GATE : p.fence == Blocks.DARK_OAK_FENCE ? Blocks.DARK_OAK_FENCE_GATE
+                : p.fence == Blocks.ACACIA_FENCE ? Blocks.ACACIA_FENCE_GATE : Blocks.OAK_FENCE_GATE;
+        s.put(gate, fenceGate.defaultBlockState().setValue(net.minecraft.world.level.block.FenceGateBlock.FACING, out));
+    }
+
     // ------------------------------------------------------------ a market stall
 
     private static Built stall(ServerLevel level, Lot lot, Palette p, RandomSource r, Slate s) {
@@ -634,7 +736,7 @@ public final class HouseGen {
         }
         int n = s.flush(level);
         BlockPos front = doorCell(x0, z0, x1, z1, y + 1, f, 1).relative(f);
-        return new Built(new BoundingBox(x0, y - 1, z0, x1, y + 4, z1), front, List.of(), null, n);
+        return new Built(new BoundingBox(x0, y - 1, z0, x1, y + 4, z1), front, List.of(), null, n, List.of());
     }
 
     private HouseGen() {
