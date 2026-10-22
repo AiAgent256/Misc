@@ -352,22 +352,30 @@ public final class Fief {
     public static void census(ServerLevel level, HoldingManager mgr, Holding h, long now) {
         if (h.fief.isEmpty()) return;
         BlockPos c = h.center();
-        if (!level.isLoaded(c) || !level.isLoaded(c.offset(REACH, 0, 0)) || !level.isLoaded(c.offset(-REACH, 0, 0))) return;
-        AABB area = new AABB(c).inflate(REACH, 80, REACH);
+        // the people work whether or not anyone is there to count them: away, the last count stands, and the fields,
+        // pens and mine give what they gave the last day they were seen
+        boolean seen = level.isLoaded(c) && level.isLoaded(c.offset(REACH, 0, 0)) && level.isLoaded(c.offset(-REACH, 0, 0));
+        if (!seen && h.fiefJobs.isEmpty()) return;
         Map<String, Integer> jobs = new java.util.LinkedHashMap<>();
-        int pop = 0;
-        for (Villager v : level.getEntitiesOfClass(Villager.class, area, Entity::isAlive)) {
-            pop++;
-            ResourceLocation id = ForgeRegistries.VILLAGER_PROFESSIONS.getKey(v.getVillagerData().getProfession());
-            String set = Labour.jobOf(v);                    // the castle's miners and smiths: their work is Labour's
-            String job = set != null ? set : id == null ? "none" : id.getPath();
-            jobs.merge(job, 1, Integer::sum);
-        }
-        int herd = 0;
-        for (Holding.FiefBuilding b : h.fief) {
-            if (!b.piece().equals("pasture")) continue;
-            AABB pen = AABB.of(b.box()).inflate(2, 4, 2);
-            herd += level.getEntitiesOfClass(Animal.class, pen, Entity::isAlive).size();
+        int pop = 0, herd = 0;
+        if (seen) {
+            AABB area = new AABB(c).inflate(REACH, 80, REACH);
+            for (Villager v : level.getEntitiesOfClass(Villager.class, area, Entity::isAlive)) {
+                pop++;
+                ResourceLocation id = ForgeRegistries.VILLAGER_PROFESSIONS.getKey(v.getVillagerData().getProfession());
+                String set = Labour.jobOf(v);                    // the castle's miners and smiths: their work is Labour's
+                String job = set != null ? set : id == null ? "none" : id.getPath();
+                jobs.merge(job, 1, Integer::sum);
+            }
+            for (Holding.FiefBuilding b : h.fief) {
+                if (!b.piece().equals("pasture")) continue;
+                AABB pen = AABB.of(b.box()).inflate(2, 4, 2);
+                herd += level.getEntitiesOfClass(Animal.class, pen, Entity::isAlive).size();
+            }
+        } else {
+            jobs.putAll(h.fiefJobs);
+            pop = h.fiefPop;
+            herd = h.fiefHerd;
         }
         h.fiefPop = pop;
         h.fiefHerd = herd;
@@ -389,8 +397,21 @@ public final class Fief {
             for (var e : made.entrySet()) h.addStock(new ResourceLocation("minecraft", e.getKey()), e.getValue());
         }
         // the real work: what the mine dug, the butcher and shearer took, the fields gave up (already in the stores)
-        Map<String, Integer> real = Produce.daily(level, mgr, h);
+        Map<String, Integer> real;
+        if (seen) {
+            real = Produce.daily(level, mgr, h);
+            h.fiefReal.clear();
+            h.fiefReal.putAll(real);
+        } else {
+            real = new java.util.LinkedHashMap<>(h.isPlayerOwned() ? h.fiefReal : Map.of());
+            for (var e : real.entrySet()) h.addStock(new ResourceLocation("minecraft", e.getKey()), e.getValue());
+        }
         real.forEach((k, v) -> made.merge(k, v, Integer::sum));
+        // the mill and the ovens: wheat past the last few stacks' worth is baked, three to a loaf
+        if (h.isPlayerOwned()) {
+            int baked = bake(h);
+            if (baked > 0) made.merge("bread", baked, Integer::sum);
+        }
         int dug = 0;
         for (Produce.Dig d : h.digs.values()) dug += d.dug;
         StringBuilder sb = new StringBuilder(h.fiefName()).append(" of ").append(pop).append(pop == 1 ? " soul" : " souls");
@@ -420,6 +441,19 @@ public final class Fief {
         }
         h.fiefReport = sb.toString();
         mgr.setDirty();
+    }
+
+    /** Wheat kept back from the ovens in each castle's stores. */
+    public static final int WHEAT_KEPT = 32;
+
+    /** The day's baking: every three wheat past {@link #WHEAT_KEPT} make a loaf. How many loaves. */
+    public static int bake(Holding h) {
+        ResourceLocation wheat = new ResourceLocation("minecraft", "wheat"), bread = new ResourceLocation("minecraft", "bread");
+        int loaves = (h.stock(wheat) - WHEAT_KEPT) / 3;
+        if (loaves <= 0) return 0;
+        h.addStock(wheat, -3 * loaves);
+        h.addStock(bread, loaves);
+        return loaves;
     }
 
     /** The holding whose people live here, whoever holds it. */

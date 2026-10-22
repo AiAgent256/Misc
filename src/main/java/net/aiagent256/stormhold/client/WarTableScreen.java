@@ -430,12 +430,14 @@ public class WarTableScreen extends Screen {
                 : "Have the steward keep this castle's chests in order: the spoils chest emptied into your chests, each kind of thing gathered "
                 + "into the chest that holds the most of it, every chest stacked and sorted. Put a sign on any chest to keep him out of it.",
                 () -> Net.sendAction(h.id(), Net.TIDY, BlockPos.ZERO, 0)));
-        row.add(button(data.sellSurplus() ? "Market: selling" : "Market: keeping", data.sellSurplus()
-                ? "At dawn every castle's stores sell what nothing in the realm uses (crops, wool, hides, meat, fish, paper, copper) past the "
-                + "last " + net.aiagent256.stormhold.holding.Surplus.KEEP + " of each, at the shops' price, into the stores. Bread, iron, gold, "
-                + "diamonds, coal, stone, arrows and logs are never sold. Click to keep everything."
-                : "Your stores keep everything. Click to sell the surplus at dawn: crops, wool, hides, meat, fish, paper and copper past the last "
-                + net.aiagent256.stormhold.holding.Surplus.KEEP + " of each, at the shops' price.",
+        row.add(button(data.sellSurplus() ? "Market: on" : "Market: off", data.sellSurplus()
+                ? "At dawn every castle's stores sell what nothing in the realm uses (carrots, potatoes, wool, hides, meat, fish, paper, copper) "
+                + "past the last " + net.aiagent256.stormhold.holding.Surplus.KEEP + " of each, at the shops' price, into the stores. Wheat goes "
+                + "to the ovens, and bread, iron, gold, diamonds, coal, stone, arrows and logs are never sold. When the realm has under "
+                + net.aiagent256.stormhold.holding.Surplus.BREAD_LOW + " bread, the market buys it in with the stores' emeralds (6 loaves an "
+                + "emerald, at most " + net.aiagent256.stormhold.holding.Surplus.BUY_MOST + " emeralds a day). Click to keep out of the market."
+                : "Your stores keep out of the market. Click to sell the surplus at dawn (carrots, potatoes, wool, hides, meat, fish, paper, "
+                + "copper past the last " + net.aiagent256.stormhold.holding.Surplus.KEEP + " of each) and buy bread in when it runs short.",
                 () -> Net.sendAction(h.id(), Net.SURPLUS, BlockPos.ZERO, 0)));
         peopleY = layDown(row, mx, contentTop() + 12, mw) + 6;
         this.addRenderableWidget(Button.builder(Component.literal("Expand fief"), b -> Net.sendAction(h.id(), Net.EXPAND_FIEF, BlockPos.ZERO, 0))

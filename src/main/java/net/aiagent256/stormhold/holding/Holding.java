@@ -163,6 +163,8 @@ public class Holding {
     public int fiefPop;
     public final Map<String, Integer> fiefJobs = new java.util.LinkedHashMap<>();
     public int fiefHerd;
+    /** What the fields, pens and mine gave the last day someone was there to see it: the day's work when nobody is. */
+    public final Map<String, Integer> fiefReal = new java.util.LinkedHashMap<>();
 
     public record FiefBuilding(String piece, BoundingBox box) {
     }
@@ -515,6 +517,9 @@ public class Holding {
         CompoundTag fj = new CompoundTag();
         fiefJobs.forEach(fj::putInt);
         t.put("FiefJobs", fj);
+        CompoundTag fr = new CompoundTag();
+        fiefReal.forEach(fr::putInt);
+        t.put("FiefReal", fr);
         return t;
     }
 
@@ -673,6 +678,8 @@ public class Holding {
         h.fiefHerd = t.getInt("FiefHerd");
         CompoundTag fj = t.getCompound("FiefJobs");
         for (String k : fj.getAllKeys()) h.fiefJobs.put(k, fj.getInt(k));
+        CompoundTag fr = t.getCompound("FiefReal");
+        for (String k : fr.getAllKeys()) h.fiefReal.put(k, fr.getInt(k));
         return h;
     }
 

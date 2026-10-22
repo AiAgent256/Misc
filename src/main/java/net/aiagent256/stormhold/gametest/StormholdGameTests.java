@@ -3492,16 +3492,37 @@ public class StormholdGameTests {
             } else {
                 Stormhold.LOGGER.info("Forge order test skipped: the test castle stands in zone level {}", lowLevel);
             }
-            // market day: wheat past the last 64 sells at 20 a emerald, bread and iron never
-            high.addStock(wheat, 3999);
+            // market day: carrots past the last 64 sell at 22 an emerald; wheat, bread and iron never
+            var carrot = new net.minecraft.resources.ResourceLocation("minecraft", "carrot");
+            high.addStock(carrot, 3999);
+            high.addStock(wheat, 332);
             high.addStock(bread, 1103);
             int ironBefore = high.stock(iron), em = high.stock(net.aiagent256.stormhold.holding.Rewards.EMERALD);
             var sold = new java.util.LinkedHashMap<String, Integer>();
             int got = net.aiagent256.stormhold.holding.Surplus.sell(high, sold);
-            if (got != (3999 - 64) / 20) throw new IllegalStateException("sold for " + got + ", not " + (3999 - 64) / 20);
-            if (high.stock(wheat) != 3999 - got * 20 || high.stock(wheat) < 64) throw new IllegalStateException("wheat left " + high.stock(wheat));
-            if (high.stock(bread) != 1103 || high.stock(iron) != ironBefore) throw new IllegalStateException("sold bread or iron");
+            if (got != (3999 - 64) / 22) throw new IllegalStateException("sold for " + got + ", not " + (3999 - 64) / 22);
+            if (high.stock(carrot) != 3999 - got * 22 || high.stock(carrot) < 64) throw new IllegalStateException("carrots left " + high.stock(carrot));
+            if (high.stock(wheat) != 332 || high.stock(bread) != 1103 || high.stock(iron) != ironBefore)
+                throw new IllegalStateException("sold wheat, bread or iron");
             if (high.stock(net.aiagent256.stormhold.holding.Rewards.EMERALD) != em + got) throw new IllegalStateException("the emeralds didn't reach the stores");
+            // the ovens: wheat past the last 32 baked three to a loaf
+            int baked = net.aiagent256.stormhold.holding.Fief.bake(high);
+            if (baked != 100 || high.stock(wheat) != 32 || high.stock(bread) != 1203) throw new IllegalStateException("baked " + baked + ", wheat left "
+                    + high.stock(wheat) + ", bread " + high.stock(bread));
+            // bread short: the market buys it in with the stores' emeralds
+            for (Holding x : List.of(low, high, vassal)) x.addStock(bread, -x.stock(bread));
+            int emBefore = 0;
+            for (Holding x : List.of(low, high, vassal)) emBefore += x.stock(net.aiagent256.stormhold.holding.Rewards.EMERALD);
+            int[] bought = net.aiagent256.stormhold.holding.Surplus.buyBread(mgr, me, mgr.ownedBy(me));
+            int emAfter = 0, breadAfter = 0;
+            for (Holding x : List.of(low, high, vassal)) {
+                emAfter += x.stock(net.aiagent256.stormhold.holding.Rewards.EMERALD);
+                breadAfter += x.stock(bread);
+            }
+            int want = Math.min(Math.min(net.aiagent256.stormhold.holding.Surplus.BUY_MOST, (320 + 5) / 6), emBefore);
+            if (bought[1] != want || breadAfter != want * 6 || emAfter != emBefore - want)
+                throw new IllegalStateException("bought " + bought[0] + " loaves for " + bought[1] + " (bread now " + breadAfter + ", emeralds "
+                        + emBefore + " to " + emAfter + "), not " + want * 6 + " for " + want);
         } finally {
             for (Holding x : List.of(low, high, vassal)) mgr.holdings.remove(x.id);
             mgr.seats.remove(me);
