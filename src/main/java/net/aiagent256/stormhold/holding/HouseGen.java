@@ -387,8 +387,8 @@ public final class HouseGen {
         if (!p.flat && r.nextBoolean()) shutters(s, x0, z0, x1, z1, y, floors, p);
         // the garden: wheat in rows with a channel of water, fenced
         if (garden != null) gardenPlot(s, garden, front, p);
-        // the step and a lantern on a post by the door
-        s.put(step.below(), Blocks.DIRT_PATH);
+        // a trodden step before the door
+        s.put(step.below(), Blocks.DIRT_PATH.defaultBlockState());
         int n = s.flush(level);
         BoundingBox box = new BoundingBox(Math.min(x0, lot.x0()), y - 1, Math.min(z0, lot.z0()),
                 Math.max(x1, lot.x0() + lot.w() - 1), ridgeTop + 2, Math.max(z1, lot.z0() + lot.d() - 1));
