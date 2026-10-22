@@ -114,7 +114,7 @@ public final class WarPlan {
         }
         parts.sort((x, y) -> Integer.compare(x.seconds(), y.seconds()));
         int theirKit = Frontier.level(level, enemy);
-        double def = enemy.strength() * 1.3 * Campaigns.kit(theirKit);
+        double def = enemy.strength() * 1.3 * enemy.walls() * Campaigns.kit(theirKit);
         int attitude;
         String note = "";
         if (enemy.isHouseOwned() && !enemy.houseId.equals("outlaws")) {

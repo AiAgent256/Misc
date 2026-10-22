@@ -2492,7 +2492,7 @@ public class StormholdGameTests {
                             row[ki], themes[ti], level.random);
                 }
             }
-            dumpTown(level, cx - 88, y - 1, cz - 88, cx + 88, y + 24, cz + 88);
+            dumpTown(level, "TOWNDUMP", cx - 88, y - 1, cz - 88, cx + 88, y + 24, cz + 88);
             if (p.houses < 12) throw new IllegalStateException("the town only grew to " + about);
             // the streets all join up
             java.util.Set<Long> street = new java.util.HashSet<>();
@@ -2600,8 +2600,98 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** All eight stages of fortification go up round a castle: corner towers, gatehouse, curtain, bastions, braziers and stakes, archers' posts on them. */
+    @GameTest(template = "arena", timeoutTicks = 600)
+    public static void fortificationsRiseStageByStage(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        int cx = 8000 + (int) Math.floorMod(g.absolutePos(BlockPos.ZERO).asLong(), 7L) * 400, cz = 12000;
+        int cc = cx >> 4, ccz = cz >> 4;
+        for (int dx = -5; dx <= 5; dx++) {
+            for (int dz = -5; dz <= 5; dz++) {
+                level.setChunkForced(cc + dx, ccz + dz, true);
+                level.getChunk(cc + dx, ccz + dz);
+            }
+        }
+        int y = 70;
+        var B = net.minecraft.world.level.block.Blocks.STONE_BRICKS.defaultBlockState();
+        for (int x = cx - 60; x <= cx + 60; x++) {
+            for (int z = cz - 60; z <= cz + 60; z++) {
+                for (int yy = y - 4; yy < y - 1; yy++) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.DIRT.defaultBlockState(), 2);
+                level.setBlock(new BlockPos(x, y - 1, z), net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(), 2);
+                for (int yy = y; yy < y + 22; yy++)
+                    if (!level.getBlockState(new BlockPos(x, yy, z)).isAir()) level.setBlock(new BlockPos(x, yy, z), net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
+                // a gentle rise to the north-east, so the works have to follow the land
+                int rise = Math.max(0, Math.min(3, (x - cx + z - cz - 40) / 8));
+                for (int k = 0; k < rise; k++) level.setBlock(new BlockPos(x, y + k, z), net.minecraft.world.level.block.Blocks.GRASS_BLOCK.defaultBlockState(), 2);
+            }
+        }
+        // the castle: a curtain of its own with a keep, the gate in the south wall
+        for (int x = cx - 12; x <= cx + 11; x++)
+            for (int z = cz - 12; z <= cz + 11; z++) {
+                boolean wall = x == cx - 12 || x == cx + 11 || z == cz - 12 || z == cz + 11;
+                boolean keep = Math.abs(x - cx) <= 3 && Math.abs(z - cz) <= 3;
+                int hgt = wall ? 8 : keep ? 14 : 0;
+                for (int yy = y; yy < y + hgt; yy++) if (!(z == cz + 11 && Math.abs(x - cx) <= 1 && yy < y + 4)) level.setBlock(new BlockPos(x, yy, z), B, 2);
+            }
+        Holding h = sample(g);
+        h.box = new BoundingBox(cx - 12, y, cz - 12, cx + 11, y + 14, cz + 11);
+        h.gatePos = new BlockPos(cx, y, cz + 11);
+        h.warTablePos = BlockPos.ZERO;
+        h.owner = Sides.player(g.makeMockPlayer().getUUID());
+        h.posts.put(Role.ARCHER, new ArrayList<>());
+        h.fortify = 0;
+        mgr.add(h);
+        try {
+            int cap = h.capacity(Role.KNIGHT);
+            double walls = h.walls();
+            for (int stage = 1; stage <= net.aiagent256.stormhold.holding.Builder.MAX_FORTIFY; stage++) {
+                h.work = net.aiagent256.stormhold.holding.Builder.FORTIFY;
+                h.workQueue = null;
+                for (int k = 0; k < 4000 && !h.work.equals(net.aiagent256.stormhold.holding.Builder.NONE); k++)
+                    net.aiagent256.stormhold.holding.Builder.tick(level, mgr, h);
+                if (h.fortify != stage) throw new IllegalStateException("stage " + stage + " never finished: fortify " + h.fortify + ", work " + h.work);
+            }
+            dumpTown(level, "FORTDUMP", cx - 40, y - 4, cz - 40, cx + 40, y + 24, cz + 40);
+            if (h.capacity(Role.KNIGHT) <= cap || h.walls() <= walls) throw new IllegalStateException("the works added nothing to the garrison or the walls");
+            var stone = net.minecraft.world.level.block.Blocks.STONE_BRICKS;
+            // a corner tower stands nine over the land at the palisade's corner
+            int tx = cx - 12 - 7, tz = cz - 12 - 7;
+            int top = y - 1 + 9;
+            if (!level.getBlockState(new BlockPos(tx + 2, top, tz)).is(stone) || !level.getBlockState(new BlockPos(tx, top, tz)).is(stone))
+                throw new IllegalStateException("no corner tower at " + tx + ", " + tz + ": " + level.getBlockState(new BlockPos(tx + 2, top, tz)));
+            // the curtain: five high halfway along the west side, merlons on its outer face
+            int wx = cx - 12 - 7, wz = cz - 4;
+            int solid = 0;
+            for (int yy = y; yy < y + 7; yy++) if (level.getBlockState(new BlockPos(wx, yy, wz)).is(stone)) solid++;
+            if (solid < 5) throw new IllegalStateException("the curtain at " + wx + ", " + wz + " is " + solid + " high");
+            // the gatehouse: the portcullis's teeth over the road, the road itself open
+            int bars = 0;
+            for (int x = cx - 5; x <= cx + 5; x++) for (int yy = y; yy < y + 10; yy++)
+                if (level.getBlockState(new BlockPos(x, yy, cz + 11 + 7 + 1)).is(net.minecraft.world.level.block.Blocks.IRON_BARS)) bars++;
+            if (bars < 5) throw new IllegalStateException("only " + bars + " iron bars over the gate road");
+            for (int yy = y; yy < y + 4; yy++)
+                if (!level.getBlockState(new BlockPos(cx, yy, cz + 11 + 7)).isAir()) throw new IllegalStateException("the curtain closed the road at " + (y + yy));
+            // stakes beyond the moat, braziers alight, archers' posts on the works
+            int stakes = 0, fires = 0;
+            for (int x = cx - 32; x <= cx + 32; x++) for (int z = cz - 32; z <= cz + 32; z++) for (int yy = y; yy < y + 20; yy++) {
+                var st = level.getBlockState(new BlockPos(x, yy, z));
+                if (st.is(net.minecraft.world.level.block.Blocks.POINTED_DRIPSTONE)) stakes++;
+                if (st.is(net.minecraft.world.level.block.Blocks.CAMPFIRE)) fires++;
+            }
+            int posts = h.posts.get(Role.ARCHER).size();
+            Stormhold.LOGGER.info("Fort test: {} stakes, {} braziers, {} archers' posts", stakes, fires, posts);
+            if (stakes < 30 || fires < 4 || posts < 14) throw new IllegalStateException(stakes + " stakes, " + fires + " braziers, " + posts + " posts");
+        } finally {
+            mgr.holdings.remove(h.id);
+            mgr.byKey.remove(h.key);
+            for (int dx = -5; dx <= 5; dx++) for (int dz = -5; dz <= 5; dz++) level.setChunkForced(cc + dx, ccz + dz, false);
+        }
+        g.succeed();
+    }
+
     /** The blocks of a region to the log, a column a line (bare grass left out), for tools/castlegen to draw. */
-    private static void dumpTown(ServerLevel level, int x0, int y0, int z0, int x1, int y1, int z1) {
+    private static void dumpTown(ServerLevel level, String tag, int x0, int y0, int z0, int x1, int y1, int z1) {
         java.util.Map<String, Integer> pal = new java.util.LinkedHashMap<>();
         pal.put("minecraft:air", 0);
         java.util.Map<net.minecraft.world.level.block.state.BlockState, Integer> known = new java.util.IdentityHashMap<>();
@@ -2624,14 +2714,14 @@ public class StormholdGameTests {
                 }
                 if (top < y0) continue;
                 if (top == y0 && level.getBlockState(new BlockPos(x, y0, z)).is(net.minecraft.world.level.block.Blocks.GRASS_BLOCK)) continue;
-                out.append("TOWNDUMP C ").append(x - x0).append(' ').append(z - z0).append(' ')
+                out.append(tag).append(" C ").append(x - x0).append(' ').append(z - z0).append(' ')
                         .append(String.join(",", java.util.Arrays.copyOf(ids, top - y0 + 1))).append('\n');
                 cols++;
             }
         }
-        StringBuilder head = new StringBuilder("TOWNDUMP H " + (x1 - x0 + 1) + " " + (y1 - y0 + 1) + " " + (z1 - z0 + 1) + "\n");
-        for (var e : pal.entrySet()) head.append("TOWNDUMP P ").append(e.getValue()).append(' ').append(e.getKey()).append('\n');
-        Stormhold.LOGGER.info("Town dump: {} columns\n{}{}TOWNDUMP END", cols, head, out);
+        StringBuilder head = new StringBuilder(tag + " H " + (x1 - x0 + 1) + " " + (y1 - y0 + 1) + " " + (z1 - z0 + 1) + "\n");
+        for (var e : pal.entrySet()) head.append(tag).append(" P ").append(e.getValue()).append(' ').append(e.getKey()).append('\n');
+        Stormhold.LOGGER.info("{} dump: {} columns\n{}{}{} END", tag, cols, head, out, tag);
     }
 
     /** A column rides to the player on the clock and the men fall in on arrival. */
@@ -2886,7 +2976,7 @@ public class StormholdGameTests {
                             if (way == 2 && (h.troops() != men - 2 || h.stock(emerald) != emeralds + 15)) throw new IllegalStateException("the road was not cleared");
                         }
                         case net.aiagent256.stormhold.holding.Events.MASON -> {
-                            if (way == 1 && h.fortify != 1) throw new IllegalStateException("the mason did not build");
+                            if (way == 1 && !h.work.equals(net.aiagent256.stormhold.holding.Builder.FORTIFY)) throw new IllegalStateException("the mason did not set to work");
                         }
                         case net.aiagent256.stormhold.holding.Events.WEDDING -> {
                             if (way == 1 && at.fiefPop != pop + 4) throw new IllegalStateException("no one came to the feast");

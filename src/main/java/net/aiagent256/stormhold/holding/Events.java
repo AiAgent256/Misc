@@ -115,7 +115,7 @@ public final class Events {
                     && !Standing.friendly(mgr, h.houseId, player) && !Politics.castlesOf(mgr, h.houseId).isEmpty();
             case TOURNEY -> friendlyHouse(mgr, player) != null;
             case SPY -> rivalHouse(mgr, player) != null;
-            case MASON -> !h.isTown() && h.fortify < 3 && h.work.equals(Builder.NONE);
+            case MASON -> !h.isTown() && h.fortify < Builder.MAX_FORTIFY && h.work.equals(Builder.NONE);
             case PETITION -> h.isTown();
             case RELIC -> !h.isTown() && h.tier >= 2;
             default -> true;
@@ -310,8 +310,11 @@ public final class Events {
                 }
                 case MASON -> {
                     if (first && pay(mgr, h, p, STONE, 40)) {
-                        h.fortify++;
-                        line = "The mason raised the walls of " + name + ".";
+                        // his crew takes the next stage on for the stone: the Master Builder's work, free
+                        h.work = Builder.FORTIFY;
+                        h.workQueue = null;
+                        h.workDone = 0;
+                        line = "The mason's crew set to work on " + Builder.stageName(h.fortify + 1) + " at " + name + ".";
                     } else line = first ? "The mason left " + name + ": not enough stone." : "The mason left " + name + " for other work.";
                 }
                 case WEDDING -> {

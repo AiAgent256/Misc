@@ -284,7 +284,12 @@ public class Holding {
         }
         if (Council.has(ownerPlayer(), Council.Seat.MARSHAL)) base = (int) Math.round(base * 1.15);
         if (fortify <= 0) return base;
-        return (int) Math.round(base * (1 + 0.15 * fortify));
+        return (int) Math.round(base * (1 + 0.15 * Math.min(3, fortify) + 0.10 * Math.max(0, fortify - 3)));
+    }
+
+    /** How much the works add to the defenders' worth against a storming: an eighth more for each stage of fortification. */
+    public double walls() {
+        return 1.0 + 0.125 * fortify;
     }
 
     public int count(Role role) {

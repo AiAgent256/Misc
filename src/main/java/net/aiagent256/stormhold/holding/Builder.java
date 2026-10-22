@@ -39,8 +39,9 @@ import java.util.Map;
 /**
  * The Master Builder: once a castle is yours he's at the War Table, and you set him to work. Repair puts
  * back what was broken getting in (walls, the portcullis, the gate) block by block, in the castle's own
- * style. Fortify adds defences in three stages: a palisade of stakes, a moat, hoardings over the archers'
- * posts; each stage lets the castle hold more men. Both eat stone and iron from the stores.
+ * style. Fortify adds defences in eight stages: a palisade of stakes, a moat, hoardings over the archers'
+ * posts, then the great works (see {@link Fortify}): corner towers, a gatehouse, a stone curtain, bastions, braziers
+ * and a field of stakes. Each stage lets the castle hold more men and makes it harder to storm. Both eat stone and iron from the stores.
  */
 public final class Builder {
     public static final String NONE = "NONE", REPAIR = "REPAIR", FORTIFY = "FORTIFY", LIGHT = "LIGHT", CLEAR = "CLEAR";
@@ -52,7 +53,7 @@ public final class Builder {
     /** Torches a coal makes, and road blocks a stone pays for. */
     public static final int TORCHES_PER_COAL = 4, ROAD_PER_STONE = 10;
     private static final ResourceLocation COAL = new ResourceLocation("minecraft", "coal"), CHARCOAL = new ResourceLocation("minecraft", "charcoal");
-    public static final int MAX_FORTIFY = 3;
+    public static final int MAX_FORTIFY = 8;
     /** Blocks placed per second. */
     private static final int RATE = 24, SLOW_RATE = 5, CLEAR_RATE = 80;
     private static final ResourceLocation[] STONE = {
@@ -62,7 +63,7 @@ public final class Builder {
 
     /** Stone and iron each stage of fortification costs. */
     public static int[] fortifyCost(int stage) {
-        return new int[]{48 * stage, 6 * stage};
+        return new int[]{48 * stage + 64 * Math.max(0, stage - 3), 6 * stage};
     }
 
     // ------------------------------------------------------------ the man himself
@@ -191,6 +192,11 @@ public final class Builder {
             case 1 -> "a palisade of stakes";
             case 2 -> "the moat";
             case 3 -> "hoardings over the walls";
+            case 4 -> "stone towers at the corners";
+            case 5 -> "a gatehouse over the road";
+            case 6 -> "a stone curtain wall";
+            case 7 -> "bastions along the curtain";
+            case 8 -> "braziers and a field of stakes";
             default -> "nothing";
         };
     }
@@ -440,6 +446,7 @@ public final class Builder {
             else if (h.workDone > 0) HoldingEvents.announceNear(level, h.center(), 160, HoldingEvents.gold("The walls of " + h.name + " stand whole again."));
         } else {
             h.fortify = Math.min(MAX_FORTIFY, h.fortify + 1);
+            Fortify.finished(h);
             tell(level, h, "Master Builder " + h.builderName + " has finished " + stageName(h.fortify) + " at " + h.name
                     + ". The castle can hold more men now.");
         }
@@ -536,13 +543,12 @@ public final class Builder {
             case 1 -> palisade(level, h);
             case 2 -> moat(level, h);
             case 3 -> hoardings(level, h);
-            default -> {
-            }
+            default -> Fortify.plan(level, h, stage, h.workQueue);
         }
     }
 
     /** Where the road leaves the gate; the fortifications leave a causeway there. */
-    private static boolean onCauseway(Holding h, int x, int z, int width) {
+    static boolean onCauseway(Holding h, int x, int z, int width) {
         BlockPos out = Campaigns.gateOutside(h);
         BlockPos c = h.center();
         double dx = out.getX() - c.getX(), dz = out.getZ() - c.getZ();

@@ -395,7 +395,7 @@ public class WarTableScreen extends Screen {
 
     private void worksWidgets(HoldingInfo h, int mx, int mw) {
         boolean busy = h.status().contains("Builder ");
-        int stage = Math.min(3, fortifyStage(h) + 1);
+        int stage = Math.min(Builder.MAX_FORTIFY, fortifyStage(h) + 1);
         int[] cost = Builder.fortifyCost(stage);
         List<Button> row = new ArrayList<>();
         Button repair = button("Repair", "Put back every block of the castle's plans that's missing: walls, gate, portcullis, roofs. A stone "
@@ -403,10 +403,12 @@ public class WarTableScreen extends Screen {
                 () -> Net.sendAction(h.id(), Net.REPAIR, BlockPos.ZERO, 0));
         repair.active = !busy;
         row.add(repair);
-        Button fort = button(fortifyStage(h) >= 3 ? "Fortified" : "Fortify " + "I".repeat(stage), "Stage " + stage + ": " + Builder.stageName(stage)
-                + ". " + cost[0] + " stone and " + cost[1] + " iron from the stores or the castle's chests. Each stage lets the castle hold 15% more men.",
+        String[] roman = {"", "I", "II", "III", "IV", "V", "VI", "VII", "VIII"};
+        Button fort = button(fortifyStage(h) >= Builder.MAX_FORTIFY ? "Fortified" : "Fortify " + roman[Math.min(8, stage)], "Stage " + stage + " of "
+                + Builder.MAX_FORTIFY + ": " + Builder.stageName(stage) + ". " + cost[0] + " stone and " + cost[1] + " iron from the stores or the "
+                + "castle's chests. Each stage lets the castle hold more men and makes it an eighth harder to storm.",
                 () -> Net.sendAction(h.id(), Net.FORTIFY, BlockPos.ZERO, 0));
-        fort.active = !busy && fortifyStage(h) < 3;
+        fort.active = !busy && fortifyStage(h) < Builder.MAX_FORTIFY;
         row.add(fort);
         String[] names = {"Light it", "Clear trees", "Lay roads"};
         String[] tips = {

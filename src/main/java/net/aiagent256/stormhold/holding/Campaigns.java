@@ -182,7 +182,7 @@ public final class Campaigns {
         double att = 0;
         for (Role r : new Role[]{Role.CAPTAIN, Role.KNIGHT, Role.ARCHER, Role.CROSSBOWMAN}) att += sends(from, r) * r.strength();
         att *= kit(Frontier.level(level, from));
-        double def = enemy.strength() * 1.3 * kit(Frontier.level(level, enemy));
+        double def = enemy.strength() * 1.3 * enemy.walls() * kit(Frontier.level(level, enemy));
         if (att <= 0) return "no one to send";
         // each side's luck on the day is 0.8 to 1.2 of its worth
         int win = 0, n = 40;
@@ -240,7 +240,7 @@ public final class Campaigns {
             if (oh != null) from.add(oh.name);
         }
         att *= 0.8 + level.random.nextDouble() * 0.4;
-        double def = enemy.strength() * 1.3 * (0.8 + level.random.nextDouble() * 0.4) * kit(Frontier.level(level, enemy));
+        double def = enemy.strength() * 1.3 * enemy.walls() * (0.8 + level.random.nextDouble() * 0.4) * kit(Frontier.level(level, enemy));
         Holding origin = c.origin != null ? mgr.holdings.get(c.origin) : null;
         java.util.UUID lord = origin != null ? origin.ownerPlayer() : null;
         if (att > def) {
@@ -605,7 +605,7 @@ public final class Campaigns {
         if (waitForLord(level, h, c, HoldingEvents.ownerName(level, mgr, c.side) + "'s " + c.total() + " men")) return;
         if (!Config.ABSTRACT_RAIDS.get()) return;
         // fought out while the lord is away
-        double def = h.strength() * (h.mode == Holding.Mode.DEFEND ? 1.6 : 1.2) * (0.8 + level.random.nextDouble() * 0.4)
+        double def = h.strength() * h.walls() * (h.mode == Holding.Mode.DEFEND ? 1.6 : 1.2) * (0.8 + level.random.nextDouble() * 0.4)
                 * (Council.has(h.ownerPlayer(), Council.Seat.MARSHAL) ? 1.2 : 1.0) * kit(Frontier.level(level, h));
         double att = c.strength() * (0.8 + level.random.nextDouble() * 0.4) * kit(c.renown);
         SiegeWorks.clear(level, c);

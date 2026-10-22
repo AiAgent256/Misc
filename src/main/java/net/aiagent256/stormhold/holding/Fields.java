@@ -160,7 +160,7 @@ public final class Fields {
             if (Math.sqrt(dx * dx + dz * dz) > Fief.REACH + half - 4) continue;
             if (!level.isLoaded(new BlockPos(x0 - 1, 64, z0 - 1)) || !level.isLoaded(new BlockPos(x1 + 1, 64, z1 + 1))
                     || !level.isLoaded(new BlockPos(x0 - 1, 64, z1 + 1)) || !level.isLoaded(new BlockPos(x1 + 1, 64, z0 - 1))) continue;
-            if (h.box.inflatedBy(8).intersects(foot)) continue;
+            if (h.box.inflatedBy(Town.FORT + 2).intersects(foot)) continue;
             if (Town.blocks(h, foot.inflatedBy(1))) continue;
             boolean clear = true;
             for (Holding.FiefBuilding b : h.fief) {

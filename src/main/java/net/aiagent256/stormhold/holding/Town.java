@@ -47,8 +47,8 @@ public final class Town {
 
     /** Main street and lanes: their width, and how long a stretch is laid at a time. */
     static final int MAIN_W = 3, LANE_W = 2, MAIN_LEN = 14, LANE_LEN = 12;
-    /** A street keeps this far from the castle's walls. */
-    static final int CLEAR = 4;
+    /** The approach road starts this far from the walls; streets and lots keep out of the fortifications' belt (to the stakes beyond the moat). */
+    static final int CLEAR = 4, FORT = Fortify.STAKES_TO + 1;
     /** Steps of growth waiting to be built, at most. */
     public static final int MOST_PENDING = 3;
 
@@ -332,7 +332,7 @@ public final class Town {
             Direction g = Direction.getNearest(h.gatePos.getX() - c.getX(), 0, h.gatePos.getZ() - c.getZ());
             if (g.getAxis() != Direction.Axis.Y) out = g;
         }
-        BoundingBox clear = h.box.inflatedBy(CLEAR);
+        BoundingBox clear = h.box.inflatedBy(FORT);
         for (Direction d : new Direction[]{out, out.getClockWise(), out.getCounterClockWise(), out.getOpposite()}) {
             boolean atGate = d == out && gated;
             BlockPos start = atGate ? h.gatePos : c;
@@ -350,7 +350,7 @@ public final class Town {
                     if (!ok(level, h, p, s)) continue;
                     // from the gate (or the walls) to where the street starts, the road's laid too
                     Street approach = new Street();
-                    approach.a = atGate ? h.gatePos.relative(d) : start.relative(d, -CLEAR);
+                    approach.a = atGate ? h.gatePos.relative(d) : start.relative(d, -(FORT - CLEAR));
                     approach.dir = d;
                     approach.width = MAIN_W;
                     approach.len = (int) Math.round(Math.sqrt(approach.a.atY(0).distSqr(s.a.atY(0))));
@@ -429,7 +429,7 @@ public final class Town {
         double reach = Fief.REACH + Math.max(h.box.getXSpan(), h.box.getZSpan()) / 2.0 - 8;
         if (Math.sqrt(end.atY(0).distSqr(c.atY(0))) > reach) return false;
         BoundingBox mine = s.box(0);
-        if (h.box.inflatedBy(CLEAR).intersects(mine)) return false;
+        if (h.box.inflatedBy(FORT).intersects(mine)) return false;
         for (Street o : p.streets) if (o.box(0).intersects(mine)) return false;
         for (Lot l : p.lots) if (l.box(0).intersects(mine)) return false;
         for (Holding.FiefBuilding b : h.fief) if (flat(b.box().inflatedBy(1)).intersects(mine)) return false;
@@ -600,7 +600,7 @@ public final class Town {
     static boolean fits(Holding h, Plan p, Lot l, List<Lot> fresh) {
         BoundingBox b = l.box(0);
         for (Lot o : fresh) if (o.box(0).intersects(b)) return false;
-        if (h.box.inflatedBy(CLEAR + 2).intersects(b)) return false;
+        if (h.box.inflatedBy(FORT + 1).intersects(b)) return false;
         for (Street s : p.streets) if (s.box(0).intersects(b)) return false;
         for (Lot o : p.lots) if (o != l && o.box(0).intersects(b)) return false;
         for (Holding.FiefBuilding f : h.fief) if (flat(f.box().inflatedBy(1)).intersects(b)) return false;
