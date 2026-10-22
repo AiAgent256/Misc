@@ -159,6 +159,92 @@ for _name in GATES_AND_KEEPS:
     REVISIONS[_name] = REVISIONS.get(_name, 1) + 1
 
 
+def build_plan(fn, name, style, seed_shift, strict=True):
+    """One plan built, furnished, lit and audited as the export sees it. Returns (g, meta, kinds, audits).
+    With strict, a plan that fails its limits stops the build; without, the failures are reported in audits."""
+    t = time.time()
+    parts.CAP_STYLE = style
+    g, meta = fn() if seed_shift is None else fn(seed=fn.__defaults__[0] + seed_shift)
+    parts.CAP_STYLE = "cone"
+    # machicolations in the corbelled parapets, then the men onto their sills and to the holes' lips
+    holes = [] if meta.get("kind") == "landmark" else machicolate.open_crenels(g, meta["GL"])
+    at_embrasures = fixup.embrasures(g)
+    lips = machicolate.assign_lips(g) if holes else 0
+    meta["name"] = name
+    character = meta.get("character") or rooms.character_for(name, seed_shift or 0)
+    meta["character"] = character
+    landmark = meta.get("kind") == "landmark"
+    # a landmark is built as it stands: no widening the gaps between its columns, nobody's furniture in it
+    widened = 0 if landmark else scale.widen_doorways(g, meta["GL"])
+    report = []
+    kinds = {"beds": 0, "men": 0} if landmark else rooms.furnish(g, meta["GL"], character, report=report, tier=meta.get("tier", 2))
+    kinds["doorways_widened"] = widened
+    kinds["machicolations"] = len(holes)
+    kinds["lips"] = lips
+    meta["beds"] = kinds["beds"]
+    meta["rooms"] = report
+    if meta.get("tier", 2) >= 2 and meta.get("kind") != "town":
+        # a crypt under the keep: the city's keep stands on its top terrace
+        keep_gl = meta["levels"][-1] if meta.get("levels") else meta["GL"]
+        cr = crypt.dig(g, meta["GL"], character, tier=meta.get("tier", 2), keep_gl=keep_gl)
+        if cr is None:
+            raise SystemExit(f"{name}: no room for a crypt under the keep")
+        kinds.update(cr)
+    g.markers.pop("dwelling", None)              # homes not put up for sale are just homes
+    # a plan new since the second lighting rule is lit by it from the first
+    kinds["lit"] = 0 if landmark else fixup.light_rooms(g, meta["GL"], rev=max(REVISIONS.get(name, 1), 2 if name in NEW_PLANS else 1))
+    opened = 0 if landmark else fixup.clear_blocked_doorways(g, meta["GL"], tuple(meta.get("levels", ())))
+    # loops low in the towers where the walk can't see the walls' foot: after the furniture, so no slit
+    # opens behind a bed, and after the doorways, so a slit's sill isn't taken for a blocked door
+    kinds["loops"] = 0 if landmark else loops.flank(g, meta["GL"])[0]
+    dropped = fixup.drop_buried_markers(g)
+    bad, checked = walk.audit(g, meta)
+    unreachable = sum(len(v) for v in bad.values())
+    print(f"{name} ({character}): built in {time.time() - t:.1f}s, palette {len(g.palette)}, rooms " +
+          ", ".join(f"{k}={v}" for k, v in sorted(kinds.items())))
+    print(f"  walkability: {checked} posts checked, {unreachable} unreachable, {opened} doorways opened, {dropped} buried posts dropped")
+    failures = []
+    if unreachable:
+        for k, v in bad.items():
+            print(f"    {k}: {v[:6]}")
+        failures.append(f"{unreachable} posts cannot be walked to from the gate")
+    sc = scale_audit.audit(g, meta)
+    print(f"  scale: {scale_audit.summary(sc)}")
+    for k, v in sc.items():
+        if v:
+            print(f"    {k}: {sorted(v)[:5]}")
+    # a moated plan holds to its castle's limits
+    limit = SCALE_LIMITS.get(name) or SCALE_LIMITS.get(name.replace("_moat", ""), SCALE_LIMITS["*"])
+    over = [k for k in ("narrow_stairs", "pinches", "dark_rooms") if len(sc[k]) > limit[k]]
+    if over:
+        failures.append("cramped: " + ", ".join(f"{k} {len(sc[k])} > {limit[k]}" for k in over))
+    da = None
+    if not landmark:
+        da = defense_audit.audit(g, meta)
+        print(f"  defence: {defense_audit.summary(da)}")
+        lim = DEFENSE_LIMITS.get(name) or DEFENSE_LIMITS.get(name.replace("_moat", "")) or DEFENSE_LIMITS.get(name.rstrip("2"))
+        lim = lim or DEFENSE_LIMITS["town" if meta.get("kind") == "town" else "*"]
+        walks = max(1, da["posts"])
+        weak = []
+        if len(da["one_wide"]) > lim["one_wide"]:
+            weak.append(f"{len(da['one_wide'])} bowmen on one-wide walks, e.g. {da['one_wide'][:3]}")
+        if len(da["two_wide"]) > lim["two_wide"] * walks:
+            weak.append(f"{len(da['two_wide'])} of {walks} bowmen on two-wide walks, e.g. {da['two_wide'][:3]}")
+        if da["cover"] < lim["foot"]:
+            weak.append(f"the walls' foot is {da['cover'] * 100:.0f}% covered (< {lim['foot'] * 100:.0f}%), dead e.g. {da['dead'][:3]}")
+        if da["field"] < lim["field"]:
+            weak.append(f"the field is {da['field'] * 100:.0f}% covered (< {lim['field'] * 100:.0f}%)")
+        if weak:
+            failures.append("weak defences: " + "; ".join(weak))
+    if kinds["beds"] < kinds["men"] and meta.get("kind") != "landmark":
+        failures.append(f"{kinds['beds']} beds for {kinds['men']} men")
+    if failures and strict:
+        raise SystemExit(f"{name}: " + "; ".join(failures))
+    audits = {"walk_bad": bad, "walk_checked": checked, "doorways_opened": opened, "buried_dropped": dropped,
+              "scale": sc, "defence": da, "failures": failures, "limits": {"scale": limit}}
+    return g, meta, kinds, audits
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default=None)
@@ -173,77 +259,7 @@ def main():
         if args.only and name != args.only:
             continue
         t = time.time()
-        parts.CAP_STYLE = style
-        g, meta = fn() if seed_shift is None else fn(seed=fn.__defaults__[0] + seed_shift)
-        parts.CAP_STYLE = "cone"
-        # machicolations in the corbelled parapets, then the men onto their sills and to the holes' lips
-        holes = [] if meta.get("kind") == "landmark" else machicolate.open_crenels(g, meta["GL"])
-        at_embrasures = fixup.embrasures(g)
-        lips = machicolate.assign_lips(g) if holes else 0
-        meta["name"] = name
-        character = meta.get("character") or rooms.character_for(name, seed_shift or 0)
-        meta["character"] = character
-        landmark = meta.get("kind") == "landmark"
-        # a landmark is built as it stands: no widening the gaps between its columns, nobody's furniture in it
-        widened = 0 if landmark else scale.widen_doorways(g, meta["GL"])
-        kinds = {"beds": 0, "men": 0} if landmark else rooms.furnish(g, meta["GL"], character, tier=meta.get("tier", 2))
-        kinds["doorways_widened"] = widened
-        kinds["machicolations"] = len(holes)
-        kinds["lips"] = lips
-        meta["beds"] = kinds["beds"]
-        if meta.get("tier", 2) >= 2 and meta.get("kind") != "town":
-            # a crypt under the keep: the city's keep stands on its top terrace
-            keep_gl = meta["levels"][-1] if meta.get("levels") else meta["GL"]
-            cr = crypt.dig(g, meta["GL"], character, tier=meta.get("tier", 2), keep_gl=keep_gl)
-            if cr is None:
-                raise SystemExit(f"{name}: no room for a crypt under the keep")
-            kinds.update(cr)
-        g.markers.pop("dwelling", None)              # homes not put up for sale are just homes
-        # a plan new since the second lighting rule is lit by it from the first
-        kinds["lit"] = 0 if landmark else fixup.light_rooms(g, meta["GL"], rev=max(REVISIONS.get(name, 1), 2 if name in NEW_PLANS else 1))
-        opened = 0 if landmark else fixup.clear_blocked_doorways(g, meta["GL"], tuple(meta.get("levels", ())))
-        # loops low in the towers where the walk can't see the walls' foot: after the furniture, so no slit
-        # opens behind a bed, and after the doorways, so a slit's sill isn't taken for a blocked door
-        kinds["loops"] = 0 if landmark else loops.flank(g, meta["GL"])[0]
-        dropped = fixup.drop_buried_markers(g)
-        bad, checked = walk.audit(g, meta)
-        unreachable = sum(len(v) for v in bad.values())
-        print(f"{name} ({character}): built in {time.time() - t:.1f}s, palette {len(g.palette)}, rooms " +
-              ", ".join(f"{k}={v}" for k, v in sorted(kinds.items())))
-        print(f"  walkability: {checked} posts checked, {unreachable} unreachable, {opened} doorways opened, {dropped} buried posts dropped")
-        if unreachable:
-            for k, v in bad.items():
-                print(f"    {k}: {v[:6]}")
-            raise SystemExit(f"{name}: {unreachable} posts cannot be walked to from the gate")
-        sc = scale_audit.audit(g, meta)
-        print(f"  scale: {scale_audit.summary(sc)}")
-        for k, v in sc.items():
-            if v:
-                print(f"    {k}: {sorted(v)[:5]}")
-        # a moated plan holds to its castle's limits
-        limit = SCALE_LIMITS.get(name) or SCALE_LIMITS.get(name.replace("_moat", ""), SCALE_LIMITS["*"])
-        over = [k for k in ("narrow_stairs", "pinches", "dark_rooms") if len(sc[k]) > limit[k]]
-        if over:
-            raise SystemExit(f"{name}: cramped: " + ", ".join(f"{k} {len(sc[k])} > {limit[k]}" for k in over))
-        if not landmark:
-            da = defense_audit.audit(g, meta)
-            print(f"  defence: {defense_audit.summary(da)}")
-            lim = DEFENSE_LIMITS.get(name) or DEFENSE_LIMITS.get(name.replace("_moat", "")) or DEFENSE_LIMITS.get(name.rstrip("2"))
-            lim = lim or DEFENSE_LIMITS["town" if meta.get("kind") == "town" else "*"]
-            walks = max(1, da["posts"])
-            bad = []
-            if len(da["one_wide"]) > lim["one_wide"]:
-                bad.append(f"{len(da['one_wide'])} bowmen on one-wide walks, e.g. {da['one_wide'][:3]}")
-            if len(da["two_wide"]) > lim["two_wide"] * walks:
-                bad.append(f"{len(da['two_wide'])} of {walks} bowmen on two-wide walks, e.g. {da['two_wide'][:3]}")
-            if da["cover"] < lim["foot"]:
-                bad.append(f"the walls' foot is {da['cover'] * 100:.0f}% covered (< {lim['foot'] * 100:.0f}%), dead e.g. {da['dead'][:3]}")
-            if da["field"] < lim["field"]:
-                bad.append(f"the field is {da['field'] * 100:.0f}% covered (< {lim['field'] * 100:.0f}%)")
-            if bad:
-                raise SystemExit(f"{name}: weak defences: " + "; ".join(bad))
-        if kinds["beds"] < kinds["men"] and meta.get("kind") != "landmark":
-            raise SystemExit(f"{name}: {kinds['beds']} beds for {kinds['men']} men")
+        g, meta, kinds, _ = build_plan(fn, name, style, seed_shift)
         if not args.no_export:
             out = export_name(name)
             meta["name"] = out
