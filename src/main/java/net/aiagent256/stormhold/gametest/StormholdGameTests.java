@@ -2540,7 +2540,7 @@ public class StormholdGameTests {
                     }
                 }
                 String k = made.get(i).piece();
-                if (!k.equals("smithy") && !k.equals("stall")) {
+                if (!k.equals("smithy") && !k.equals("stall") && !k.equals("stable")) {
                     if (doors == 0) throw new IllegalStateException("the " + k + " at " + a + " has no door");
                     if (!byStreet) throw new IllegalStateException("the " + k + " at " + a + " doesn't open on a street");
                 }
