@@ -541,9 +541,9 @@ public final class Campaigns {
             int spoils = Rewards.raidSpoils(c, true);
             Vassals.favour(level, mgr, h, 10, "you fought for " + h.name);
             Heirs.beaten(level, mgr, h, c);
-            boolean pack = Rewards.pay(level, mgr, h.ownerPlayer(), spoils, h) > 0;
+            String where = Rewards.pay(level, mgr, h.ownerPlayer(), spoils, h);
             HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The raid on " + h.name + " is broken! The spoils of the field: "
-                    + spoils + " emeralds" + (pack ? "." : ", to its stores.")).withStyle(ChatFormatting.GREEN));
+                    + spoils + " emeralds, to " + where + ".").withStyle(ChatFormatting.GREEN));
             Chronicle.log(level, mgr, Chronicle.WAR, HoldingEvents.ownerName(level, mgr, c.side) + "'s attack on " + h.name
                     + " is broken at the walls.", h.ownerPlayer());
             c.stage = Campaign.Stage.DONE;

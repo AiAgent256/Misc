@@ -583,13 +583,13 @@ public final class Warbands {
     /** The warband broken: its spoils into the castle's stores. */
     static void broken(ServerLevel level, HoldingManager mgr, Holding h, Campaign c, int spoils, boolean watched) {
         discardLive(level, c);
-        boolean pack = false;
+        String where = "its stores";
         if (spoils > 0) {
-            if (watched) pack = Rewards.pay(level, mgr, h.ownerPlayer(), spoils, h) > 0;
+            if (watched) where = Rewards.pay(level, mgr, h.ownerPlayer(), spoils, h);
             else h.addStock(new ResourceLocation("minecraft", "emerald"), spoils);
         }
         HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("The illager warband is broken at " + h.name + "! Their spoils, "
-                + spoils + " emeralds, " + (pack ? "are yours." : "go to its stores.")).withStyle(ChatFormatting.GREEN));
+                + spoils + " emeralds, go to " + where + ".").withStyle(ChatFormatting.GREEN));
         Chronicle.log(level, mgr, Chronicle.WAR, "The illagers are broken at the walls of " + h.name + ".", h.ownerPlayer());
         c.stage = Campaign.Stage.DONE;
         mgr.setDirty();

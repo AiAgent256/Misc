@@ -675,14 +675,16 @@ public class StormholdGameTests {
         var chest = net.aiagent256.stormhold.holding.Steward.container(level, chestAt);
         if (count(chest, net.minecraft.world.item.Items.ROTTEN_FLESH) != 3 || count(chest, net.minecraft.world.item.Items.IRON_SWORD) != 1)
             throw new IllegalStateException("the spoils chest holds the wrong things");
-        // the rents: every place pays its lord at dawn; away from the game it goes to the stores
+        // the rents: every place pays its lord at dawn, into the treasury chest the steward sets up beside the War Table
         int rent = net.aiagent256.stormhold.holding.Rewards.rent(level, h);
         if (rent < 3) throw new IllegalStateException("a rent of " + rent);
         var em = net.aiagent256.stormhold.holding.Rewards.EMERALD;
         int was = h.stock(em);
         var line = net.aiagent256.stormhold.holding.Rewards.rents(level, mgr, lord, List.of(h));
-        if (line == null || !line.getString().startsWith("Rents") || h.stock(em) != was + rent)
-            throw new IllegalStateException("rents: " + (line == null ? "none" : line.getString()) + ", stores " + h.stock(em) + " from " + was);
+        BlockPos coffer = net.aiagent256.stormhold.holding.Steward.treasuryChest(level, h);
+        if (line == null || !line.getString().startsWith("Rents") || coffer == null || h.stock(em) != was
+                || count(net.aiagent256.stormhold.holding.Steward.container(level, coffer), net.minecraft.world.item.Items.EMERALD) != rent)
+            throw new IllegalStateException("rents: " + (line == null ? "none" : line.getString()) + ", treasury chest " + coffer + ", stores " + h.stock(em) + " from " + was);
         // what winning pays
         int tower = h.tier;
         h.tier = 3;

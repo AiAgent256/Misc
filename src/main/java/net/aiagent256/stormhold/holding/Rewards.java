@@ -3,6 +3,7 @@ package net.aiagent256.stormhold.holding;
 import net.aiagent256.stormhold.Sides;
 import net.aiagent256.stormhold.entity.Role;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -19,35 +20,80 @@ import java.util.UUID;
 /**
  * What winning pays, and what a lord's places pay him. Raids broken, warbands broken and castles taken
  * pay a purse; a house's soldiers carry coin; and every morning each place you hold sends its rents
- * and dues to you, wherever you are.
+ * and dues to the treasury chest at your seat.
  */
 public final class Rewards {
     public static final ResourceLocation EMERALD = new ResourceLocation("minecraft", "emerald");
 
-    /** Emeralds into the lord's pack if he's on, else into a place's stores. How many reached the pack. */
-    public static int pay(ServerLevel level, HoldingManager mgr, @Nullable UUID player, int emeralds, @Nullable Holding fallback) {
-        if (emeralds <= 0) return 0;
-        ServerPlayer sp = player == null ? null : level.getServer().getPlayerList().getPlayer(player);
-        if (sp != null) {
+    /**
+     * Emeralds to the lord: into the treasury chest at his seat (a chest signed "Treasury", set up beside its War Table
+     * the first time), or at the place they were won if the seat's not loaded; what won't fit, or with neither loaded,
+     * into the stores. Never into his pack. Where they went, for the message ("the treasury at Stormhold").
+     */
+    public static String pay(ServerLevel level, HoldingManager mgr, @Nullable UUID player, int emeralds, @Nullable Holding fallback) {
+        Holding seat = player == null ? null : mgr.seatOf(player);
+        if (seat == null && player != null) {
+            List<Holding> mine = mgr.ownedBy(player);
+            if (!mine.isEmpty()) seat = mine.get(0);
+        }
+        if (emeralds <= 0) return "the treasury";
+        for (Holding h : seat == fallback || fallback == null ? new Holding[]{seat} : new Holding[]{seat, fallback}) {
+            if (h == null || h.warTablePos.equals(BlockPos.ZERO) || !level.isLoaded(h.warTablePos)) continue;
+            BlockPos at = Steward.treasuryChest(level, h);
+            if (at == null) at = treasury(level, h);
+            net.minecraft.world.Container chest = at == null ? null : Steward.container(level, at);
+            if (chest == null) continue;
             int left = emeralds;
             while (left > 0) {
                 int n = Math.min(64, left);
-                ItemStack s = new ItemStack(Items.EMERALD, n);
-                if (!sp.getInventory().add(s)) sp.drop(s, false);
-                left -= n;
+                ItemStack rest = Spoils.put(chest, new ItemStack(Items.EMERALD, n));
+                left -= n - rest.getCount();
+                if (!rest.isEmpty()) break;
             }
-            return emeralds;
+            chest.setChanged();
+            if (left > 0) {
+                h.addStock(EMERALD, left);
+                mgr.setDirty();
+                return "the treasury at " + h.name + " (" + left + " that wouldn't fit to its stores)";
+            }
+            return "the treasury at " + h.name;
         }
-        Holding into = fallback;
-        if (into == null && player != null) {
-            List<Holding> mine = mgr.ownedBy(player);
-            if (!mine.isEmpty()) into = mine.get(0);
-        }
+        Holding into = seat != null ? seat : fallback;
         if (into != null) {
             into.addStock(EMERALD, emeralds);
             mgr.setDirty();
+            return "the stores of " + into.name;
         }
-        return 0;
+        return "nowhere";
+    }
+
+    /** A chest beside the War Table with a "Treasury" sign on it, the first time there's coin to put in it. */
+    @Nullable
+    static BlockPos treasury(ServerLevel level, Holding h) {
+        BlockPos table = h.warTablePos;
+        if (table.equals(BlockPos.ZERO) || !level.isLoaded(table)) return null;
+        for (int r = 1; r <= 4; r++) {
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
+                    BlockPos p = table.offset(dx, 0, dz);
+                    if (!level.getBlockState(p).isAir() || !level.getBlockState(p.above()).isAir() || !level.getBlockState(p.above(2)).isAir()) continue;
+                    if (!level.getBlockState(p.below()).isFaceSturdy(level, p.below(), net.minecraft.core.Direction.UP) || !h.box.isInside(p)) continue;
+                    level.setBlock(p, net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState(), 3);
+                    level.setBlock(p.above(), net.minecraft.world.level.block.Blocks.OAK_SIGN.defaultBlockState(), 3);
+                    if (level.getBlockEntity(p.above()) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign) {
+                        sign.setText(new net.minecraft.world.level.block.entity.SignText().setMessage(0, Component.literal("Treasury")), true);
+                        sign.setChanged();
+                    }
+                    Steward.TREASURY_AT.put(h.id, p);
+                    HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("Your steward has set up a treasury chest beside the War Table at "
+                            + h.name + " (" + p.getX() + ", " + p.getY() + ", " + p.getZ() + "). Rents, tolls, tribute, spoils and purses go in it "
+                            + "from now on. Sign any chest of your seat \"Treasury\" to use that one instead.").withStyle(ChatFormatting.GOLD));
+                    return p;
+                }
+            }
+        }
+        return null;
     }
 
     // ------------------------------------------------------------ rents
@@ -83,8 +129,7 @@ public final class Rewards {
             parts.add(h.name + " " + r + (Vassals.is(h) ? " (vassal)" : ""));
         }
         if (total <= 0 && besieged.isEmpty()) return null;
-        int inPack = pay(level, mgr, player, total, mine.get(0));
-        String where = inPack > 0 ? "to your purse" : "to the stores of " + mine.get(0).name;
+        String where = "to " + pay(level, mgr, player, total, mine.get(0));
         return Component.literal("Rents and dues: " + String.join(", ", parts) + (parts.isEmpty() ? "nothing" : "") + ". " + total
                 + " emeralds " + where + "." + (besieged.isEmpty() ? "" : " " + String.join(", ", besieged) + " paid nothing: under attack."))
                 .withStyle(ChatFormatting.GREEN);
@@ -107,8 +152,8 @@ public final class Rewards {
     /** The castle is yours: its treasury with it. */
     public static void seized(ServerLevel level, HoldingManager mgr, Holding h, UUID player, boolean peaceful) {
         int n = peaceful ? treasury(level, h) / 2 : treasury(level, h);
-        pay(level, mgr, player, n, h);
-        HoldingEvents.tell(level, player, Component.literal("The treasury of " + h.name + " is yours: " + n + " emeralds.")
+        String where = pay(level, mgr, player, n, h);
+        HoldingEvents.tell(level, player, Component.literal("The treasury of " + h.name + " is yours: " + n + " emeralds, to " + where + ".")
                 .withStyle(ChatFormatting.GOLD));
     }
 

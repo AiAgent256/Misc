@@ -391,19 +391,7 @@ public final class Politics {
     }
 
     private static void pay(ServerLevel level, HoldingManager mgr, UUID player, int emeralds) {
-        ServerPlayer sp = level.getServer().getPlayerList().getPlayer(player);
-        int left = emeralds;
-        if (sp != null) {
-            while (left > 0) {
-                int n = Math.min(64, left);
-                ItemStack s = new ItemStack(Items.EMERALD, n);
-                if (!sp.getInventory().add(s)) sp.drop(s, false);
-                left -= n;
-            }
-            return;
-        }
-        List<Holding> mine = mgr.ownedBy(player);
-        if (!mine.isEmpty()) mine.get(0).addStock(EMERALD, left);
+        net.aiagent256.stormhold.holding.Rewards.pay(level, mgr, player, emeralds, null);
     }
 
     private static void near(ServerLevel level, BlockPos at, int radius, Component msg) {

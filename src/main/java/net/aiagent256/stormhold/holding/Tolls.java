@@ -65,9 +65,9 @@ public final class Tolls {
         }
         if (roads == 0 && blocked.isEmpty()) return null;
         mgr.setDirty();
-        boolean pack = total > 0 && Rewards.pay(level, mgr, player, total, mine.get(0)) > 0;
+        String where = total > 0 ? Rewards.pay(level, mgr, player, total, mine.get(0)) : "";
         StringBuilder s = new StringBuilder("Road tolls: " + total + " emeralds from " + roads + (roads == 1 ? " road" : " roads")
-                + (total > 0 ? (pack ? " to your purse." : " to the stores.") : "."));
+                + (total > 0 ? " to " + where + "." : "."));
         if (!cleared.isEmpty()) s.append(" The merchants thank you for clearing ").append(String.join(", ", cleared)).append(".");
         if (!blocked.isEmpty()) s.append(" No tolls while brigands hold ").append(String.join(", ", blocked)).append(".");
         if (!camped.isEmpty()) s.append(" Brigands have camped on the road from ").append(String.join("; ", camped)).append("!");

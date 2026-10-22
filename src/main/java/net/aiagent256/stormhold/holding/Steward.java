@@ -46,14 +46,14 @@ import java.util.UUID;
  * you're near, and tells you each morning what he's done.
  */
 public final class Steward {
-    public static final String SELL = "sell", STORES = "stores", SEND = "send", KEEP = "keep", BUY = "buy", SPOILS = "spoils";
+    public static final String SELL = "sell", STORES = "stores", SEND = "send", KEEP = "keep", BUY = "buy", SPOILS = "spoils", TREASURY = "treasury";
 
     /** A standing order read off a sign. */
     public record Rule(String kind, boolean whenFull, int over, Map<Item, Integer> want, String place, boolean sell) {
     }
 
-    /** Where each place's spoils chest is, as last seen. */
-    static final Map<UUID, BlockPos> SPOILS_AT = new HashMap<>();
+    /** Where each place's spoils chest and treasury chest are, as last seen. */
+    static final Map<UUID, BlockPos> SPOILS_AT = new HashMap<>(), TREASURY_AT = new HashMap<>();
 
     /** Chests the steward has already told the lord he's taken charge of, by holding. Not saved: he says it again after a restart. */
     private static final Map<UUID, Set<BlockPos>> KNOWN = new HashMap<>();
@@ -78,6 +78,7 @@ public final class Steward {
                     if (c == null) continue;
                     seen.add(at);
                     if (r.kind().equals(SPOILS)) SPOILS_AT.putIfAbsent(h.id, at);
+                    if (r.kind().equals(TREASURY)) TREASURY_AT.putIfAbsent(h.id, at);
                     if (known.add(at)) announce(level, h, r, at);
                     run(level, mgr, h, owner, r, c);
                 }
@@ -89,9 +90,20 @@ public final class Steward {
     /** The place's spoils chest: the one last seen, else the first signed "Spoils" in it, else null. */
     @Nullable
     public static BlockPos spoilsChest(ServerLevel level, Holding h) {
-        BlockPos at = SPOILS_AT.get(h.id);
+        return signed(level, h, SPOILS, SPOILS_AT);
+    }
+
+    /** The place's treasury chest: the one last seen, else the first signed "Treasury" in it, else null. */
+    @Nullable
+    public static BlockPos treasuryChest(ServerLevel level, Holding h) {
+        return signed(level, h, TREASURY, TREASURY_AT);
+    }
+
+    @Nullable
+    private static BlockPos signed(ServerLevel level, Holding h, String kind, Map<UUID, BlockPos> cache) {
+        BlockPos at = cache.get(h.id);
         if (at != null && level.isLoaded(at) && container(level, at) != null) return at;
-        SPOILS_AT.remove(h.id);
+        cache.remove(h.id);
         for (int cx = h.box.minX() >> 4; cx <= h.box.maxX() >> 4; cx++) {
             for (int cz = h.box.minZ() >> 4; cz <= h.box.maxZ() >> 4; cz++) {
                 LevelChunk chunk = level.getChunkSource().getChunkNow(cx, cz);
@@ -99,10 +111,10 @@ public final class Steward {
                 for (BlockEntity be : chunk.getBlockEntities().values()) {
                     if (!(be instanceof SignBlockEntity sign) || !h.box.isInside(be.getBlockPos())) continue;
                     Rule r = read(sign);
-                    if (r == null || !r.kind().equals(SPOILS)) continue;
+                    if (r == null || !r.kind().equals(kind)) continue;
                     BlockPos p = containerPos(level, sign);
                     if (p == null) continue;
-                    SPOILS_AT.put(h.id, p);
+                    cache.put(h.id, p);
                     return p;
                 }
             }
@@ -135,6 +147,7 @@ public final class Steward {
             case "keep", "keep stocked", "stock", "steward keep" -> KEEP;
             case "buy", "keep and buy", "steward buy" -> BUY;
             case "spoils", "loot", "the spoils", "spoils of war" -> SPOILS;
+            case "treasury", "the treasury", "coffers", "the coffers", "treasure" -> TREASURY;
             default -> head.startsWith("send to ") || head.startsWith("ship to ") ? SEND : null;
         };
         if (kind == null) return null;
@@ -476,6 +489,7 @@ public final class Steward {
             case SEND -> "sends it by courier to " + r.place();
             case KEEP -> "keeps it stocked from the stores: " + wants(r);
             case SPOILS -> "has the garrison put what they take off the dead in it" + (r.sell() ? ", and sells what the shops will buy" : "");
+            case TREASURY -> "keeps the realm's coin in it: rents, tolls, tribute, spoils and purses";
             default -> "keeps it stocked, buying what the stores lack: " + wants(r);
         };
         HoldingEvents.tell(level, h.ownerPlayer(), Component.literal("Steward " + h.stewardName + " of " + h.name + " takes charge of the chest at "

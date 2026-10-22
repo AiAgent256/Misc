@@ -253,7 +253,7 @@ public class WarTableScreen extends Screen {
         if (vassal) row.add(button("Revoke", "Take " + h.name() + " back into your own hands. He returns to the ranks as a knight.",
                 () -> Net.sendAction(h.id(), Net.REVOKE, BlockPos.ZERO, 0)));
         String seatDoes = "tribute, envoys' purses and anything paid to you while you're away go into its stores, and wages come out of them "
-                + "first; rents still come to your purse at dawn. Your roads start from its gate, and the Realm map crowns it.";
+                + "first; rents, tolls and purses go into the treasury chest beside its War Table. Your roads start from its gate, and the Realm map crowns it.";
         Button seat = button(h.seat() ? "Your seat" : "Make this my seat", (h.seat() ? h.name() + " is your seat: " : "Rule from " + h.name() + ": ")
                 + seatDoes, () -> Net.sendAction(h.id(), Net.SET_SEAT, BlockPos.ZERO, 0));
         seat.active = !h.seat() && !vassal;
