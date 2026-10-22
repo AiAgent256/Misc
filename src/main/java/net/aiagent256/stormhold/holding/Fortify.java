@@ -212,7 +212,7 @@ final class Fortify {
         }
 
         void soft(BlockPos p, BlockState s) {
-            soft.add(new Builder.Job(p.immutable(), s);
+            soft.add(new Builder.Job(p.immutable(), s, true));
         }
 
         void into(java.util.Deque<Builder.Job> q) {
@@ -267,7 +267,7 @@ final class Fortify {
         for (int y = base + 1; y <= base + 2; y++) set(q, new BlockPos(cx - sx * 2, y, cz), Blocks.AIR.defaultBlockState());
         BlockState ladder = Blocks.LADDER.defaultBlockState().setValue(LadderBlock.FACING, sx > 0 ? Direction.WEST : Direction.EAST);
         for (int y = base + 1; y <= top; y++) set(q, new BlockPos(cx + sx, y, cz), ladder);
-        set(q, new BlockPos(cx, top - 1, cz), Blocks.LANTERN.defaultBlockState().setValue(LanternBlock.HANGING);
+        set(q, new BlockPos(cx, top - 1, cz), Blocks.LANTERN.defaultBlockState().setValue(LanternBlock.HANGING, true));
         posts.add(new BlockPos(cx, top + 1, cz));
         posts.add(new BlockPos(cx - 1, top + 1, cz + 1));
         return true;
@@ -298,7 +298,7 @@ final class Fortify {
             BlockPos d = mid.relative(along, sgn * 5);
             for (int y = base + DECK + 1; y <= base + DECK + 2; y++) set(q, d.atY(y), Blocks.AIR.defaultBlockState());
         }
-        set(q, mid.atY(base + DECK - 1).relative(out, -1), Blocks.LANTERN.defaultBlockState().setValue(LanternBlock.HANGING);
+        set(q, mid.atY(base + DECK - 1).relative(out, -1), Blocks.LANTERN.defaultBlockState().setValue(LanternBlock.HANGING, true));
         posts.add(mid.relative(along, -2).atY(base + DECK + 1));
         posts.add(mid.relative(along, 2).atY(base + DECK + 1));
     }
