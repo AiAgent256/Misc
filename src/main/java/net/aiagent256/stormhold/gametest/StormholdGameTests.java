@@ -2462,6 +2462,25 @@ public class StormholdGameTests {
             for (int i = 0; i < 120 && p.pending > 0; i++) net.aiagent256.stormhold.holding.Town.tick(level, mgr, h);
             String about = p.houses + " built, " + p.streets.size() + " streets, " + p.lots.size() + " lots, " + p.pending + " waiting, failed " + p.failed;
             Stormhold.LOGGER.info("Town test: {}", about);
+            // and one of each kind in each country, for the picture
+            String[] themes = {"north", "riverlands", "reach", "stormlands", "dorne"};
+            net.aiagent256.stormhold.holding.HouseGen.Kind[] row = {net.aiagent256.stormhold.holding.HouseGen.Kind.HOUSE,
+                    net.aiagent256.stormhold.holding.HouseGen.Kind.FARMHOUSE, net.aiagent256.stormhold.holding.HouseGen.Kind.INN,
+                    net.aiagent256.stormhold.holding.HouseGen.Kind.SMITHY, net.aiagent256.stormhold.holding.HouseGen.Kind.BAKERY};
+            for (int ti = 0; ti < themes.length; ti++) {
+                for (int ki = 0; ki < row.length; ki++) {
+                    int x0 = cx - 70 + ki * 13, z0 = cz - 26 - ti * 13;
+                    BoundingBox lot = new BoundingBox(x0 - 1, -64, z0 - 1, x0 + 10, 320, z0 + 11);
+                    boolean free = true;
+                    for (var b : h.fief) if (b.box().intersects(new BoundingBox(lot.minX(), b.box().minY(), lot.minZ(), lot.maxX(), b.box().maxY(), lot.maxZ()))) free = false;
+                    for (var s : p.streets) if (s.box(1).intersects(lot)) free = false;
+                    if (!free) continue;
+                    var front = ki % 2 == 0 ? net.minecraft.core.Direction.NORTH : net.minecraft.core.Direction.WEST;
+                    net.aiagent256.stormhold.holding.HouseGen.build(level, new net.aiagent256.stormhold.holding.HouseGen.Lot(x0, z0, 9 + ki % 2, 10, y - 1, front),
+                            row[ki], themes[ti], level.random);
+                }
+            }
+            dumpTown(level, cx - 88, y - 1, cz - 88, cx + 88, y + 24, cz + 88);
             if (p.houses < 12) throw new IllegalStateException("the town only grew to " + about);
             // the streets all join up
             java.util.Set<Long> street = new java.util.HashSet<>();
@@ -2537,25 +2556,6 @@ public class StormholdGameTests {
             var q = net.aiagent256.stormhold.holding.Town.Plan.load(p.save());
             if (q.streets.size() != p.streets.size() || q.lots.size() != p.lots.size() || q.houses != p.houses || !q.linked.equals(p.linked))
                 throw new IllegalStateException("the town didn't save and load");
-            // and one of each kind in each country, for the picture
-            String[] themes = {"north", "riverlands", "reach", "stormlands", "dorne"};
-            net.aiagent256.stormhold.holding.HouseGen.Kind[] row = {net.aiagent256.stormhold.holding.HouseGen.Kind.HOUSE,
-                    net.aiagent256.stormhold.holding.HouseGen.Kind.FARMHOUSE, net.aiagent256.stormhold.holding.HouseGen.Kind.INN,
-                    net.aiagent256.stormhold.holding.HouseGen.Kind.SMITHY, net.aiagent256.stormhold.holding.HouseGen.Kind.BAKERY};
-            for (int ti = 0; ti < themes.length; ti++) {
-                for (int ki = 0; ki < row.length; ki++) {
-                    int x0 = cx - 70 + ki * 13, z0 = cz - 26 - ti * 13;
-                    BoundingBox lot = new BoundingBox(x0 - 1, -64, z0 - 1, x0 + 10, 320, z0 + 11);
-                    boolean free = true;
-                    for (var b : h.fief) if (b.box().intersects(new BoundingBox(lot.minX(), b.box().minY(), lot.minZ(), lot.maxX(), b.box().maxY(), lot.maxZ()))) free = false;
-                    for (var s : p.streets) if (s.box(1).intersects(lot)) free = false;
-                    if (!free) continue;
-                    var front = ki % 2 == 0 ? net.minecraft.core.Direction.NORTH : net.minecraft.core.Direction.WEST;
-                    net.aiagent256.stormhold.holding.HouseGen.build(level, new net.aiagent256.stormhold.holding.HouseGen.Lot(x0, z0, 9 + ki % 2, 10, y - 1, front),
-                            row[ki], themes[ti], level.random);
-                }
-            }
-            dumpTown(level, cx - 88, y - 1, cz - 88, cx + 88, y + 24, cz + 88);
             folk = level.getEntitiesOfClass(net.minecraft.world.entity.npc.Villager.class, new net.minecraft.world.phys.AABB(new BlockPos(cx, y, cz)).inflate(130, 40, 130));
         } finally {
             for (var v : folk) v.discard();

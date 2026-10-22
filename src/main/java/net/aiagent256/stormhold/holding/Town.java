@@ -283,24 +283,36 @@ public final class Town {
     public record Result(String what, boolean newStreet, boolean main) {
     }
 
-    /** One step: a building on a free lot; if there's none the land allows, a new stretch of street and its lots first. */
+    /** One step: a building on a free lot; if there's none the land allows, a new stretch of street (one with room for lots) first. */
     @Nullable
     public static Result step(ServerLevel level, Holding h, Plan p) {
         RandomSource r = level.random;
         Result built = buildOnALot(level, h, p, r);
         if (built != null) return built;
-        for (int attempt = 0; attempt < 6; attempt++) {
+        for (int attempt = 0; attempt < 8; attempt++) {
             boolean main = r.nextInt(5) < 2 || p.streets.size() < 2;
-            Street s = main ? extendMain(level, h, p, r) : branch(level, h, p, r);
-            if (s == null) s = main ? branch(level, h, p, r) : extendMain(level, h, p, r);
-            if (s == null) return null;
-            pave(level, h, p, s);
-            p.streets.add(s);
-            addLots(level, h, p, s, p.streets.size() - 1, r);
+            Plot c = main ? extendMain(level, h, p, r) : branch(level, h, p, r);
+            if (c == null) c = main ? branch(level, h, p, r) : extendMain(level, h, p, r);
+            if (c == null) return null;
+            lay(level, h, p, c);
             Result b = buildOnALot(level, h, p, r);
-            if (b != null) return new Result(b.what(), true, s.main);
+            if (b != null) return new Result(b.what(), true, c.street().main);
         }
         return null;
+    }
+
+    /** A stretch of street that'll go, and the lots along it. */
+    record Plot(Street street, List<Lot> lots) {
+    }
+
+    /** Pave it and take it into the plan, with its lots. */
+    static void lay(ServerLevel level, Holding h, Plan p, Plot c) {
+        pave(level, h, p, c.street());
+        p.streets.add(c.street());
+        for (Lot l : c.lots()) {
+            l.street = p.streets.size() - 1;
+            p.lots.add(l);
+        }
     }
 
     // ------------------------------------------------------------ the streets
@@ -321,7 +333,7 @@ public final class Town {
             int guard = 0;
             while (clear.isInside(start.atY(clear.minY())) && guard++ < 300) start = start.relative(d);
             for (int shift : new int[]{0, 3, 6, 10}) {
-                for (int len : new int[]{MAIN_LEN, 7}) {
+                for (int len : new int[]{MAIN_LEN + 4, MAIN_LEN, 8}) {
                     Street s = new Street();
                     s.a = start.relative(d, shift);
                     s.dir = d;
@@ -337,9 +349,7 @@ public final class Town {
                     approach.width = MAIN_W;
                     approach.len = (int) Math.round(Math.sqrt(approach.a.atY(0).distSqr(s.a.atY(0))));
                     if (approach.len > 0) pave(level, h, p, approach);
-                    pave(level, h, p, s);
-                    p.streets.add(s);
-                    addLots(level, h, p, s, 0, level.random);
+                    lay(level, h, p, new Plot(s, lotsFor(h, p, s, level.random)));
                     return true;
                 }
             }
@@ -349,29 +359,31 @@ public final class Town {
 
     /** The high street onward from its far end: straight on mostly, sometimes turning. */
     @Nullable
-    static Street extendMain(ServerLevel level, Holding h, Plan p, RandomSource r) {
+    static Plot extendMain(ServerLevel level, Holding h, Plan p, RandomSource r) {
         Street last = null;
         for (Street s : p.streets) if (s.main) last = s;
         if (last == null) return null;
         List<Direction> ways = new ArrayList<>(List.of(last.dir, last.dir, last.dir, last.dir.getClockWise(), last.dir.getCounterClockWise()));
         java.util.Collections.shuffle(ways, new java.util.Random(r.nextLong()));
         for (Direction d : new java.util.LinkedHashSet<>(ways)) {
-            for (int len : new int[]{MAIN_LEN - 3 + r.nextInt(6), 7}) {
+            for (int len : new int[]{MAIN_LEN - 2 + r.nextInt(8), 10}) {
                 Street s = new Street();
                 s.dir = d;
                 s.a = d == last.dir ? last.end().relative(d) : last.end().relative(d, last.edge(d));
                 s.width = MAIN_W;
                 s.main = true;
                 s.len = len;
-                if (ok(level, h, p, s)) return s;
+                if (!ok(level, h, p, s)) continue;
+                List<Lot> lots = lotsFor(h, p, s, r);
+                if (!lots.isEmpty()) return new Plot(s, lots);
             }
         }
         return null;
     }
 
-    /** A lane off any street, square to it, from wherever there's a gap between its lots. */
+    /** A lane off any street, square to it, from wherever there's a gap between its lots, long enough to reach past them to room of its own. */
     @Nullable
-    static Street branch(ServerLevel level, Holding h, Plan p, RandomSource r) {
+    static Plot branch(ServerLevel level, Holding h, Plan p, RandomSource r) {
         if (p.streets.isEmpty()) return null;
         List<int[]> tries = new ArrayList<>();
         for (int si = 0; si < p.streets.size(); si++) {
@@ -384,18 +396,20 @@ public final class Town {
         java.util.Collections.shuffle(tries, new java.util.Random(r.nextLong()));
         int checked = 0;
         for (int[] t : tries) {
-            if (checked++ > 160) break;
+            if (checked++ > 200) break;
             Street from = p.streets.get(t[0]);
             Direction d = t[2] == 0 ? from.dir.getClockWise() : from.dir.getCounterClockWise();
             int width = from.main && r.nextInt(3) == 0 ? MAIN_W : LANE_W;
-            for (int len : new int[]{LANE_LEN - 3 + r.nextInt(7), 7}) {
+            for (int len : new int[]{LANE_LEN + 10 + r.nextInt(8), LANE_LEN + 4, LANE_LEN - 2}) {
                 Street s = new Street();
                 s.dir = d;
                 s.a = from.a.relative(from.dir, t[1]).relative(d, from.edge(d));
                 s.width = width;
                 s.main = false;
                 s.len = len;
-                if (ok(level, h, p, s)) return s;
+                if (!ok(level, h, p, s)) continue;
+                List<Lot> lots = lotsFor(h, p, s, r);
+                if (!lots.isEmpty()) return new Plot(s, lots);
             }
         }
         return null;
@@ -526,34 +540,45 @@ public final class Town {
 
     // ------------------------------------------------------------ lots
 
-    /** Lots down both sides of a stretch, a verge back from it, a block between each and a wider gap where a lane could go. */
-    static void addLots(ServerLevel level, Holding h, Plan p, Street s, int index, RandomSource r) {
+    /**
+     * Lots down both sides of a stretch, a verge back from it: each as wide and deep as the room allows, a two-block gap
+     * between, and now and then three blocks left for a lane. Where one won't fit, the next is tried a block further on.
+     */
+    static List<Lot> lotsFor(Holding h, Plan p, Street s, RandomSource r) {
+        List<Lot> out = new ArrayList<>();
         Direction side = s.dir.getClockWise();
         for (int sgn : new int[]{1, -1}) {
             Direction toward = sgn > 0 ? side : side.getOpposite();
             int off = (sgn > 0 ? s.right() : s.left()) + 2;       // the street's half and a verge
-            int t = r.nextInt(2);
-            int laneGap = s.len >= 12 ? 3 + r.nextInt(s.len - 8) : -10;
-            while (t < s.len - 3) {
-                int frontage = 5 + r.nextInt(4);
-                if (laneGap >= 0 && t + frontage > laneGap && t <= laneGap + 2) {
-                    // leave three blocks for a lane
-                    t = laneGap + 3;
-                    laneGap = -10;
+            int t = 0, since = 0;
+            while (t <= s.len - 5) {
+                Lot got = null;
+                int frontage = Math.min(s.len - t, 5 + r.nextInt(4)), depth = 6 + r.nextInt(5);
+                for (int[] fd : new int[][]{{frontage, depth}, {frontage, 6}, {5, depth}, {5, 6}}) {
+                    if (fd[0] < 5) continue;
+                    Lot l = lot(s, toward, off, t, fd[0], fd[1]);
+                    if (fits(h, p, l, out)) {
+                        got = l;
+                        break;
+                    }
+                }
+                if (got == null) {
+                    t++;
                     continue;
                 }
-                if (t + frontage > s.len) frontage = s.len - t;
-                if (frontage < 5) break;
-                Lot l = lot(s, toward, off, t, frontage, 6 + r.nextInt(5), index);
-                // too deep for the room there? a shallower one
-                if (!fits(h, p, l) && l.depth() > 6) l = lot(s, toward, off, t, frontage, 6, index);
-                if (fits(h, p, l)) p.lots.add(l);
-                t += frontage + 2;   // room between for both roofs' eaves
+                out.add(got);
+                t += (got.front.getAxis() == Direction.Axis.Z ? got.w : got.d) + 2;   // room between for both roofs' eaves
+                // every couple of lots, a gap a lane could come through
+                if (++since >= 2 + r.nextInt(2)) {
+                    t += 3;
+                    since = 0;
+                }
             }
         }
+        return out;
     }
 
-    private static Lot lot(Street s, Direction toward, int off, int t, int frontage, int depth, int index) {
+    private static Lot lot(Street s, Direction toward, int off, int t, int frontage, int depth) {
         BlockPos c1 = s.a.relative(s.dir, t).relative(toward, off);
         BlockPos c2 = s.a.relative(s.dir, t + frontage - 1).relative(toward, off + depth - 1);
         Lot l = new Lot();
@@ -562,13 +587,13 @@ public final class Town {
         l.w = Math.abs(c1.getX() - c2.getX()) + 1;
         l.d = Math.abs(c1.getZ() - c2.getZ()) + 1;
         l.front = toward.getOpposite();
-        l.street = index;
         return l;
     }
 
-    /** Clear of the castle, the streets, the other lots and every building, and within the fief. */
-    static boolean fits(Holding h, Plan p, Lot l) {
+    /** Clear of the castle, the streets, the other lots (and those just laid out) and every building, and within the fief. */
+    static boolean fits(Holding h, Plan p, Lot l, List<Lot> fresh) {
         BoundingBox b = l.box(0);
+        for (Lot o : fresh) if (o.box(0).intersects(b)) return false;
         if (h.box.inflatedBy(CLEAR + 2).intersects(b)) return false;
         for (Street s : p.streets) if (s.box(0).intersects(b)) return false;
         for (Lot o : p.lots) if (o != l && o.box(0).intersects(b)) return false;
