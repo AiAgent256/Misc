@@ -140,11 +140,12 @@ public final class Fields {
         int half = Math.max(h.box.getXSpan(), h.box.getZSpan()) / 2;
         for (int attempt = 0; attempt < 40; attempt++) {
             int ax, az;
-            if (!p.streets.isEmpty() && r.nextInt(3) > 0) {
+            if (!p.streets.isEmpty() && (attempt < 30 || r.nextInt(3) > 0)) {
+                // close round the town: out past the lots of some street
                 Town.Street s = p.streets.get(r.nextInt(p.streets.size()));
                 BlockPos q = s.a.relative(s.dir, r.nextInt(s.len));
                 double ang = r.nextDouble() * Math.PI * 2;
-                int dist = 14 + r.nextInt(18);
+                int dist = 12 + Math.max(w, d) / 2 + r.nextInt(8 + attempt / 2);
                 ax = q.getX() + (int) (Math.cos(ang) * dist);
                 az = q.getZ() + (int) (Math.sin(ang) * dist);
             } else {
