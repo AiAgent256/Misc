@@ -9,6 +9,8 @@ tapestries, a pious one candles, a grim one chains.
 """
 import math
 
+import shell
+
 from furnish import AIR, LOOT, Dresser, _Guarded, find_rooms
 
 CHARACTERS = {
@@ -817,15 +819,28 @@ def dress_smithy(d, room, ch):
 
 
 def dress_treasury(d, room, ch):
+    """Strongboxes and casks against the walls, a counting table, the gold stacked in one corner behind bars."""
     d.fill_wall([lambda x, z, f: d.chest(x, z, f, "castle_treasury"),
-                 lambda x, z, f: d.put(x, z, "minecraft:gold_block"),
                  lambda x, z, f: d.barrel(x, z, "castle_treasury", f=f),
-                 lambda x, z, f: d.put(x, z, "minecraft:raw_gold_block" if d.rng.random() < 0.5 else "minecraft:gold_block"),
+                 lambda x, z, f: d.chest(x, z, f, "castle_treasury"),
                  lambda x, z, f: d.put(x, z, f"minecraft:{ch['lantern']}[hanging=false]")],
                 limit=max(3, min(12, room.size() // 10)))
-    for (x, z) in d.inner:
-        if d.free(x, z) and d.rng.random() < 0.08:
-            d.put(x, z, "minecraft:gold_block")
+    # the strongroom corner: gold two high behind iron bars
+    for (x, z), f in d.wall_cells(shuffle=False):
+        sx, sz = x - f[1], z + f[0]
+        bx, bz = x + f[0], z + f[1]
+        if d.free(x, z) and d.free(sx, sz) and d.free(bx, bz) and d.free(sx + f[0], sz + f[1]):
+            for (cx, cz) in ((x, z), (sx, sz)):
+                d.put(cx, cz, "minecraft:gold_block")
+                if d.g.get(cx, d.y + 1, cz) == AIR:
+                    d.g.set(cx, d.y + 1, cz, "minecraft:raw_gold_block" if (cx + cz) % 2 else "minecraft:gold_block")
+            for (cx, cz) in ((bx, bz), (sx + f[0], sz + f[1])):
+                d.put(cx, cz, "minecraft:iron_bars")
+                if d.g.get(cx, d.y + 1, cz) == AIR:
+                    d.g.set(cx, d.y + 1, cz, "minecraft:iron_bars")
+            break
+    cx, cz = (room.x0 + room.x1) // 2, (room.z0 + room.z1) // 2
+    d.table(cx - 1, cz, 3, "x", chairs=True, dressing=["minecraft:candle[candles=3,lit=true]", "minecraft:gold_block", AIR])
     d.sconces(every=5, block="minecraft:soul_wall_torch")
     d.rug(ch["rug"] if ch["rug"] != "brown" else "red", 3, 3)
     d.lanterns(every=5)
@@ -1042,7 +1057,7 @@ def furnish(g, GL, character="martial", report=None, tier=2):
                     protected.add((x + dx, y, z + dz))
                     protected.add((x + dx, y + 1, z + dz))
     ch = CHARACTERS[character]
-    counts = {}
+    counts = {"partition_walls": shell.partition(g, GL, protected, fixed_kind)}
     for room, kind in plan(g, GL, character, tier):
         if len(room.cells) < 12 or (len(room.cells) <= 16 and len(room.doorways) >= 2):
             continue                                  # a stair head or a tower passage, not a room
@@ -1050,10 +1065,47 @@ def furnish(g, GL, character="martial", report=None, tier=2):
         d = Dresser(_Guarded(g), room, protected)
         if len(d.wall) + len(d.inner) < 6:
             continue                                  # a stair landing: nothing fits
+        for k, v in shell.dress(d, room, ch, kind).items():
+            counts["shell_" + k] = counts.get("shell_" + k, 0) + v
         DRESSERS[kind](d, room, ch)
+        for k, v in shell.finish(d, room, ch, kind).items():
+            counts["shell_" + k] = counts.get("shell_" + k, 0) + v
         counts[kind] = counts.get(kind, 0) + 1
         if report is not None:
             report.append((kind, room.y, room.x0, room.z0, room.w(), room.d(), room.size()))
     counts["beds"] = beds_in(g)
     counts["men"] = MEN.get(tier, 24)
+    # the partition walls make smaller rooms than the planner reckoned on: bunks go into the lodgings, the
+    # quarters and the guardrooms, biggest first, until the garrison has its beds
+    rounds = (("lodging", "quarters", "guardroom", "store", "chamber"), ("barracks", "armoury", "cellar", "mess"))
+    for round_, kinds_ in enumerate(rounds):
+        if counts["beds"] >= counts["men"] or report is None:
+            break
+        rs = find_rooms(g, GL, set())
+        for kind, y, x0, z0, w, dd, size in sorted(report, key=lambda e: -e[6]):
+            if counts["beds"] >= counts["men"]:
+                break
+            if kind not in kinds_:
+                continue
+            # the furniture has shrunk the room's footprint since the plan: match by overlap, not by corner
+            best, rm = 0, None
+            for cand in rs:
+                if cand.y != y:
+                    continue
+                ov = max(0, min(x0 + w, cand.x0 + cand.w()) - max(x0, cand.x0)) * max(0, min(z0 + dd, cand.z0 + cand.d()) - max(z0, cand.z0))
+                if ov > best:
+                    best, rm = ov, cand
+            if rm is None:
+                continue
+            d = Dresser(_Guarded(g), rm, protected)
+            colors = ["brown", "gray", "light_gray", "white"]
+            for (x, z), f in d.wall_cells(shuffle=False):
+                if counts["beds"] >= counts["men"]:
+                    break
+                if ((x + z) % 2 or round_) and d.bunk(x, z, f, colors[(x * 7 + z) % 4]):
+                    if not _doors_connected(d, rm):
+                        _unbed(d, x, z, f)
+                    else:
+                        counts["beds"] = beds_in(g)
+                        counts["bunks_added"] = counts.get("bunks_added", 0) + 1
     return counts

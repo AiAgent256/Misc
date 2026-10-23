@@ -7,14 +7,14 @@
  "theme": "stormlands",
  "layouts": [
   {
-   "name": "great_city_r5",
+   "name": "great_city_r6",
    "size_x": 256,
    "size_z": 256,
    "ground": 8,
    "weight": 1
   },
   {
-   "name": "canal_city_r5",
+   "name": "canal_city_r6",
    "size_x": 256,
    "size_z": 256,
    "ground": 8,

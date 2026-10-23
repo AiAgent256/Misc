@@ -175,6 +175,14 @@ for _fn, _name, _style, _shift in builds():
     REVISIONS[_name] = REVISIONS.get(_name, 1) + 1
 
 
+# The interiors revision: every room's shell dressed before the furniture (skirting, pilasters, cornice, bordered
+# floors, cloth hangings, chimney breasts, headboards), the big keep floors cut into chambers with doors, the
+# treasury's gold in chests and a barred strongroom. The temple ruin has no rooms to furnish and keeps its blocks.
+for _fn, _name, _style, _shift in builds():
+    if _name != "temple_ruin":
+        REVISIONS[_name] = REVISIONS.get(_name, 1) + 1
+
+
 def build_plan(fn, name, style, seed_shift, strict=True):
     """One plan built, furnished, lit and audited as the export sees it. Returns (g, meta, kinds, audits).
     With strict, a plan that fails its limits stops the build; without, the failures are reported in audits."""

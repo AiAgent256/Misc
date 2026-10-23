@@ -58,7 +58,15 @@ public class StormholdGameTests {
             "watchtower_c2_r3", "great_city_r5", "canal_city_r5", "town_walled_r6", "town_cross_r5", "town_green_r5",
             "great_castle_d_r4", "great_castle_d2_r4", "holdfast_b_moat_r4", "holdfast_c_moat_r4",
             "great_castle_a_moat_r4", "great_castle_c_moat_r4", "lake_castle_r4", "lake_castle2_r4", "fortified_manor_r3",
-            "fortified_manor2_r3", "gatehouse_castle_r2", "gatehouse_castle2_r2", "hill_town_r2"};
+            "fortified_manor2_r3", "gatehouse_castle_r2", "gatehouse_castle2_r2", "hill_town_r2",
+            // the interiors revision: the rooms' shells dressed, the keep floors cut into chambers, cloth on the walls
+            "great_castle_a_r5", "great_castle_a2_r5", "great_castle_b_r5", "great_castle_b2_r5", "great_castle_c_r5",
+            "great_castle_c2_r5", "holdfast_a_r5", "holdfast_a2_r5", "holdfast_b_r5", "holdfast_b2_r5", "holdfast_c_r5",
+            "holdfast_c2_r5", "watchtower_a_r5", "watchtower_a2_r5", "watchtower_b_r4", "watchtower_b2_r4", "watchtower_c_r4",
+            "watchtower_c2_r4", "great_city_r6", "canal_city_r6", "town_walled_r7", "town_cross_r6", "town_green_r6",
+            "great_castle_d_r5", "great_castle_d2_r5", "holdfast_b_moat_r5", "holdfast_c_moat_r5",
+            "great_castle_a_moat_r5", "great_castle_c_moat_r5", "lake_castle_r5", "lake_castle2_r5", "fortified_manor_r4",
+            "fortified_manor2_r4", "gatehouse_castle_r3", "gatehouse_castle2_r3", "hill_town_r3"};
 
     @GameTest(template = "arena")
     public static void castleDataLoads(GameTestHelper g) {
@@ -79,7 +87,8 @@ public class StormholdGameTests {
                 "town_walled_r2", "town_cross_r2", "town_green_r2", "great_city_r2", "canal_city_r2",
                 "town_walled_r3", "town_cross_r3", "town_green_r3", "town_walled_r4", "town_cross_r4", "town_green_r4",
                 "great_city_r3", "canal_city_r3", "hill_town", "great_city_r5", "canal_city_r5", "town_walled_r6",
-                "town_cross_r5", "town_green_r5", "hill_town_r2"}) {
+                "town_cross_r5", "town_green_r5", "hill_town_r2", "great_city_r6", "canal_city_r6", "town_walled_r7",
+                "town_cross_r6", "town_green_r6", "hill_town_r3"}) {
             var lay = DataRegistries.layout(n);
             int shops = 0;
             java.util.Set<String> kinds = new java.util.HashSet<>();

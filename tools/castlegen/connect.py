@@ -110,10 +110,16 @@ def _covered(g, x, y, z, h=8):
     return any(not walk.passable(g.get(x, y + k, z)) for k in range(2, h))
 
 
+def _cornice(s):
+    """A piece of the room's shell a ladder may go through: the cornice stair, a hanging lantern, a chain."""
+    return ("stairs" in s and "half=top" in s) or "lantern" in s or "chain" in s
+
+
 def _ladder_wall(g, x, z, y0, y1):
-    """The side of (x, z) with a wall from y0 to y1 to hang a ladder on, as the ladder's facing; or None."""
+    """The side of (x, z) with a wall from y0 to y1 to hang a ladder on, as the ladder's facing; or None.
+    The shell's cornice stairs count as wall: they stand on the wall and a rung can hang from them."""
     for dx, dz, f in ((1, 0, "west"), (-1, 0, "east"), (0, 1, "north"), (0, -1, "south")):
-        if all(is_wall(g.get(x + dx, y, z + dz)) for y in range(y0, y1 + 1)):
+        if all(is_wall(g.get(x + dx, y, z + dz)) or _cornice(g.get(x + dx, y, z + dz)) for y in range(y0, y1 + 1)):
             return f
     return None
 
@@ -127,21 +133,21 @@ def _try_ladders(g, room, cells, protected, max_rungs=16):
             continue
         # up: the room's ceiling, one block thick, with reached floor on it
         yc = y + 2
-        while yc < g.Y - 2 and walk.passable(g.get(x, yc, z)) and yc - y < max_rungs:
+        while yc < g.Y - 2 and (walk.passable(g.get(x, yc, z)) or _cornice(g.get(x, yc, z))) and yc - y < max_rungs:
             yc += 1
         if yc - y < max_rungs and not walk.passable(g.get(x, yc, z)) and (x, yc + 1, z) in cells and is_wall(g.get(x, yc, z)):
-            if all(g.get(x, yy, z) == AIR for yy in range(y, yc)):
+            if all(g.get(x, yy, z) == AIR or _cornice(g.get(x, yy, z)) for yy in range(y, yc)):
                 f = _ladder_wall(g, x, z, y, yc)
                 if f and (best is None or yc - y < best[0]):
                     best = (yc - y, x, z, y, yc, f)
         # down: a reached floor under the room's floor
         yf = y - 1
         yb = yf - 1
-        while yb > 1 and walk.passable(g.get(x, yb, z)) and yf - yb < max_rungs:
+        while yb > 1 and (walk.passable(g.get(x, yb, z)) or _cornice(g.get(x, yb, z))) and yf - yb < max_rungs:
             yb -= 1
         ys = yb + 1                                  # standing level below
         if ys < yf and (x, ys, z) in cells and is_wall(g.get(x, yf, z)) and yf - ys < max_rungs:
-            if all(g.get(x, yy, z) == AIR for yy in range(ys, yf)):
+            if all(g.get(x, yy, z) == AIR or _cornice(g.get(x, yy, z)) for yy in range(ys, yf)):
                 f = _ladder_wall(g, x, z, ys, yf)
                 if f and (best is None or yf - ys < best[0]):
                     best = (yf - ys, x, z, ys, yf, f)

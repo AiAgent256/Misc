@@ -309,11 +309,11 @@ class Dresser:
         self.take(x, z)
 
     def bed(self, x, z, f, color):
-        """Foot against the wall at (x, z), head one cell into the room."""
+        """Head against the wall at (x, z), foot one cell into the room (so a headboard can stand on the wall)."""
         hx, hz = x + f[0], z + f[1]
         if not self.free(x, z) or not self.free(hx, hz):
             return False
-        self.g.bed(x, self.y, z, self.facing(f), color)
+        self.g.bed(hx, self.y, hz, self.facing((-f[0], -f[1])), color)
         self.take(x, z)
         self.take(hx, hz)
         return True
@@ -340,7 +340,7 @@ class Dresser:
             for (cx, cz) in cells:
                 for (dx, dz) in sides:
                     sx, sz = cx + dx, cz + dz
-                    if self.free(sx, sz, 1, ignore_used=ignore_used) and self.rng.random() < 0.75:
+                    if self.free(sx, sz, 1, ignore_used=ignore_used):      # benches run the table's length
                         self.g.stair(sx, self.y + dy, sz, "minecraft:dark_oak_stairs", self.facing((-dx, -dz)))
                         self.take(sx, sz)
         return True
@@ -478,7 +478,7 @@ class Dresser:
             return False
         hx, hz = x + f[0], z + f[1]
         if self.g.get(x, self.y + 1, z) == AIR and self.g.get(hx, self.y + 1, hz) == AIR and self.room.height >= 4:
-            self.g.bed(x, self.y + 1, z, self.facing(f), color)
+            self.g.bed(hx, self.y + 1, hz, self.facing((-f[0], -f[1])), color)
         return True
 
     def canopy_bed(self, x, z, f, color, canopy="minecraft:red_wool"):
@@ -604,6 +604,14 @@ class Dresser:
                     self.g.set(cx, self.y + 1, cz, "minecraft:polished_andesite_slab[type=bottom]")
             if self.g.get(x, self.y + 2, z) == AIR:
                 self.g.set(x, self.y + 2, z, f"minecraft:polished_andesite_stairs[facing={self.facing(f)},half=top]")
+            # the chimney breast, up to the ceiling, with a mantel shelf along its foot
+            for (cx, cz) in ((x, z), (sx, sz), (tx, tz)):
+                for h in range(3, self.room.height):
+                    if self.g.get(cx, self.y + h, cz) == AIR:
+                        self.g.set(cx, self.y + h, cz, "minecraft:polished_andesite")
+            for (cx, cz) in ((sx, sz), (tx, tz)):
+                if self.g.get(cx, self.y + 2, cz) == AIR:
+                    self.g.set(cx, self.y + 2, cz, f"minecraft:dark_oak_trapdoor[facing={self.facing(f)},half=top,open=false]")
             # keep the cell in front of the fire clear
             self.take(x + f[0], z + f[1])
             return True

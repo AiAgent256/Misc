@@ -7,28 +7,28 @@
  "theme": "stormlands",
  "layouts": [
   {
-   "name": "town_walled_r6",
+   "name": "town_walled_r7",
    "size_x": 100,
    "size_z": 100,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "town_cross_r5",
+   "name": "town_cross_r6",
    "size_x": 104,
    "size_z": 88,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "town_green_r5",
+   "name": "town_green_r6",
    "size_x": 96,
    "size_z": 96,
    "ground": 5,
    "weight": 1
   },
   {
-   "name": "hill_town_r2",
+   "name": "hill_town_r3",
    "size_x": 144,
    "size_z": 144,
    "ground": 5,
