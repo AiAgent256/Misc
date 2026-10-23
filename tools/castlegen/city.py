@@ -292,20 +292,7 @@ def market_square(g, x0, z0, x1, z1, GL, rng):
     g.fill(cx, GL - 1, cz, cx, GL + 3, cz, "minecraft:chiseled_stone_bricks")
     g.fill_mask(disk(g, cx, cz, 1.5), GL + 4, GL + 4, "minecraft:stone_brick_slab[type=bottom]")
     g.set(cx, GL + 5, cz, "minecraft:water")
-    # stalls in rows
-    cols = ["red", "yellow", "blue", "green", "white", "orange", "purple", "lime"]
-    i = 0
-    for sx in range(x0 + 4, x1 - 8, 12):
-        for sz in (z0 + 4, z1 - 8):
-            if abs(sx - cx) < 10:
-                continue
-            col = cols[i % len(cols)]
-            i += 1
-            for (x, z) in ((sx, sz), (sx + 5, sz), (sx, sz + 4), (sx + 5, sz + 4)):
-                g.fill(x, GL, z, x, GL + 2, z, "minecraft:spruce_fence")
-            g.fill(sx, GL + 3, sz, sx + 5, GL + 3, sz + 4, f"minecraft:{col}_wool")
-            g.fill(sx + 1, GL, sz + 1, sx + 4, GL, sz + 1, "minecraft:barrel[facing=up]")
-            g.set(sx + 2, GL, sz + 3, "minecraft:hay_block[axis=y]")
+    # the stalls are the stall clusters the city sets out on either side of the fountain
     for x in range(x0 + 6, x1 - 4, 14):
         lamp_post(g, x, z0 + 1, GL); lamp_post(g, x, z1 - 1, GL)
     # notice board on the north side of the fountain
@@ -746,7 +733,7 @@ def great_city(seed=77):
     market_square(g, 68, 168, 186, 194, GL, rng)
     arcade(g, 68, 168, 186, 170, GL, rng, "south", trades=["cloth", "general", "potter", "chandler"])
     arcade(g, 68, 192, 186, 194, GL, rng, "north", trades=["baker", "butcher", "general", "fish"])
-    stall_cluster(g, 72, 173, 110, 190, GL, rng, trades=["general", "fletcher", "farmer", "baker", "armoury"])
+    stall_cluster(g, 80, 173, 110, 190, GL, rng, trades=["general", "fletcher", "farmer", "baker", "armoury"])   # clear of the bell tower
     stall_cluster(g, 146, 173, 182, 190, GL, rng, trades=["fish", "weapons", "butcher", "apothecary", "general"])
     bell_tower(g, 70, 170, GL)
     barracks(g, 200, 170, 240, 192, GL, rng)

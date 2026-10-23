@@ -7,105 +7,105 @@
  "theme": "north",
  "layouts": [
   {
-   "name": "watchtower_a_r3",
+   "name": "watchtower_a_r4",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 3
   },
   {
-   "name": "watchtower_b_r2",
+   "name": "watchtower_b_r3",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 3
   },
   {
-   "name": "watchtower_c_r2",
+   "name": "watchtower_c_r3",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 3
   },
   {
-   "name": "watchtower_a2_r3",
+   "name": "watchtower_a2_r4",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 3
   },
   {
-   "name": "watchtower_b2_r2",
+   "name": "watchtower_b2_r3",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 3
   },
   {
-   "name": "watchtower_c2_r2",
+   "name": "watchtower_c2_r3",
    "size_x": 48,
    "size_z": 48,
    "ground": 4,
    "weight": 3
   },
   {
-   "name": "holdfast_a_r3",
+   "name": "holdfast_a_r4",
    "size_x": 80,
    "size_z": 80,
    "ground": 5,
    "weight": 3
   },
   {
-   "name": "holdfast_b_r3",
+   "name": "holdfast_b_r4",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 3
   },
   {
-   "name": "holdfast_c_r3",
+   "name": "holdfast_c_r4",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 3
   },
   {
-   "name": "holdfast_a2_r3",
+   "name": "holdfast_a2_r4",
    "size_x": 80,
    "size_z": 80,
    "ground": 5,
    "weight": 3
   },
   {
-   "name": "holdfast_b2_r3",
+   "name": "holdfast_b2_r4",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 3
   },
   {
-   "name": "holdfast_c2_r3",
+   "name": "holdfast_c2_r4",
    "size_x": 72,
    "size_z": 72,
    "ground": 5,
    "weight": 3
   },
   {
-   "name": "great_castle_a_r3",
+   "name": "great_castle_a_r4",
    "size_x": 128,
    "size_z": 128,
    "ground": 6,
    "weight": 1
   },
   {
-   "name": "great_castle_b_r3",
+   "name": "great_castle_b_r4",
    "size_x": 128,
    "size_z": 128,
    "ground": 6,
    "weight": 1
   },
   {
-   "name": "great_castle_c_r3",
+   "name": "great_castle_c_r4",
    "size_x": 160,
    "size_z": 112,
    "ground": 6,

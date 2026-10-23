@@ -402,6 +402,8 @@ public final class HouseGen {
                     Blocks.STONECUTTER, Blocks.LECTERN, Blocks.CAULDRON, Blocks.BARREL)).defaultBlockState());
             default -> place(s, x0, z0, x1, z1, door, back, work, pick(r, List.of(Blocks.CRAFTING_TABLE, Blocks.BARREL, Blocks.COMPOSTER)).defaultBlockState());
         }
+        // the stone's relief: a footing course, sills and hoods on the windows, a hood over the door
+        relief(level, s, x0, z0, x1, z1, y, floors, door, front, p, kind);
         // shutters on some windows, a flower box or two
         if (!p.flat && r.nextBoolean()) shutters(s, x0, z0, x1, z1, y, floors, p);
         // the garden: wheat in rows with a channel of water, fenced
@@ -413,6 +415,84 @@ public final class HouseGen {
         BoundingBox box = new BoundingBox(Math.min(x0, lot.x0()), y - 1, Math.min(z0, lot.z0()),
                 Math.max(x1, lot.x0() + lot.w() - 1), ridgeTop + 2, Math.max(z1, lot.z0() + lot.d() - 1));
         return new Built(box, step, beds, garden, n, stalls);
+    }
+
+    /** The stairs and the slab cut from a house's foundation stone. */
+    static Block stairOf(Block b) {
+        if (b == Blocks.COBBLESTONE) return Blocks.COBBLESTONE_STAIRS;
+        if (b == Blocks.POLISHED_DIORITE) return Blocks.POLISHED_DIORITE_STAIRS;
+        if (b == Blocks.SANDSTONE) return Blocks.SANDSTONE_STAIRS;
+        if (b == Blocks.COBBLED_DEEPSLATE) return Blocks.COBBLED_DEEPSLATE_STAIRS;
+        return Blocks.STONE_BRICK_STAIRS;
+    }
+
+    static Block slabOf(Block b) {
+        if (b == Blocks.COBBLESTONE) return Blocks.COBBLESTONE_SLAB;
+        if (b == Blocks.POLISHED_DIORITE) return Blocks.POLISHED_DIORITE_SLAB;
+        if (b == Blocks.SANDSTONE) return Blocks.SANDSTONE_SLAB;
+        if (b == Blocks.COBBLED_DEEPSLATE) return Blocks.COBBLED_DEEPSLATE_SLAB;
+        return Blocks.STONE_BRICK_SLAB;
+    }
+
+    /** Free to build in: nothing of the house's own there, and only air or plants in the world. */
+    private static boolean open(ServerLevel level, Slate s, BlockPos q) {
+        BlockState own = s.at(q.getX(), q.getY(), q.getZ());
+        if (own != null) return false;
+        BlockState w = level.getBlockState(q);
+        return w.isAir() || w.canBeReplaced() && w.getFluidState().isEmpty();
+    }
+
+    /** The side a wall cell of the box x0..x1, z0..z1 faces out on. */
+    private static Direction faceOf(int x, int z, int x0, int z0, int x1, int z1) {
+        if (z == z0) return Direction.NORTH;
+        if (z == z1) return Direction.SOUTH;
+        if (x == x0) return Direction.WEST;
+        return Direction.EAST;
+    }
+
+    /**
+     * The mason's relief on a house: a footing course of the foundation stone under a ground floor of plaster, brick
+     * or boards; under every window above the ground floor a stone sill, over every window a hood, a hood over the
+     * door. All of it a block out from the wall and above a man's head but the footing, which is the wall's own
+     * lowest course.
+     */
+    private static void relief(ServerLevel level, Slate s, int x0, int z0, int x1, int z1, int y, int floors, BlockPos door,
+                               Direction front, Palette p, Kind kind) {
+        Block sill = stairOf(p.foundation), hood = slabOf(p.foundation);
+        BlockState hoodTop = hood.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.TOP);
+        if (p.lower != p.foundation && !p.flat) {
+            for (int x = x0; x <= x1; x++) {
+                for (int z = z0; z <= z1; z++) {
+                    boolean edge = x == x0 || x == x1 || z == z0 || z == z1;
+                    if (!edge) continue;
+                    BlockState at = s.at(x, y + 1, z);
+                    if (at != null && at.is(p.lower)) s.put(x, y + 1, z, p.foundation);
+                }
+            }
+        }
+        for (int x = x0; x <= x1; x++) {
+            for (int z = z0; z <= z1; z++) {
+                boolean edge = x == x0 || x == x1 || z == z0 || z == z1;
+                boolean corner = (x == x0 || x == x1) && (z == z0 || z == z1);
+                if (!edge || corner) continue;
+                Direction out = faceOf(x, z, x0, z0, x1, z1);
+                for (int f = 0; f < floors; f++) {
+                    int base = y + 4 * f;
+                    BlockState lo = s.at(x, base + 2, z);
+                    if (lo == null || !lo.is(Blocks.GLASS_PANE)) continue;
+                    BlockState hi = s.at(x, base + 3, z);
+                    int top = hi != null && hi.is(Blocks.GLASS_PANE) ? base + 3 : base + 2;
+                    BlockPos under = new BlockPos(x, base + 1, z).relative(out), over = new BlockPos(x, top + 1, z).relative(out);
+                    if (f > 0 && open(level, s, under))
+                        s.put(under, sill.defaultBlockState().setValue(StairBlock.FACING, out.getOpposite()).setValue(StairBlock.HALF, Half.TOP));
+                    if (open(level, s, over) && open(level, s, over.above())) s.put(over, hoodTop);
+                }
+            }
+        }
+        if (kind != Kind.STABLE && kind != Kind.SMITHY) {
+            BlockPos over = door.above(2).relative(front);
+            if (open(level, s, over)) s.put(over, sill.defaultBlockState().setValue(StairBlock.FACING, front.getOpposite()).setValue(StairBlock.HALF, Half.TOP));
+        }
     }
 
     /** Something solid set at this cell already? */
@@ -695,8 +775,25 @@ public final class HouseGen {
 
     // ------------------------------------------------------------ a market stall
 
+    /** The wood slab that goes with a fence of the same wood. */
+    private static Block woodSlab(Block fence) {
+        if (fence == Blocks.DARK_OAK_FENCE) return Blocks.DARK_OAK_SLAB;
+        if (fence == Blocks.OAK_FENCE) return Blocks.OAK_SLAB;
+        if (fence == Blocks.ACACIA_FENCE) return Blocks.ACACIA_SLAB;
+        return Blocks.SPRUCE_SLAB;
+    }
+
+    private static final List<Block> STALL_GOODS = List.of(Blocks.DECORATED_POT, Blocks.FLOWER_POT, Blocks.POTTED_POPPY, Blocks.CANDLE,
+            Blocks.CAKE, Blocks.POTTED_OXEYE_DAISY, Blocks.LANTERN);
+    private static final List<Block> STALL_STOCK = List.of(Blocks.BARREL, Blocks.HAY_BLOCK, Blocks.BARREL, Blocks.COMPOSTER, Blocks.MELON,
+            Blocks.PUMPKIN);
+
+    /**
+     * A market stall at the street edge of its lot: posts at the corners, the back ones a block taller; a striped
+     * canopy stepping down to the street; a board counter along the front with small goods set out on it; stock and
+     * a curtain of the stall's colour at the back; a lantern hung over the stallholder.
+     */
     private static Built stall(ServerLevel level, Lot lot, Palette p, RandomSource r, Slate s) {
-        // up to five along the street and four back, at the street edge of the lot, in the middle of its frontage
         Direction f = lot.front();
         boolean alongX = f.getAxis() == Direction.Axis.Z;
         int along = alongX ? lot.w() : lot.d(), deep = alongX ? lot.d() : lot.w();
@@ -714,7 +811,10 @@ public final class HouseGen {
             x1 = x0 + sd - 1;
         }
         int y = lot.y();
-        Block wool = pick(r, List.of(Blocks.RED_WOOL, Blocks.YELLOW_WOOL, Blocks.BLUE_WOOL, Blocks.GREEN_WOOL, Blocks.WHITE_WOOL, Blocks.ORANGE_WOOL));
+        Block wool = pick(r, List.of(Blocks.RED_WOOL, Blocks.YELLOW_WOOL, Blocks.BLUE_WOOL, Blocks.GREEN_WOOL, Blocks.ORANGE_WOOL,
+                Blocks.LIME_WOOL, Blocks.PURPLE_WOOL, Blocks.CYAN_WOOL));
+        Block slab = woodSlab(p.fence);
+        BlockState counter = slab.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.TOP);
         for (int x = x0; x <= x1; x++) {
             for (int z = z0; z <= z1; z++) {
                 s.put(x, y, z, p.floor);
@@ -723,20 +823,46 @@ public final class HouseGen {
                     if (!below.isAir() && below.getFluidState().isEmpty() && !below.canBeReplaced()) break;
                     s.put(x, y - k, z, p.foundation);
                 }
-                boolean corner = (x == x0 || x == x1) && (z == z0 || z == z1);
-                for (int h = 1; h <= 2; h++) s.put(x, y + h, z, corner ? p.fence.defaultBlockState() : Blocks.AIR.defaultBlockState());
-                s.put(x, y + 3, z, ((x + z) % 2 == 0 ? wool : Blocks.WHITE_WOOL).defaultBlockState());
+                // which row from the street: 0 the counter's, the last the back
+                int row = switch (f) {
+                    case NORTH -> z - z0;
+                    case SOUTH -> z1 - z;
+                    case WEST -> x - x0;
+                    default -> x1 - x;
+                };
+                int across = alongX ? x - x0 : z - z0;
+                boolean side = across == 0 || across == sw - 1;
+                boolean backRow = row == sd - 1;
+                Block stripe = across % 2 == 1 ? wool : Blocks.WHITE_WOOL;
+                for (int h = 1; h <= 4; h++) s.put(x, y + h, z, Blocks.AIR.defaultBlockState());
+                if (side && (row == 0 || backRow)) {
+                    // a post: the back ones carry the canopy a block higher
+                    int ph = backRow ? 3 : 2;
+                    for (int h = 1; h <= ph; h++) s.put(x, y + h, z, p.fence.defaultBlockState());
+                    s.put(x, y + ph + 1, z, slab.defaultBlockState());
+                    continue;
+                }
+                if (row == 0) {
+                    s.put(x, y + 3, z, stripe.defaultBlockState());
+                    if (!side) {
+                        s.put(x, y + 1, z, counter);
+                        if (r.nextInt(5) < 4) s.put(x, y + 2, z, pick(r, STALL_GOODS).defaultBlockState());
+                    }
+                } else {
+                    s.put(x, y + 4, z, stripe.defaultBlockState());
+                    if (backRow && !side) {
+                        s.put(x, y + 1, z, pick(r, STALL_STOCK).defaultBlockState());
+                        s.put(x, y + 3, z, wool.defaultBlockState());
+                    }
+                }
             }
         }
-        // the counter along the street side
-        for (int x = x0 + 1; x < x1; x++) {
-            for (int z = z0 + 1; z < z1; z++) {
-                if (onSide(x, z, x0 + 1, z0 + 1, x1 - 1, z1 - 1, f)) s.put(x, y + 1, z, Blocks.BARREL.defaultBlockState());
-            }
-        }
+        // the lantern over the stallholder's place, in the middle of the second row
+        BlockPos mid = doorCell(x0, z0, x1, z1, y + 3, f, sw / 2).relative(f.getOpposite());
+        s.put(mid, Blocks.LANTERN.defaultBlockState().setValue(LanternBlock.HANGING, true));
         int n = s.flush(level);
         BlockPos front = doorCell(x0, z0, x1, z1, y + 1, f, 1).relative(f);
-        return new Built(new BoundingBox(x0, y - 1, z0, x1, y + 4, z1), front, List.of(), null, n, List.of());
+        return new Built(new BoundingBox(x0, y - 1, z0, x1, y + 5, z1), front, List.of(), null, n, List.of());
     }
 
     private HouseGen() {

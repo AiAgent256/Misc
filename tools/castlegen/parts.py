@@ -618,6 +618,10 @@ def building(g, x0, z0, x1, z1, GL, wall_h, axis, door_cells=(), upper_floor=Non
             g.set(lx, GL + 2, lz, f"minecraft:wall_torch[facing={f}]")
     if upper_floor:
         g.fill(x0 + 1, upper_floor, z0 + 1, x1 - 1, upper_floor, z1 - 1, PLANK)
+        avoid = {(x - (1 if x == x1 else -1 if x == x0 else 0), z - (1 if z == z1 else -1 if z == z0 else 0)) for (x, z) in door_cells}
+        if chimney:
+            avoid.add(tuple(chimney))
+        inside_flight(g, x0 + 1, z0 + 1, x1 - 1, z1 - 1, GL, upper_floor, avoid)
     top = gable_roof(g, x0, z0, x1, z1, GL + wall_h, axis, roof or ROOF_STAIR, wall_block)
     if chimney:
         cx, cz = chimney
@@ -632,6 +636,60 @@ def building(g, x0, z0, x1, z1, GL, wall_h, axis, door_cells=(), upper_floor=Non
             if upper_floor:
                 g.lantern(x, GL + wall_h - 1, z)
     return (x0 + 1, z0 + 1, x1 - 1, z1 - 1)
+
+
+def inside_flight(g, ix0, iz0, ix1, iz1, GL, floor_y, avoid=()):
+    """A straight stair along an inside wall of the room ix0..ix1, iz0..iz1 from the ground floor (standing GL) up
+    through a hatch to the floor at floor_y. Two wide where the room has the depth, one where it hasn't (a house
+    stair, let off the castles' rule). Steps rise a block a cell; the run hugs a wall, starting at a corner, and keeps
+    clear of the door mouths and the chimney in `avoid`. The cells it takes are locked for the rest of the build.
+    Returns them, or an empty set when no wall has the length."""
+    n = floor_y - GL + 1                              # steps; the last is in the floor
+    AIR_ = "minecraft:air"
+    for width in (2, 1):
+        runs = []
+        for (row, along, inward) in ((iz0, "x", 1), (iz1, "x", -1), (ix0, "z", 1), (ix1, "z", -1)):
+            lo, hi = (ix0, ix1) if along == "x" else (iz0, iz1)
+            depth = (iz1 - iz0 + 1) if along == "x" else (ix1 - ix0 + 1)
+            if hi - lo + 1 < n + 1 or depth < width + 2:
+                continue
+            for start, step in ((lo, 1), (hi, -1)):
+                lanes = []
+                for w in range(width):
+                    r = row + w * inward
+                    lanes.append([(start + k * step, r) if along == "x" else (r, start + k * step) for k in range(n)])
+                r = row + width * inward
+                side = [(start + k * step, r) if along == "x" else (r, start + k * step) for k in range(n)]
+                facing = ("east" if step > 0 else "west") if along == "x" else ("south" if step > 0 else "north")
+                runs.append((lanes, side, facing))
+        for lanes, side, facing in runs:
+            if any(c in avoid for lane in lanes for c in lane) or any(s_ in avoid for s_ in side):
+                continue
+            need = []
+            for lane in lanes:
+                for k, (x, z) in enumerate(lane):
+                    need += [(x, y, z) for y in range(GL + k, min(GL + k + 4, floor_y))] + \
+                            ([(x, y, z) for y in range(floor_y + 1, GL + k + 3)] if GL + k + 2 > floor_y else [])
+            need += [(side[0][0], GL + h, side[0][1]) for h in range(3)]
+            need += [(side[-1][0], floor_y + 1 + h, side[-1][1]) for h in range(2)]
+            if not all(g.get(*c) == AIR_ for c in need):
+                continue
+            taken = set(need)
+            for lane in lanes:
+                for k, (x, z) in enumerate(lane):
+                    g.stair(x, GL + k, z, "minecraft:spruce_stairs", facing)
+                    taken.add((x, GL + k, z))
+                    if n - 4 <= k < n - 1:
+                        g.set(x, floor_y, z, AIR_)           # the hatch: head room over the top of the flight
+                        taken.add((x, floor_y, z))
+            for (x, z) in side:
+                taken |= {(x, GL, z), (x, GL + 1, z), (x, floor_y + 1, z), (x, floor_y + 2, z)}
+            g.lock(taken)
+            g.protected_xz = getattr(g, "protected_xz", set()) | {(x, z) for (x, _, z) in taken}
+            if width == 1:
+                g.narrow_ok = getattr(g, "narrow_ok", set()) | {c for lane in lanes for c in lane}
+            return taken
+    return set()
 
 
 def lamp_post(g, x, z, GL, h=3):

@@ -237,9 +237,11 @@ def tithe_barn(g, x0, z0, x1, z1, GL, rng, door="south"):
                 g.set(x, GL, z, "minecraft:hay_block[axis=y]")
                 if (x + z) % 3 == 0:
                     g.set(x, GL + 1, z, "minecraft:hay_block[axis=y]")
-    g.barrel(x0 + 1, GL, cz, LOOT + "castle_granary"); g.barrel(x1 - 1, GL, cz, LOOT + "castle_granary")
-    g.barrel(x0 + 1, GL + 1, cz, LOOT + "castle_granary")
-    g.chest(x1 - 1, GL, cz + 1, "west", LOOT + "castle_store")
+    # the granary barrels and the store chest stand off the door's mouth
+    bz = cz + 2 if door in ("west", "east") else cz
+    g.barrel(x0 + 1, GL, bz, LOOT + "castle_granary"); g.barrel(x1 - 1, GL, bz, LOOT + "castle_granary")
+    g.barrel(x0 + 1, GL + 1, bz, LOOT + "castle_granary")
+    g.chest(x1 - 1, GL, bz + 1, "west", LOOT + "castle_store")
 
 
 BOARD_SIGNS = (("Shops",), ("Houses", "for sale"), ("NOTICE", "BOARD", "", "Right-click"), ("Work", "for hire"), ("Ask the", "reeve"))
@@ -395,11 +397,12 @@ def _framed(fn):
 
     @functools.wraps(fn)
     def build(seed=fn.__defaults__[0]):
+        was = _town.FACADES
         _town.FACADES = True
         try:
             return fn(seed)
         finally:
-            _town.FACADES = False
+            _town.FACADES = was
     build.__defaults__ = fn.__defaults__
     return build
 
@@ -476,7 +479,7 @@ def town_cross(seed=302):
     for z in range(6, 84, 12):
         lamp_post(g, 47, z, GL); lamp_post(g, 56, z, GL)
     for x in range(6, 100, 14):
-        lamp_post(g, x, 39, GL)
+        lamp_post(g, x, 41, GL)                 # on the street, clear of the shop doors and the jetties over them
     toll_gate(g, 48, 55, 2, GL)
     for (x, z) in ((51, 10), (51, 76), (12, 43), (90, 43), (40, 44), (62, 44)):
         g.mark("knight", x, GL, z)

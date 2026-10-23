@@ -10,7 +10,9 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CampfireBlock;
 import net.minecraft.world.level.block.LadderBlock;
 import net.minecraft.world.level.block.LanternBlock;
+import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Half;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import org.jetbrains.annotations.Nullable;
@@ -42,17 +44,18 @@ final class Fortify {
     /** Archers' posts for the stage being built, added to the castle's when it's finished. Not saved: a restart replans. */
     private static final Map<UUID, List<BlockPos>> POSTS = new HashMap<>();
 
-    record Stone(Block block, Block slab) {
+    record Stone(Block block, Block slab, Block stair) {
     }
 
     static Stone stone(Holding h) {
-        if (h.isNether()) return new Stone(Blocks.POLISHED_BLACKSTONE_BRICKS, Blocks.POLISHED_BLACKSTONE_BRICK_SLAB);
+        if (h.isNether())
+            return new Stone(Blocks.POLISHED_BLACKSTONE_BRICKS, Blocks.POLISHED_BLACKSTONE_BRICK_SLAB, Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS);
         return switch (h.theme == null ? "north" : h.theme) {
-            case "dorne" -> new Stone(Blocks.CUT_SANDSTONE, Blocks.SMOOTH_SANDSTONE_SLAB);
-            case "reach" -> new Stone(Blocks.POLISHED_DIORITE, Blocks.POLISHED_DIORITE_SLAB);
-            case "stormlands" -> new Stone(Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICK_SLAB);
-            case "nether" -> new Stone(Blocks.POLISHED_BLACKSTONE_BRICKS, Blocks.POLISHED_BLACKSTONE_BRICK_SLAB);
-            default -> new Stone(Blocks.STONE_BRICKS, Blocks.STONE_BRICK_SLAB);
+            case "dorne" -> new Stone(Blocks.CUT_SANDSTONE, Blocks.SMOOTH_SANDSTONE_SLAB, Blocks.SMOOTH_SANDSTONE_STAIRS);
+            case "reach" -> new Stone(Blocks.POLISHED_DIORITE, Blocks.POLISHED_DIORITE_SLAB, Blocks.POLISHED_DIORITE_STAIRS);
+            case "stormlands" -> new Stone(Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_BRICK_SLAB, Blocks.DEEPSLATE_BRICK_STAIRS);
+            case "nether" -> new Stone(Blocks.POLISHED_BLACKSTONE_BRICKS, Blocks.POLISHED_BLACKSTONE_BRICK_SLAB, Blocks.POLISHED_BLACKSTONE_BRICK_STAIRS);
+            default -> new Stone(Blocks.STONE_BRICKS, Blocks.STONE_BRICK_SLAB, Blocks.STONE_BRICK_STAIRS);
         };
     }
 
@@ -71,7 +74,7 @@ final class Fortify {
     /** Can the works take this block: open air, the land, growing things, the palisade, or what they've set already. */
     static boolean takes(BlockState s, Stone st) {
         return s.isAir() || s.canBeReplaced() || Builder.natural(s) || s.is(BlockTags.LOGS) || s.is(BlockTags.LEAVES) || s.is(BlockTags.FENCES)
-                || s.is(Blocks.POINTED_DRIPSTONE) || s.is(st.block()) || s.is(st.slab()) || s.is(Blocks.LADDER);
+                || s.is(Blocks.POINTED_DRIPSTONE) || s.is(st.block()) || s.is(st.slab()) || s.is(st.stair()) || s.is(Blocks.LADDER);
     }
 
     /** Is the column the town's, or a fief building's? The works keep off it. */
@@ -263,6 +266,24 @@ final class Fortify {
                 if (edge) set(q, new BlockPos(x, top + 1, z), Math.floorMod(x + z, 2) == 0 ? st.block().defaultBlockState() : Blocks.AIR.defaultBlockState());
             }
         }
+        // the mason's relief: a battered foot stepping out from the base, a corbel course under the merlons
+        Direction gate = out(h);
+        for (int i = -2; i <= 2; i++) {
+            for (Direction side : new Direction[]{Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST}) {
+                int x = side == Direction.WEST ? cx - 3 : side == Direction.EAST ? cx + 3 : cx + i;
+                int z = side == Direction.NORTH ? cz - 3 : side == Direction.SOUTH ? cz + 3 : cz + i;
+                if (!level.isLoaded(new BlockPos(x, 64, z)) || someones(h, x, z) || Builder.onCauseway(h, x, z, gate == null ? 9 : 11)) continue;
+                if (x == cx - sx * 3 && z == cz) continue;                     // the door's step
+                Direction in = side.getOpposite();
+                int gy = ground(level, x, z);
+                BlockPos foot = new BlockPos(x, gy + 1, z);
+                if (gy + 1 <= base + 1 && takes(level.getBlockState(foot), st) && !level.getBlockState(foot.below()).isAir())
+                    set(q, foot, st.stair().defaultBlockState().setValue(StairBlock.FACING, in).setValue(StairBlock.HALF, Half.BOTTOM));
+                BlockPos corbel = new BlockPos(x, top - 1, z);
+                if (Math.floorMod(i, 2) == 0 && takes(level.getBlockState(corbel), st))
+                    set(q, corbel, st.stair().defaultBlockState().setValue(StairBlock.FACING, in).setValue(StairBlock.HALF, Half.TOP));
+            }
+        }
         // the door, toward the castle; the ladder against the far wall, through a hole in the platform
         for (int y = base + 1; y <= base + 2; y++) set(q, new BlockPos(cx - sx * 2, y, cz), Blocks.AIR.defaultBlockState());
         BlockState ladder = Blocks.LADDER.defaultBlockState().setValue(LadderBlock.FACING, sx > 0 ? Direction.WEST : Direction.EAST);
@@ -329,6 +350,17 @@ final class Fortify {
                         boolean merlon = Math.floorMod(x + z, 2) == 0;
                         for (int y = g + 6; y <= g + 7; y++)
                             set(q, new BlockPos(x, y, z), merlon ? st.block().defaultBlockState() : Blocks.AIR.defaultBlockState());
+                        // the battered foot outside, off the corners, the road and anyone's ground
+                        boolean corner = (x == r[0] || x == r[2]) && (z == r[1] || z == r[3]);
+                        Direction o = outward(h, x, z);
+                        int fx = x + o.getStepX(), fz = z + o.getStepZ();
+                        if (!corner && level.isLoaded(new BlockPos(fx, 64, fz)) && !someones(h, fx, fz)
+                                && !Builder.onCauseway(h, fx, fz, gate == null ? 9 : 11)) {
+                            int fg = ground(level, fx, fz);
+                            BlockPos foot = new BlockPos(fx, fg + 1, fz);
+                            if (fg <= g && takes(level.getBlockState(foot), st) && !level.getBlockState(foot.below()).isAir())
+                                set(q, foot, st.stair().defaultBlockState().setValue(StairBlock.FACING, o.getOpposite()).setValue(StairBlock.HALF, Half.BOTTOM));
+                        }
                     } else {
                         if (++n % 6 == 0) posts.add(new BlockPos(x, g + 6, z));
                         // a ladder up the inside every twenty blocks

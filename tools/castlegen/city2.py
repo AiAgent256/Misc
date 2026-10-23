@@ -9,7 +9,7 @@ from parts import (STONE, DARK, FOUND, PAVE, ROAD, FLOOR_STONE, ROOF, STONE_STAI
                    curtain, side_grids, posts_on_walk, round_tower, square_tower, pointed_arch, building, lamp_post)
 from castle import portcullis_plane, bartizan
 from castle2 import portcullis_plane_x, parapet_rect
-from town import dense_block, terrace, arcade, stall_cluster
+from town import dense_block, terrace, arcade, stall_cluster, stall_row
 from city import (LOOT, AIR, SQUARE, NOBLE, carve, row_x, row_z, tree_oak, great_sept, barracks, inn, market_square,
                   keep, ring_tower, grand_stair, statue_plinth, lighthouse, bell_tower, dragonpit)
 
@@ -236,7 +236,10 @@ def canal_city(seed=91):
     arcade(g, 68, 192, 108, 194, GL, rng, "north", trades=["baker", "butcher", "general"])
     arcade(g, 147, 168, 186, 170, GL, rng, "south", trades=["chandler", "cloth", "general"])
     arcade(g, 147, 192, 186, 194, GL, rng, "north", trades=["fish", "general", "fish"])
-    stall_cluster(g, 72, 173, 106, 190, GL, rng, trades=["general", "fletcher", "farmer", "baker", "armoury"])
+    stall_cluster(g, 80, 173, 106, 190, GL, rng, trades=["general", "fletcher", "farmer", "baker", "armoury"])   # clear of the bell tower
+    # and a row each side of the fountain in the east square, under the arcade
+    stall_row(g, 150, 158, 172, GL, rng, "south", trades=["fish", "general"])
+    stall_row(g, 174, 182, 172, GL, rng, "south", trades=["potter", "farmer"])
     bell_tower(g, 70, 170, GL)
     barracks(g, 200, 170, 240, 192, GL, rng)
     # the harbour quarter: taverns and fishmongers stacked over the quay street, warehouses on the canal

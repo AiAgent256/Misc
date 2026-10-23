@@ -45,6 +45,10 @@ def audit(g, meta, cells=None):
         if "stairs" in below and "half=bottom" in below:
             if (x, z) in spiral:
                 continue                    # spirals are two wide by construction, bar their corners
+            if (x, z) in getattr(g, "narrow_ok", ()):
+                continue                    # a house's stair, one wide as a house's is
+            if any(bx0 <= x <= bx1 and by0 <= y - 1 <= by1 and bz0 <= z <= bz1 for (bx0, by0, bz0, bx1, by1, bz1) in getattr(g, "roof_boxes", ())):
+                continue                    # a roof's slope, walked from a wall-walk: not a stair
             # part of a flight at all? a lone stair block is a chair or a sill, not a step
             flight = any("stairs" in g.get(x + dx, yy, z + dz) and (x + dx, yy + 1, z + dz) in cells
                          for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)) for yy in (y - 2, y))
@@ -73,6 +77,9 @@ def audit(g, meta, cells=None):
     nset = set(narrow)
     pinches, alleys = [], []
     for (x, y, z) in narrow:
+        here = g.get(x, y, z)
+        if "_door[" in here and "trapdoor" not in here:
+            continue                        # a hung door is one leaf wide by design, not a gap the widener missed
         ahead = ((0, 1), (0, -1)) if narrow_axis[(x, y, z)] == "x" else ((1, 0), (-1, 0))
         ends = 0
         for dx, dz in ahead:

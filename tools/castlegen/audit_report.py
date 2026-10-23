@@ -52,32 +52,40 @@ def build(audit_dir):
                     f"<td>{s['rooms']}</td><td class='{'bad' if s['unreachable'] else ''}'>{s['unreachable']}</td>"
                     f"<td class='{'bad' if s['upper_dead'] else ''}'>{s['upper_dead']} of {s['upper']}</td>"
                     f"<td>{s['purpose']}</td><td>{s['doors']}</td><td class='{'bad' if r.get('sealed_yards') else ''}'>{', '.join(str(y[0]) for y in r.get('sealed_yards', [])[:3]) or ''}</td>"
-                    f"<td>{100 * s['lanes'] // max(1, s['ground'])}%</td>"
+                    f"<td>{100 * s['lanes'] // max(1, s['ground'])}%</td><td>{sum(v for k, v in r['kinds'].items() if k.startswith('relief_'))}</td>"
                     f"<td>{r['walk_checked']}</td><td>{'' if not r['failures'] else 'yes'}</td></tr>")
+        def pub_(p):
+            if p.endswith(".jpg"):
+                import shutil
+                shutil.copyfile(os.path.join(audit_dir, p), os.path.join(pub, p))
+            else:
+                shrink(os.path.join(audit_dir, p), os.path.join(pub, p))
+            files[f"img/{p}"] = os.path.join(pub, p)
+        eyes = []
+        for cap, p in r["pics"].get("eye", []):
+            pub_(p)
+            eyes.append(f"<figure class='eye'><img src='img/{p}' alt='{html.escape(name + ': ' + cap)}' loading='lazy'><figcaption>{html.escape(cap)}</figcaption></figure>")
         imgs = []
         for p in r["pics"]["iso"]:
-            shrink(os.path.join(audit_dir, p), os.path.join(pub, p))
-            files[f"img/{p}"] = os.path.join(pub, p)
-            imgs.append(f"<figure><img src='img/{p}' alt='{name} from outside' loading='lazy'><figcaption>Outside</figcaption></figure>")
+            pub_(p)
+            imgs.append(f"<figure><img src='img/{p}' alt='{name} from outside' loading='lazy'><figcaption>The whole plan, from the south-east</figcaption></figure>")
         cuts = []
         for lvl, p in r["pics"]["cut"]:
-            shrink(os.path.join(audit_dir, p), os.path.join(pub, p))
-            files[f"img/{p}"] = os.path.join(pub, p)
+            pub_(p)
             cuts.append(f"<figure><img src='img/{p}' alt='{name} cut at floor {lvl}' loading='lazy'><figcaption>Cut away above floor +{lvl}</figcaption></figure>")
         floors = []
         fl = list(r["pics"]["floor"])
-        keep = [f for f in fl if f[0] == 0] + sorted([f for f in fl if f[0] != 0 and f[2] >= 2], key=lambda f: -f[2])[:9]
+        keep = [f for f in fl if f[0] == 0] + sorted([f for f in fl if f[0] != 0 and f[2] >= 2], key=lambda f: -f[2])[:3]
         keep.sort(key=lambda f: f[0])
         for lvl, p, n in keep:
-            shrink(os.path.join(audit_dir, p), os.path.join(pub, p))
-            files[f"img/{p}"] = os.path.join(pub, p)
+            pub_(p)
             floors.append(f"<figure><img src='img/{p}' alt='{name} floor {lvl}' loading='lazy'><figcaption>Floor +{lvl}: {n} rooms</figcaption></figure>")
         probs = Counter(p[0] for p in r["problems"])
         plist = "".join(f"<li><b>{k}</b> {v}</li>" for k, v in probs.most_common())
         detail = "".join(f"<li>{html.escape(p[0])}: {html.escape(p[1])}</li>" for p in r["problems"][:40])
         doors = "".join(f"<li>{html.escape(d[0])} at {d[1]} ({d[2]})</li>" for d in r["doors"][:12])
         kinds = r["kinds"]
-        rk = ", ".join(f"{k} {v}" for k, v in sorted(kinds.items()) if k not in ("beds", "men", "lips", "machicolations", "loops", "lit", "doorways_widened", "crypt_len", "crypt_skulls", "crypt_tombs"))
+        rk = ", ".join(f"{k} {v}" for k, v in sorted(kinds.items()) if k not in ("beds", "men", "lips", "machicolations", "loops", "lit", "doorways_widened", "crypt_len", "crypt_skulls", "crypt_tombs", "joined", "yards", "mouths") and not k.startswith("relief_"))
         d = r["defence"]
         dline = "" if not d else f"Bowmen's posts {d['posts']}, on one-wide walks {d['one_wide']}, two-wide {d['two_wide']}; walls' foot seen {d['cover'] * 100:.0f}%, field {d['field'] * 100:.0f}%, blind posts {d['blind']}."
         fails = "".join(f"<li>{html.escape(f)}</li>" for f in r["failures"])
@@ -85,9 +93,13 @@ def build(audit_dir):
 <section id='{name}' class='plan'>
 <h2>{name} <span class='kind'>{kind}{' tier ' + str(r['tier']) if r['tier'] else ''}, {r['character']}</span></h2>
 <p class='meta'>{r['size'][0]} by {r['size'][2]} blocks, {r['size'][1]} high. Beds {kinds.get('beds', 0)} for {kinds.get('men', 0)} men. Rooms dressed: {rk}.</p>
+<p class='meta'>Relief: {', '.join(f"{v} {k[7:]}" for k, v in sorted(kinds.items()) if k.startswith('relief_') and v) or 'none'}. Ways in added after the furniture: {kinds.get('joined', 0)} rooms, {kinds.get('yards', 0)} yards; {kinds.get('mouths', 0)} pieces of furniture taken out of doorways.</p>
 <p class='meta'>Walk from the gate: {r['walk_checked']} posts checked, {sum(len(v) for v in r['walk_bad'].values())} unreachable. {s['lanes']} of {s['ground']} outdoor ground cells ({100 * s['lanes'] // max(1, s['ground'])}%) are one-wide lanes. {dline}</p>
 {('<p class="meta">Sealed open ground inside the walls: ' + ', '.join(f"{y[0]} cells around ({y[1]}, {y[2]})" for y in r.get('sealed_yards', [])) + '.</p>') if r.get('sealed_yards') else ''}
 {('<ul class="fail">' + fails + '</ul>') if fails else ''}
+<h3>At a man's eye</h3>
+<div class='gallery eyes'>{''.join(eyes)}</div>
+<h3>From above, and cut open</h3>
 <div class='gallery'>{''.join(imgs)}{''.join(cuts)}</div>
 <h3>Floors</h3>
 <p class='legend'><span class='sw ok'></span> floor a soldier can reach from the gate <span class='sw no'></span> floor he can't <span class='sw mk'></span> a post (knight, archer, lord, shop)</p>
@@ -121,6 +133,8 @@ def build(audit_dir):
         if n in data and data[n].get("sealed_yards"):
             yards.append(f"{n} {', '.join(str(y[0]) for y in data[n]['sealed_yards'][:3])} cells")
     yard_text = "; ".join(yards) or "none"
+    BEFORE = {"town_unreach": 709, "castle_unreach": 180, "yards": 36, "doors": 85}
+    relief_total = sum(v for r in data.values() for k, v in r["kinds"].items() if k.startswith("relief_"))
     page = f"""<title>Stormhold Walkpath Audit</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;600&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono&display=swap">
@@ -150,6 +164,8 @@ section.plan {{ border-top:1px solid var(--line); padding-top:20px; margin-top:2
 .gallery {{ display:flex; flex-wrap:wrap; gap:12px; }}
 figure {{ margin:0; flex:1 1 340px; min-width:0; max-width:560px; }}
 .floors figure {{ flex:1 1 420px; max-width:620px; }}
+.eyes figure {{ flex:1 1 460px; max-width:580px; }}
+.eyes img {{ image-rendering:auto; }}
 figure img {{ width:100%; height:auto; border:1px solid var(--line); background:#d4dde8; image-rendering:pixelated; }}
 figcaption {{ font-size:.8rem; color:var(--mute); margin-top:4px; }}
 .legend {{ font-size:.82rem; color:var(--mute); }}
@@ -165,21 +181,21 @@ a {{ color:var(--acc); }}
 </style>
 <main>
 <h1>Stormhold Walkpath Audit</h1>
-<p class='lead'>Every plan the generator builds, as it reaches the world: walked from the gate by the same rules the soldiers' pathfinder uses, every room checked for a way in, a purpose, furniture and light, every door for a wall behind it, every market lane for width. Pictures are the generator's own output, cut open floor by floor.</p>
+<p class='lead'>Every plan the generator builds, as it reaches the world: walked from the gate by the same rules the soldiers' pathfinder uses, every room checked for a way in, a purpose, furniture and light, every door for a wall behind it, every market lane for width. The pictures are drawn from the game's own block models and textures: at a man's eye from the road, inside the gate and in the rooms, then the whole plan from above and cut open floor by floor.</p>
 <div class='findings'>
-<h3>What the audit found</h3>
+<h3>What changed since the first audit</h3>
 <ul>
-<li><b>Upstairs is sealed in nearly every town and city house.</b> {towns['unreach_upper']} of {towns['upper']} upper rooms in the towns and cities have no stair or ladder from the floor below: the townhouse generator lays plank floors between storeys and never cuts a way up. {towns['bedrooms']} of those are lodgings with beds nobody can sleep in. The castles have the same fault in {castles['unreach_upper']} upper rooms, mostly tower floors.</li>
-<li><b>Sealed wards and tower rooms in the castles.</b> {castles['unreach_ground']} ground rooms in the castles have no opening at all, most of them the ground floors of the corner and wall towers (kennels, cellars, wells, stores). The great castles also wall off whole yards: {yard_text}.</li>
-<li><b>Market stalls are a solid block.</b> A stall is four fence posts with a square of wool and a carpet on top, packed on a 4-block grid so the stalls touch: no lane a villager can trade through, every stall the same shape, no counter you can see from the street. A rebuilt stall needs a pitched awning, an open front, a counter and goods on it, and a two-wide lane between rows.</li>
-<li><b>{totals['purpose']} rooms of twenty cells or more given no purpose</b> ({towns['nop']} in the towns and cities: upper house floors, arcade bays and tower tops; {castles['nop']} in the castles: tower tops under their caps and the stair halls). They're built, lit, and empty.</li>
-<li><b>{totals['doors']} house doors hung against a party wall</b> in the cities and towns: a terrace house's door set where the next house's wall stands. No castle has one.</li>
-<li><b>Lanes.</b> {100 * totals['lanes'] // max(1, totals['ground'])}% of outdoor ground cells are one-wide corridors overall; the worst are the great castles' wall-walk passages (11%) and the temple ruin's fallen drums.</li>
+<li><b>Every town house has its stair.</b> A straight flight of four along the back wall, one over another up the house, where the house is seven wide; a ladder up the back or a side wall through a hatch in each floor where it isn't. Unreachable rooms in the towns and cities: {BEFORE['town_unreach']} before, {towns['unreach']} now ({towns['unreach_upper']} of them upstairs, {towns['bedrooms']} lodgings).</li>
+<li><b>Towers, wards and yards opened.</b> The wall towers' ground floors get two short ladders down from their gallery rooms, with a half floor between; anything still shut off after the furniture gets a door through to a reached room, a ladder through its floor or ceiling, or a doorway to the ground inside the walls, never to the field. Unreachable rooms in the castles: {BEFORE['castle_unreach']} before, {castles['unreach']} now. Sealed yards inside the walls: {BEFORE['yards']} before, {sum(len(data[n].get('sealed_yards', [])) for n in data)} now.</li>
+<li><b>The market rebuilt.</b> Stalls stand in rows sharing their posts, facing each other across aisles four wide, in blocks of four with cross aisles between: a striped canopy stepping down to the front with a valance over the buyers, a board counter with the small goods on it, stock and a curtain at the back, a walk behind the counters for the stallholders, a lantern over each.</li>
+<li><b>Doors.</b> Doors against a wall or over a drop: {BEFORE['doors']} before, {totals['doors']} now. A lamp post in town_cross stood in a shop door; planters under windows stood in front of doors; a bed lay across a narrow house's doorway; the tithe barn's barrels blocked its own door.</li>
+<li><b>Relief on every plan.</b> {relief_total} pieces in all: a battered plinth stepping out at the foot of stone walls where the ground in front stays two wide, pilaster buttresses breaking long faces into bays, belt courses of corbelled stone at the floor lines, sills under the windows and hoods over them, a rubble footing course under plastered houses. None of it goes on a wall carrying a corbelled parapet (that face is the machicolations' drop) or where it would narrow a lane, and every block is one the regional themes remap. The cities' houses now have the timber-framed ground storeys the market towns had.</li>
+<li><b>Rooms with no purpose: {totals['purpose']}.</b> These are rooms the furnisher didn't name, most of them shops, inn rooms and smithies the town builders furnish themselves; rooms with nothing in them at all: {totals['bare']}.</li>
 </ul>
 </div>
 <h3>All plans</h3>
 <div class='wrap'><table>
-<tr><th>Plan</th><th>Kind</th><th>Rooms</th><th>Unreachable</th><th>Upper rooms sealed</th><th>No purpose</th><th>Bad doors</th><th>Sealed yards</th><th>One-wide lanes</th><th>Posts</th><th>Fails build</th></tr>
+<tr><th>Plan</th><th>Kind</th><th>Rooms</th><th>Unreachable</th><th>Upper rooms sealed</th><th>No purpose</th><th>Bad doors</th><th>Sealed yards</th><th>One-wide lanes</th><th>Relief</th><th>Posts</th><th>Fails build</th></tr>
 {''.join(rows)}
 </table></div>
 {''.join(sections)}

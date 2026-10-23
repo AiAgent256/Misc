@@ -220,6 +220,107 @@ def floor_plan(g, y, cells, path, rooms_here, marks, s=5):
     im.save(path)
 
 
+def _ground_at(g, x, z, GL):
+    """The standing level at (x, z): over the first floor down from the sky; past the plan's edge, GL."""
+    if not (0 <= x < g.X and 0 <= z < g.Z):
+        return GL
+    for y in range(g.Y - 2, 0, -1):
+        if walk.supports(g.get(x, y - 1, z)) and walk.passable(g.get(x, y, z)) and walk.passable(g.get(x, y + 1, z)):
+            return y
+    return GL
+
+
+def _walk_level(cells, x, z, GL):
+    """The level a man walks at in column (x, z), the one nearest the ground; None if he never stands there."""
+    ys = [y for y in range(GL - 6, GL + 40) if (x, y, z) in cells]
+    return min(ys, key=lambda y: abs(y - GL)) if ys else None
+
+
+def eye_views(g, meta, rs, cells, out, name, size=(1120, 630)):
+    """Pictures at a man's eye, the real textures: the gate from the road, the way in from inside the gate, the
+    biggest room a man can walk into and the biggest upstairs. [(caption, file)]."""
+    import mcrender
+    GL = meta["GL"]
+    sc = mcrender.Scene(g, GL)
+    views = []
+    gate = g.markers.get("gate", [None])[0]
+    if gate:
+        gx, gy, gz = gate
+        d = min(((gx, (-1, 0)), (g.X - 1 - gx, (1, 0)), (gz, (0, -1)), (g.Z - 1 - gz, (0, 1))))[1]
+        ox, oz = d
+        # the road outside, far enough to take in the gate's towers
+        far = 26 if g.X >= 100 else 18
+        cx, cz = gx + ox * far + 0.5, gz + oz * far + 0.5
+        cy = _ground_at(g, int(cx), int(cz), GL) + 1.62
+        views.append(("The gate from the road", (cx, cy, cz), (gx + 0.5, gy + 6, gz + 0.5), 70))
+        # inside: walk in past the gate passage to open sky, then look on in
+        k, ix, iz = 3, gx, gz
+        while k < 60:
+            ix, iz = gx - ox * k, gz - oz * k
+            if not (0 <= ix < g.X and 0 <= iz < g.Z):
+                break
+            y = _walk_level(cells, ix, iz, GL)
+            if y is not None and k >= 8 and all(walk.passable(g.get(ix, y + h, iz)) for h in range(2, 14)):
+                break
+            k += 1
+        y = _walk_level(cells, ix, iz, GL) or _ground_at(g, ix, iz, GL)
+        views.append(("Inside the gate", (ix + 0.5, y + 1.62, iz + 0.5), (ix - ox * 30 + 0.5, y + 4, iz - oz * 30 + 0.5), 70))
+    big = sorted([r for r in rs if len(r.cells) >= 20 and any((x, r.y, z) in cells for (x, z) in r.cells)],
+                 key=lambda r: -len(r.cells))
+    picked = []
+    if big:
+        picked.append(("Inside the biggest room", big[0]))
+        up = [r for r in big if r.y > GL + 2 and r is not big[0]]
+        if up:
+            picked.append(("Upstairs", up[0]))
+    for cap, r in picked:
+        # from the middle of an end wall down the room, standing where a man can: of the four ends, the one that sees
+        # furthest before a wall or a pillar
+        mx, mz = (r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2
+        free = [c for c in r.cells if (c[0], r.y, c[1]) in cells and walk.passable(g.get(c[0], r.y + 1, c[1]))] or list(r.cells)
+        cands = [(min(free, key=lambda c: (c[0] - r.x0) * 3 + abs(c[1] - mz)), (r.x1 + 0.5, mz + 0.5)),
+                 (min(free, key=lambda c: (r.x1 - c[0]) * 3 + abs(c[1] - mz)), (r.x0 + 0.5, mz + 0.5)),
+                 (min(free, key=lambda c: (c[1] - r.z0) * 3 + abs(c[0] - mx)), (mx + 0.5, r.z1 + 0.5)),
+                 (min(free, key=lambda c: (r.z1 - c[1]) * 3 + abs(c[0] - mx)), (mx + 0.5, r.z0 + 0.5))]
+
+        def clear(c, t):
+            (x0, z0), (tx, tz) = c, t
+            d = max(0.5, ((tx - x0 - 0.5) ** 2 + (tz - z0 - 0.5) ** 2) ** 0.5)
+            n = 0
+            for k in range(1, int(d * 2)):
+                px, pz = x0 + 0.5 + (tx - x0 - 0.5) * k / (d * 2), z0 + 0.5 + (tz - z0 - 0.5) * k / (d * 2)
+                if not walk.passable(g.get(int(px), r.y + 1, int(pz))):
+                    break
+                n += 1
+            return n
+        (x0, z0), (tx, tz) = max(cands, key=lambda ct: clear(*ct))
+        kind = getattr(r, "kind", None)
+        views.append((f"{cap}: {kind or 'a room'} {r.w()} by {r.d()}", (x0 + 0.5, r.y + 1.62, z0 + 0.5), (tx, r.y + 1.0, tz), 85))
+    outp = []
+    for i, (cap, pos, look, fov) in enumerate(views):
+        p = f"{name}_eye{i}.jpg"
+        try:
+            tmp = os.path.join(out, p.replace(".jpg", ".png"))
+            sc.eye(tmp, pos=pos, look=look, size=size, fov=fov)
+            Image.open(tmp).convert("RGB").save(os.path.join(out, p), quality=84)
+            os.remove(tmp)
+            outp.append((cap, p))
+        except Exception as e:                       # a camera inside a wall, a degenerate view: skip it
+            print("    eye view skipped:", cap, e)
+    return outp, sc
+
+
+def tex_iso(sc, g, out, p, box, cut=False, rot=0, width=1500):
+    """A textured isometric picture of the box, scaled to about `width` across, saved as a JPEG."""
+    x0, y0, z0, x1, y1, z1 = box
+    s = max(3, min(14, int(width / (0.72 * ((x1 - x0) + (z1 - z0)) + 1))))
+    tmp = os.path.join(out, p.replace(".jpg", ".png"))
+    sc.iso(tmp, box, s=s, rot=rot, cut=cut)
+    Image.open(tmp).convert("RGB").save(os.path.join(out, p), quality=84)
+    os.remove(tmp)
+    return p
+
+
 def cutaway(g, path, y_cut, s, rot):
     def cut(a):
         a[:, :, y_cut:] = 1
@@ -250,19 +351,20 @@ def run(only=None, out=None, pics=True):
         rs = plan_rooms(g, meta)
         s = 7 if g.X <= 70 else 5 if g.X <= 130 else 4
         fs = max(3, min(9, 1100 // g.X))
-        pics_ = {"iso": [], "cut": [], "floor": []}
+        pics_ = {"iso": [], "cut": [], "floor": [], "eye": []}
         if not pics:
             pics_ = old.get(name, {}).get("pics", pics_)
-        for rot in ((0, 2) if pics is True else ()):
-            p = f"{name}_iso{rot}.png"
-            render.render_iso(g, os.path.join(out, p), s=s, rot=rot)
-            pics_["iso"].append(p)
-        # cutaways: just over the ground floor and over each higher floor with rooms
-        cut_levels = [GL] + [y for y in levels if y > GL + 1][:5]
-        for y in (cut_levels if pics is True else ()):
-            p = f"{name}_cut{y - GL}.png"
-            cutaway(g, os.path.join(out, p), y + 3, s, 0)
-            pics_["cut"].append((y - GL, p))
+        if pics is True:
+            # at a man's eye, with the game's own textures, and the whole plan from a corner
+            pics_["eye"], sc = eye_views(g, meta, rs, cells, out, name)
+            whole = (0, max(0, GL - 3), 0, g.X, g.Y, g.Z)
+            pics_["iso"].append(tex_iso(sc, g, out, f"{name}_iso0.jpg", whole))
+            # cutaways, textured: just over the ground floor and over the two busiest floors above it
+            busy = sorted({y for y in levels if y > GL + 1}, key=lambda y: -sum(1 for r in rs if r.y == y and len(r.cells) >= 12))[:2]
+            for y in [GL] + sorted(busy):
+                p = f"{name}_cut{y - GL}.jpg"
+                tex_iso(sc, g, out, p, (0, max(0, GL - 3), 0, g.X, y + 3, g.Z), cut=True)
+                pics_["cut"].append((y - GL, p))
         if pics == "floors":
             pics_["floor"] = []
         for y in (sorted(set([GL] + levels)) if pics else ()):

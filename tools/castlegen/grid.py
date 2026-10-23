@@ -70,8 +70,28 @@ class Grid:
     def inb(self, x, y, z):
         return 0 <= x < self.X and 0 <= y < self.Y and 0 <= z < self.Z
 
+    # ---------- locks: cells a later step of the same build may not overwrite (a stair, its head room) ----------
+    def lock(self, cells):
+        if not hasattr(self, "_locked"):
+            self._locked = np.zeros(self.a.shape, dtype=bool)
+            self._locked_any = False
+        for (x, y, z) in cells:
+            if self.inb(x, y, z):
+                self._locked[x, z, y] = True
+                self._locked_any = True
+
+    def unlock_all(self):
+        self._locked_any = False
+        if hasattr(self, "_locked"):
+            self._locked[...] = False
+
+    def locked(self, x, y, z):
+        return getattr(self, "_locked_any", False) and self.inb(x, y, z) and bool(self._locked[x, z, y])
+
     def set(self, x, y, z, block, nbt=None):
         if not self.inb(x, y, z):
+            return
+        if getattr(self, "_locked_any", False) and self._locked[x, z, y]:
             return
         if isinstance(block, Mix):
             self.a[x, z, y] = self._ids_for(block, 1)[0]
@@ -101,7 +121,14 @@ class Grid:
         if xa > xb or ya > yb or za > zb:
             return
         sub = self.a[xa:xb + 1, za:zb + 1, ya:yb + 1]
+        keep = None
+        if getattr(self, "_locked_any", False):
+            lk = self._locked[xa:xb + 1, za:zb + 1, ya:yb + 1]
+            if lk.any():
+                keep = (lk, sub[lk].copy())
         sub[...] = self._ids_for(block, sub.size).reshape(sub.shape)
+        if keep is not None:
+            sub[keep[0]] = keep[1]
         for k in [k for k in self.block_nbt if xa <= k[0] <= xb and ya <= k[1] <= yb and za <= k[2] <= zb]:
             del self.block_nbt[k]
 
@@ -114,7 +141,14 @@ class Grid:
         n = int(mask2d.sum()) * (y1 - y0 + 1)
         if n == 0:
             return
+        keep = None
+        if getattr(self, "_locked_any", False):
+            lk = self._locked[:, :, y0:y1 + 1]
+            if lk.any():
+                keep = (lk, sub[lk].copy())
         sub[mask2d] = self._ids_for(block, n).reshape(-1, y1 - y0 + 1)
+        if keep is not None:
+            sub[keep[0]] = keep[1]
 
     def replace(self, x0, y0, z0, x1, y1, z1, frm, to):
         fid = self.index.get(frm)
@@ -155,6 +189,8 @@ class Grid:
     def bed(self, x, y, z, facing, color="red"):
         """Foot at (x,z); head one step toward facing."""
         dx, dz = FACING_VEC[facing]
+        if self.locked(x, y, z) or self.locked(x + dx, y, z + dz):
+            return
         self.set(x, y, z, f"minecraft:{color}_bed[facing={facing},part=foot]")
         self.set(x + dx, y, z + dz, f"minecraft:{color}_bed[facing={facing},part=head]")
 
@@ -433,7 +469,10 @@ def dogleg_stair(g, x0, z0, y_start, y_end, step_block, core_block, floor_block,
 
 
 def gable_roof(g, x0, z0, x1, z1, y, axis, stair, fill_block, overhang=1, ridge_slab=None):
-    """Gable roof over rect; ridge runs along `axis` ('x' or 'z'). y = first roof layer."""
+    """Gable roof over rect; ridge runs along `axis` ('x' or 'z'). y = first roof layer. The roof's box is kept on
+    g.roof_boxes: a man walking a roof's slope from a wall-walk isn't climbing a stair."""
+    span = (x1 - x0 if axis == "z" else z1 - z0) // 2 + overhang + 2
+    g.roof_boxes = getattr(g, "roof_boxes", []) + [(x0 - overhang, y, z0 - overhang, x1 + overhang, y + span, z1 + overhang)]
     if axis == "z":
         a0, a1 = x0 - overhang, x1 + overhang
         k = 0

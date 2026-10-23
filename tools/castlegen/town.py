@@ -41,8 +41,8 @@ GOODS = ["minecraft:hay_block[axis=y]", "minecraft:barrel[facing=up]", "minecraf
 GOODS = [b for b in GOODS if b not in ("minecraft:bread", "minecraft:cake")] + ["minecraft:cake"]
 # Timber-framed ground storeys (the market towns from their third revision): log posts at the corners and every
 # three blocks, a beam at the storey line, the wall between them as infill, shutters on every window, some barred,
-# and a planter of flowers on the sill. Off for the cities, so their plans rebuild as they were.
-FACADES = False
+# and a planter of flowers on the sill. The cities have them too since the relief revision.
+FACADES = True
 POTS = ("minecraft:potted_red_tulip", "minecraft:potted_poppy", "minecraft:potted_azure_bluet",
         "minecraft:potted_flowering_azalea_bush", "minecraft:potted_oxeye_daisy", "minecraft:potted_cornflower")
 
@@ -225,11 +225,15 @@ def townhouse(g, x0, z0, x1, z1, GL, rng, street, storeys=None, wall=None, trade
         g.set(door[0], GL, door[1], f"minecraft:dark_oak_door[facing={street},half=lower,hinge=left]")
         g.set(door[0], GL + 1, door[1], f"minecraft:dark_oak_door[facing={street},half=upper,hinge=left]")
         sx, sz = door[0] + ddx, door[1] + ddz
+        for yy in (GL, GL + 1):
+            if any(k in g.get(sx, yy, sz) for k in ("slab", "potted", "trapdoor", "flower_pot")):
+                g.set(sx, yy, sz, AIR)          # a planter under a window that the door took
         g.set(sx, GL - 1, sz, "minecraft:stone_bricks")
         if g.get(sx, GL + 2, sz) == AIR and not (jetty and storeys >= 2):
             g.stair(sx, GL + 2, sz, "minecraft:dark_oak_stairs", OPPOSITE[street], half="top")
         g.set(door[0] + (1 if along_x else 0) + ddx, GL + 2, door[1] + (0 if along_x else 1) + ddz, "minecraft:lantern[hanging=true]") \
             if g.get(door[0] + (1 if along_x else 0) + ddx, GL + 3, door[1] + (0 if along_x else 1) + ddz) != AIR else None
+    reserved = way_up(g, x0, z0, x1, z1, GL, sh, storeys, street, passage)
     # ---- shopfront ----
     if trade and not passage:
         t = TRADES[trade]
@@ -251,7 +255,7 @@ def townhouse(g, x0, z0, x1, z1, GL, rng, street, storeys=None, wall=None, trade
             inside = [(x0 + 1 if dx > 0 else x1 - 1, z) for z in range(z0 + 1, z1) if z != door[1]]
             front = [(fx + dx, z) for z in range(z0, z1 + 1)]
         items = list(t["items"])
-        for i, (x, z) in enumerate(inside[:4]):
+        for i, (x, z) in enumerate([c for c in inside if (c[0], GL, c[1]) not in reserved][:4]):
             g.set(x, GL, z, items[i % len(items)])
         # awning: a row of coloured wool one out over the pavement, on fence props, unless the jetty covers it
         col = t["awning"] or rng.choice(AWNING_COLORS)
@@ -289,17 +293,26 @@ def townhouse(g, x0, z0, x1, z1, GL, rng, street, storeys=None, wall=None, trade
         if not passage:
             # a home: towns sell some of these to travellers
             g.mark("dwelling", door[0], GL, door[-1])
-            # a bed and a chest on the ground floor
-            bx, bz = (x0 + 1, z1 - 1) if dz > 0 else (x1 - 1, z0 + 1)
-            g.bed(bx, GL, bz, "east" if bx == x0 + 1 else "west", rng.choice(BED_COLORS))
-            g.barrel(x1 - 1 if dz > 0 else x0 + 1, GL, z1 - 1 if dz > 0 else z0 + 1, LOOT + "town_house")
-    # upper floors: a bed each
+            # a bed and a chest on the ground floor, clear of the door and the stair
+            inside_door = (door[0] - ddx, door[1] - ddz)
+            keep = reserved | {(inside_door[0], GL, inside_door[1])}
+            bed_at(g, x0, z0, x1, z1, GL, keep, rng, prefer_front=dz > 0 or dx > 0)
+            for (cx_, cz_) in ((x1 - 1, z1 - 1), (x0 + 1, z0 + 1), (x1 - 1, z0 + 1), (x0 + 1, z1 - 1)) if dz > 0 else \
+                    ((x0 + 1, z0 + 1), (x1 - 1, z1 - 1), (x0 + 1, z1 - 1), (x1 - 1, z0 + 1)):
+                if (cx_, GL, cz_) not in keep and g.get(cx_, GL, cz_) == AIR:
+                    g.barrel(cx_, GL, cz_, LOOT + "town_house")
+                    break
+    # upper floors: a bed each, a lantern
     for s in range(1, storeys):
         y = GL + sh * s
-        bx, bz = (jx0 + 1, jz1 - 1) if dz > 0 else (jx1 - 1, jz0 + 1)
-        g.bed(bx, y, bz, "east" if bx == jx0 + 1 else "west", rng.choice(BED_COLORS))
-        g.lantern(jx0 + 2, y + sh - 2, jz0 + 2)
-    g.lantern(x0 + 2, GL + sh - 2, z0 + 2)
+        bed_at(g, jx0, jz0, jx1, jz1, y, reserved, rng, prefer_front=dz > 0)
+        lantern_at(g, jx0, jz0, jx1, jz1, y + sh - 2, reserved)
+    lantern_at(g, x0, z0, x1, z1, GL + sh - 2, reserved)
+    # the chimney keeps off the stair: the next corner along
+    if chim and any((chim[0], y, chim[1]) in reserved or g.get(chim[0], y, chim[1]) != AIR for y in range(GL, GL + 3)):
+        chim = next(((a, b) for (a, b) in ((x0 + 1, z0 + 1), (x1 - 1, z1 - 1), (x0 + 1, z1 - 1), (x1 - 1, z0 + 1))
+                     if all((a, y, b) not in reserved and g.get(a, y, b) == AIR for y in range(GL, top - 1, 1)
+                            if g.get(a, y, b) != PLANK)), None)
     # ---- the timber frame of the ground storey ----
     if FACADES:
         yb = GL + sh - 1
@@ -373,6 +386,121 @@ def townhouse(g, x0, z0, x1, z1, GL, rng, street, storeys=None, wall=None, trade
             g.fill(xx, y, bz - 1, xx, y, bz + 1, "minecraft:dark_oak_fence")
             g.fill(xx - dx, y, bz, xx - dx, y + 1, bz, AIR)
     return (door[0], GL, door[1])
+
+
+def way_up(g, x0, z0, x1, z1, GL, sh, storeys, street, passage):
+    """The stair between a town house's storeys: a straight flight of four along the back wall, one over the other
+    up the house, where the house is wide enough; else a ladder up the back or a side wall, through a hatch in each
+    floor. Returns the cells (x, y, z) the stair, its headroom and its landings take, for the furniture to keep off."""
+    if storeys < 2:
+        return set()
+    dx, dz = FACING_VEC[street]
+    along_x = dz != 0
+    ix0, iz0, ix1, iz1 = x0 + 1, z0 + 1, x1 - 1, z1 - 1
+    if along_x:
+        us = list(range(ix0, ix1 + 1))
+        back = iz0 if dz > 0 else iz1
+        depth = iz1 - iz0 + 1
+
+        def cell(u, v):
+            return (u, back + v * dz)
+    else:
+        us = list(range(iz0, iz1 + 1))
+        back = ix0 if dx > 0 else ix1
+        depth = ix1 - ix0 + 1
+
+        def cell(u, v):
+            return (back + v * dx, u)
+    flights = range(storeys - 1)
+    if not passage and len(us) >= 5 and depth >= 3:
+        for seq in (us, us[::-1]):
+            cs = [cell(seq[k], 0) for k in range(4)]
+            entry, exit_ = cell(seq[0], 1), cell(seq[3], 1)
+            need = set()
+            for s_ in flights:
+                yb = GL + sh * s_
+                (a1, b1), (a2, b2), (a3, b3), (a4, b4) = cs
+                need |= {(a1, yb, b1), (a1, yb + 1, b1), (a1, yb + 2, b1), (a2, yb + 1, b2), (a2, yb + 2, b2),
+                         (a3, yb + 2, b3), (a3, yb + 4, b3), (a4, yb + 4, b4), (a4, yb + 5, b4)}
+                for (ex, ez) in [cell(seq[k], 1) for k in range(4)]:
+                    need |= {(ex, yb, ez), (ex, yb + 1, ez), (ex, yb + 4, ez), (ex, yb + 5, ez)}
+            if not all(g.get(*c) == AIR for c in need):
+                continue
+            up = seq[1] - seq[0]
+            facing = ("east" if up > 0 else "west") if along_x else ("south" if up > 0 else "north")
+            for s_ in flights:
+                yb = GL + sh * s_
+                for k, (a, b) in enumerate(cs):
+                    g.stair(a, yb + k, b, "minecraft:spruce_stairs", facing)
+                for (a, b) in cs[:3]:
+                    g.set(a, yb + sh - 1, b, AIR)           # the hatch in the floor over the flight: head room to climb
+            out = need | {(a, GL + sh * s_ + k, b) for s_ in flights for k, (a, b) in enumerate(cs)}
+            out |= {(a, GL + sh * s_ + sh - 1, b) for s_ in flights for (a, b) in cs[:3]}
+            g.protected_xz = getattr(g, "protected_xz", set()) | {(a, b) for (a, _, b) in out}
+            g.narrow_ok = getattr(g, "narrow_ok", set()) | set(cs)
+            g.lock(out)
+            return out
+    # a ladder: up the back wall at either end, else up a side wall
+    top_y = GL + sh * (storeys - 1) - 1
+    cands = []
+    if not passage:
+        side_f = street
+        for u in [us[0], us[-1]] + us[1:-1]:
+            cands.append((cell(u, 0), side_f))
+    for v in range(1 if not passage else 0, depth - (1 if not passage else 0)):
+        (a, b) = cell(us[0], v)
+        cands.append(((a, b), "east" if along_x else "south"))
+        (a, b) = cell(us[-1], v)
+        cands.append(((a, b), "west" if along_x else "north"))
+    for (lx, lz), f in cands:
+        fdx, fdz = FACING_VEC[f]
+        wx, wz = lx - fdx, lz - fdz                    # the wall the ladder hangs on
+        floors_ = {GL + sh * s_ - 1 for s_ in range(1, storeys)}
+        ok = True
+        for y in range(GL, top_y + 1):
+            here = g.get(lx, y, lz)
+            wall_ = g.get(wx, y, wz)
+            if not (here == AIR or (y in floors_ and here == PLANK)) or not g.is_solid(wx, y, wz) or \
+                    any(k in wall_ for k in ("glass", "pane", "door", "bars", "fence", "slab", "stairs")):
+                ok = False
+                break
+        land = [(lx + fdx, GL + sh * s_, lz + fdz) for s_ in range(storeys)]
+        if ok and all(g.get(a, y, b) == AIR and g.get(a, y + 1, b) == AIR for (a, y, b) in land):
+            for y in range(GL, top_y + 1):
+                g.set(lx, y, lz, f"minecraft:ladder[facing={f}]")
+            out = {(lx, y, lz) for y in range(GL, top_y + 3)}
+            for (a, y, b) in land:
+                out |= {(a, y, b), (a, y + 1, b)}
+            g.protected_xz = getattr(g, "protected_xz", set()) | {(a, b) for (a, _, b) in out}
+            g.lock(out)
+            return out
+    return set()
+
+
+def bed_at(g, x0, z0, x1, z1, y, keep, rng, prefer_front=True):
+    """A bed in a corner of the room x0..x1, z0..z1 (walls included) at y, on two free cells off `keep`."""
+    ix0, iz0, ix1, iz1 = x0 + 1, z0 + 1, x1 - 1, z1 - 1
+    cands = [(ix0, iz1, "east"), (ix1, iz1, "west"), (ix0, iz0, "east"), (ix1, iz0, "west"),
+             (ix0, iz1, "north"), (ix1, iz1, "north"), (ix0, iz0, "south"), (ix1, iz0, "south")]
+    if not prefer_front:
+        cands = cands[2:4] + cands[:2] + cands[4:]
+    col = rng.choice(BED_COLORS)
+    for (x, z, f) in cands:
+        fx, fz = FACING_VEC[f]
+        cells = ((x, z), (x + fx, z + fz))
+        if all(ix0 <= a <= ix1 and iz0 <= b <= iz1 and (a, y, b) not in keep and g.get(a, y, b) == AIR
+               and g.get(a, y + 1, b) == AIR for (a, b) in cells):
+            g.bed(x, y, z, f, col)
+            return True
+    return False
+
+
+def lantern_at(g, x0, z0, x1, z1, y, keep):
+    """A lantern hung from the ceiling near the room's corner, off the stair."""
+    for (x, z) in ((x0 + 2, z0 + 2), (x1 - 2, z1 - 2), (x0 + 2, z1 - 2), (x1 - 2, z0 + 2), ((x0 + x1) // 2, (z0 + z1) // 2)):
+        if (x, y, z) not in keep and (x, y - 1, z) not in keep and g.get(x, y, z) == AIR:
+            g.lantern(x, y, z)
+            return
 
 
 def terrace(g, a0, a1, front, depth, GL, rng, street, trades=(), lot=(5, 9), passage_at=None):
@@ -520,34 +648,99 @@ def well(g, x, z, GL):
     g.set(x, GL + 1, z, "minecraft:cauldron")
 
 
+# what a stall sets out on its counter: small things on a board, the heavy stock behind
+COUNTER = {"baker": ["minecraft:cake", "minecraft:cake", "minecraft:candle[candles=2,lit=false]"],
+           "butcher": ["minecraft:decorated_pot", "minecraft:lantern[hanging=false]"],
+           "farmer": ["minecraft:potted_red_tulip", "minecraft:potted_oxeye_daisy", "minecraft:decorated_pot"],
+           "fish": ["minecraft:sea_pickle[pickles=3,waterlogged=false]", "minecraft:decorated_pot"],
+           "chandler": ["minecraft:candle[candles=4,lit=true]", "minecraft:white_candle[candles=3,lit=true]",
+                        "minecraft:lantern[hanging=false]"],
+           "apothecary": ["minecraft:brewing_stand", "minecraft:potted_brown_mushroom", "minecraft:potted_red_mushroom"],
+           "potter": ["minecraft:decorated_pot", "minecraft:flower_pot", "minecraft:decorated_pot"],
+           "cloth": ["minecraft:red_carpet", "minecraft:white_carpet", "minecraft:purple_carpet"],
+           "fletcher": ["minecraft:lantern[hanging=false]", "minecraft:decorated_pot"],
+           "general": ["minecraft:decorated_pot", "minecraft:potted_poppy", "minecraft:candle[candles=3,lit=false]",
+                       "minecraft:lantern[hanging=false]", "minecraft:flower_pot"]}
+STOCK = {"general": ["minecraft:barrel[facing=up]", "minecraft:hay_block[axis=y]", "minecraft:chest[facing=north]",
+                     "minecraft:composter"]}
+
+
+def stall_row(g, x0, x1, zb, GL, rng, facing, trades=(), k0=0):
+    """A row of market stalls sharing their posts, every four blocks from x0 to x1, the back on row zb and the
+    counter two rows toward `facing` (north or south). Each has three bays: stock and a striped curtain at the back,
+    a walk for the stallholder in the middle (one stall's to the next, open at the row's ends), a board counter at
+    the front with the small goods on it, the canopy over all stepping down to the front and hanging a valance
+    over the buyers' heads. Returns the number of stalls."""
+    dz = 1 if facing == "south" else -1
+    zm, zf, zo = zb + dz, zb + 2 * dz, zb + 3 * dz
+    n = (x1 - x0) // 4
+    for k in range(n):
+        xa = x0 + 4 * k
+        tr = trades[(k0 + k) % len(trades)] if trades else None
+        t = TRADES[tr] if tr else None
+        col = (t and t["awning"]) or rng.choice(AWNING_COLORS)
+        stripe = "white" if col not in ("white", "light_gray") else "gray"
+        for x in range(xa, xa + 5):
+            g.fill(x, GL, zm, x, GL + 3, zm, AIR)
+        for x in range(xa + 1, xa + 4):
+            c = col if (x - xa) % 2 else stripe
+            g.set(x, GL + 4, zb, f"minecraft:{c}_wool")
+            g.set(x, GL + 4, zm, f"minecraft:{c}_wool")
+            g.set(x, GL + 3, zf, f"minecraft:{c}_wool")
+            g.set(x, GL + 3, zo, f"minecraft:{c}_carpet") if g.get(x, GL + 3, zo) == AIR else None
+            # the back: stock on the ground, the curtain over it
+            g.set(x, GL + 2, zb, f"minecraft:{c}_wool")
+            g.set(x, GL + 3, zb, f"minecraft:{c}_wool")
+            # the counter: a board on the front row, goods on it
+            g.set(x, GL, zf, "minecraft:spruce_slab[type=top]")
+        stock = list(t["items"]) if t else STOCK["general"]
+        for i, x in enumerate((xa + 1, xa + 3)):
+            g.set(x, GL, zb, stock[int(rng.integers(len(stock)))] if i == 0 or rng.random() < 0.7 else "minecraft:barrel[facing=up]")
+        g.set(xa + 2, GL, zb, "minecraft:barrel[facing=up]")
+        small = COUNTER.get(tr, COUNTER["general"])
+        for x in (xa + 1, xa + 2, xa + 3):
+            if rng.random() < 0.8:
+                g.set(x, GL + 1, zf, small[int(rng.integers(len(small)))])
+        g.set(xa + 2, GL + 3, zm, "minecraft:lantern[hanging=true]")
+        if tr:
+            g.mark("shop_" + tr, xa + 2, GL, zm)
+            rot = {"south": 0, "north": 8}[facing]
+            g.set(xa + 2, GL + 2, zo, f"minecraft:spruce_hanging_sign[rotation={rot},attached=false]", nbt=sign_nbt(t["sign"]))
+    # the posts, shared between neighbours: the back ones carry the canopy a block higher
+    for x in range(x0, x0 + 4 * n + 1, 4):
+        g.fill(x, GL, zb, x, GL + 3, zb, "minecraft:spruce_fence")
+        g.fill(x, GL, zf, x, GL + 2, zf, "minecraft:spruce_fence")
+        g.set(x, GL + 4, zb, "minecraft:spruce_slab[type=bottom]")
+        g.set(x, GL + 3, zf, "minecraft:spruce_slab[type=bottom]")
+    return n
+
+
 def stall(g, x, z, GL, rng, facing="south", trade=None):
-    """A 3x3 market stall: four posts, a coloured awning, a counter with goods."""
-    t = TRADES[trade] if trade else None
-    col = (t and t["awning"]) or rng.choice(AWNING_COLORS)
-    for (a, b) in ((x - 1, z - 1), (x + 1, z - 1), (x - 1, z + 1), (x + 1, z + 1)):
-        g.fill(a, GL, b, a, GL + 2, b, "minecraft:spruce_fence")
-    g.fill(x - 1, GL + 3, z - 1, x + 1, GL + 3, z + 1, f"minecraft:{col}_wool")
-    # a pitched awning: slabs stepping up to the middle
-    g.fill(x - 1, GL + 4, z - 1, x + 1, GL + 4, z + 1, f"minecraft:{col}_carpet")
-    dx, dz = FACING_VEC[facing]
-    items = list(t["items"]) if t else GOODS
-    if dz:
-        cz = z + dz
-        for a in (x - 1, x, x + 1):
-            g.set(a, GL, cz, f"minecraft:spruce_trapdoor[facing={facing},open=false,half=top]")
-        g.set(x - 1, GL, z, items[int(rng.integers(len(items)))]); g.set(x + 1, GL, z, items[int(rng.integers(len(items)))])
-        g.set(x, GL, z - dz, "minecraft:barrel[facing=up]")
-    else:
-        cx = x + dx
-        for b in (z - 1, z, z + 1):
-            g.set(cx, GL, b, f"minecraft:spruce_trapdoor[facing={facing},open=false,half=top]")
-        g.set(x, GL, z - 1, items[int(rng.integers(len(items)))]); g.set(x, GL, z + 1, items[int(rng.integers(len(items)))])
-        g.set(x - dx, GL, z, "minecraft:barrel[facing=up]")
-    g.set(x, GL + 2, z, "minecraft:lantern[hanging=true]")
-    if trade:
-        g.mark("shop_" + trade, x, GL, z)
-        rot = {"south": 0, "west": 4, "north": 8, "east": 12}[facing]
-        g.set(x + dx, GL + 2, z + dz, f"minecraft:spruce_hanging_sign[rotation={rot},attached=false]", nbt=sign_nbt(t["sign"]))
+    """A single stall standing by itself, its middle bay on (x, z)."""
+    dz = 1 if facing == "south" else -1
+    stall_row(g, x - 2, x + 2, z - dz, GL, rng, facing if facing in ("north", "south") else "south",
+              trades=(trade,) if trade else ())
+
+
+def stall_cluster(g, x0, z0, x1, z1, GL, rng, trades=()):
+    """The market: rows of stalls facing each other across aisles four wide, back to back between the pairs of rows,
+    in blocks of four stalls with a cross aisle two wide between the blocks."""
+    rows = []
+    z = z0
+    while z + 9 <= z1:
+        rows += [(z, "south"), (z + 9, "north")]
+        z += 10
+    if z + 4 <= z1 and z1 - z0 < 10:
+        rows.append((z, "south"))
+    k = 0
+    for zb, f in rows:
+        bx = x0
+        while bx + 4 <= x1:
+            n = min(4, (x1 - bx) // 4)
+            if n < 1:
+                break
+            k += stall_row(g, bx, bx + 4 * n, zb, GL, rng, f, trades, k0=k)
+            bx += 4 * n + 3
 
 
 def arcade(g, x0, z0, x1, z1, GL, rng, inward, trades=()):
@@ -596,14 +789,3 @@ def arcade(g, x0, z0, x1, z1, GL, rng, inward, trades=()):
                 k += 1
         for z in range(z0 + 2, z1, 6):
             g.set(xx - (1 if inward == "east" else -1), GL + 3, z, "minecraft:lantern[hanging=true]")
-
-
-def stall_cluster(g, x0, z0, x1, z1, GL, rng, trades=()):
-    """Stalls packed in staggered rows with 1-wide lanes between."""
-    k = 0
-    for z in range(z0 + 1, z1 - 1, 4):
-        off = 2 if ((z - z0) // 4) % 2 else 0
-        for x in range(x0 + 1 + off, x1 - 1, 4):
-            tr = trades[k % len(trades)] if trades else None
-            stall(g, x, z, GL, rng, facing=rng.choice(["north", "south"]), trade=tr)
-            k += 1

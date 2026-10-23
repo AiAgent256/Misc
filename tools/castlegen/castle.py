@@ -35,6 +35,18 @@ def d_tower(g, side, pos, a, b, walk, GL, r=6):
                 banner_dirs=(), lantern_floors=True)
     # from the wall-walk room up through a hatch to the roof, two short ladders; mark posts
     roof_ladder(g, tower_room(g, cx, cz, r), walk, top, (cx + 2, cz, "west"), (cx - 2, cz, "east"))
+    # and down from the gallery room to the ground floor, the store under it: two short ladders on the walls
+    # across the door line, a half floor between them
+    room = tower_room(g, cx, cz, r)
+    px, pz = dz, dx                                  # across the line of the doors
+    ends = []
+    for sgn in (1, -1):
+        k = 0
+        while g.get(cx + sgn * px * (k + 1), GL, cz + sgn * pz * (k + 1)) == "minecraft:air":
+            k += 1
+        f = {(1, 0): "west", (-1, 0): "east", (0, 1): "north", (0, -1): "south"}[(sgn * px, sgn * pz)]
+        ends.append((cx + sgn * px * k, cz + sgn * pz * k, f))
+    roof_ladder(g, room, GL, GL + 9, ends[0], ends[1])
     for k in range(6):
         ang = k * np.pi / 3
         g.mark("archer", int(round(cx + 3 * np.cos(ang))), top, int(round(cz + 3 * np.sin(ang))))

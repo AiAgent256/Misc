@@ -389,8 +389,10 @@ def write(root):
     os.makedirs(sdir, exist_ok=True)
     os.makedirs(jdir, exist_ok=True)
     index = []
+    import relief
     for fn in PIECES:
         g, meta = fn()
+        relief.relieve(g, meta)                  # the stone's relief, as on the castles' and the towns' houses
         tiles = export.write_tiles(g, os.path.join(sdir, meta["name"]), "fief/" + meta["name"])
         if len(tiles) != 1:
             raise SystemExit(meta["name"] + " spans tiles")

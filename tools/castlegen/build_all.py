@@ -12,6 +12,8 @@ import castle
 import castle2
 import city
 import city2
+import connect
+import relief
 import crypt
 import gatehouse
 import defense_audit
@@ -61,7 +63,10 @@ VARIANTS = {"fortified_manor": ("pyramid", 3), "lake_castle": ("cone", 4), "grea
 # cramped spot fails the build while the old ones wait their turn.
 SCALE_LIMITS = {"*": {"narrow_stairs": 0, "pinches": 3, "dark_rooms": 0},
                 "great_castle_a": {"narrow_stairs": 0, "pinches": 8, "dark_rooms": 0},
-                "great_castle_a2": {"narrow_stairs": 0, "pinches": 8, "dark_rooms": 0},
+                # the relief revision opened the second plan's sealed yards: the gap between a tower and the hall is
+                # walked now, and is one wide
+                "great_castle_a2": {"narrow_stairs": 0, "pinches": 9, "dark_rooms": 0},
+                "great_castle_a_moat": {"narrow_stairs": 0, "pinches": 9, "dark_rooms": 0},
                 "great_castle_b": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
                 "great_castle_b2": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
                 "great_castle_c": {"narrow_stairs": 1, "pinches": 6, "dark_rooms": 0},
@@ -73,11 +78,15 @@ SCALE_LIMITS = {"*": {"narrow_stairs": 0, "pinches": 3, "dark_rooms": 0},
                 # terrace trees stood off the keep wall, every tower room lit. What's left is house doors
                 # against party walls and a few gaps on the walks.
                 "great_city": {"narrow_stairs": 0, "pinches": 17, "dark_rooms": 0},
-                "canal_city": {"narrow_stairs": 0, "pinches": 17, "dark_rooms": 0},
+                # the relief revision: the east square's notice board stands between the arcade's piers, and the
+                # doors the old audit found against party walls open now onto one-wide gaps by the timber posts
+                "canal_city": {"narrow_stairs": 0, "pinches": 24, "dark_rooms": 0},
                 # a ruin is meant to be broken: gaps between fallen drums, shade under the last of the entablature
                 "temple_ruin": {"narrow_stairs": 0, "pinches": 10, "dark_rooms": 3},
-                "great_castle_d": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
-                "great_castle_d2": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
+                # the relief revision joined the drum towers' upper rooms to the walks: the slots from each floor
+                # onto the walk, one wide through the drum's wall, are walked now (four towers, two or three floors)
+                "great_castle_d": {"narrow_stairs": 0, "pinches": 20, "dark_rooms": 0},
+                "great_castle_d2": {"narrow_stairs": 0, "pinches": 20, "dark_rooms": 0},
                 # the ring fortress on its island: the same castle as great_castle_b inside
                 "lake_castle": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
                 "lake_castle2": {"narrow_stairs": 0, "pinches": 6, "dark_rooms": 0},
@@ -159,6 +168,13 @@ for _name in GATES_AND_KEEPS:
     REVISIONS[_name] = REVISIONS.get(_name, 1) + 1
 
 
+# The relief revision: a stair in every town house, a way into every shut room and walled yard, the market's stalls in
+# rows across aisles, the doors' mouths cleared, relief on the walls, timber-framed ground storeys in the cities.
+# Every plan's blocks changed: a revision each.
+for _fn, _name, _style, _shift in builds():
+    REVISIONS[_name] = REVISIONS.get(_name, 1) + 1
+
+
 def build_plan(fn, name, style, seed_shift, strict=True):
     """One plan built, furnished, lit and audited as the export sees it. Returns (g, meta, kinds, audits).
     With strict, a plan that fails its limits stops the build; without, the failures are reported in audits."""
@@ -166,6 +182,7 @@ def build_plan(fn, name, style, seed_shift, strict=True):
     parts.CAP_STYLE = style
     g, meta = fn() if seed_shift is None else fn(seed=fn.__defaults__[0] + seed_shift)
     parts.CAP_STYLE = "cone"
+    g.unlock_all()                                  # the builders' stair locks end with the build
     # machicolations in the corbelled parapets, then the men onto their sills and to the holes' lips
     holes = [] if meta.get("kind") == "landmark" else machicolate.open_crenels(g, meta["GL"])
     at_embrasures = fixup.embrasures(g)
@@ -197,6 +214,26 @@ def build_plan(fn, name, style, seed_shift, strict=True):
     # loops low in the towers where the walk can't see the walls' foot: after the furniture, so no slit
     # opens behind a bed, and after the doorways, so a slit's sill isn't taken for a blocked door
     kinds["loops"] = 0 if landmark else loops.flank(g, meta["GL"])[0]
+    # every door's mouth clear, every room and walled yard with a way in: after the furniture, the crypt, the doorways and the loops
+    kinds["mouths"] = connect.free_door_mouths(g)
+    if not landmark:
+        # yards first: a yard opened can bring a tower's door within reach; round again until nothing changes
+        kinds["joined"], kinds["yards"] = 0, 0
+        for _ in range(4):
+            y_ = connect.link_yards(g, meta)
+            j_ = connect.link_rooms(g, meta)
+            kinds["yards"] += y_
+            kinds["joined"] += j_
+            if not (y_ or j_):
+                break
+        # the doorways the rooms just joined bring within reach are made two wide, as every other
+        if kinds["joined"] or kinds["yards"]:
+            kinds["doorways_widened"] += scale.widen_doorways(g, meta["GL"])
+        if os.environ.get("RELIEF", "1") != "0":
+            for k, v in relief.relieve(g, meta).items():
+                kinds["relief_" + k] = v
+        # rooms the new doorways and the relief made of a gap or an alley: light them as the rest
+        kinds["lit"] += fixup.light_rooms(g, meta["GL"], rev=max(REVISIONS.get(name, 1), 2 if name in NEW_PLANS else 1))
     dropped = fixup.drop_buried_markers(g)
     bad, checked = walk.audit(g, meta)
     unreachable = sum(len(v) for v in bad.values())
