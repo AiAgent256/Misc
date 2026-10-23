@@ -20,6 +20,8 @@ PLASTER_FACE = {"white_terracotta", "light_gray_terracotta", "white_concrete_pow
                 "orange_terracotta", "smooth_stone"}
 OPENING = ("pane", "glass", "bars", "door", "trapdoor", "fence_gate")
 STAIR = "minecraft:stone_brick_stairs"
+WOOD_STAIR = "minecraft:dark_oak_stairs"
+WOOD_SLAB = "minecraft:dark_oak_slab[type=top]"
 DARK_STAIR = "minecraft:deepslate_brick_stairs"
 RUBBLE = ("minecraft:cobblestone", "minecraft:stone_bricks", "minecraft:andesite", "minecraft:cobblestone",
           "minecraft:mossy_cobblestone")
@@ -273,13 +275,14 @@ def relieve(g, meta):
             if "pane" not in below and P.is_air(ax, y - 1, az) and free(ax, y - 1, az):
                 s0 = P.start[ax, az, y - 1] if g.inb(ax, y - 1, az) else -1
                 if s0 >= 0 and (y - 1) - s0 >= 3 and P.name(x, y - 1, z) in STONE_FACE | PLASTER_FACE and lonely(ax, y - 1, az, dx, dz):
-                    put(ax, y - 1, az, f"{STAIR}[facing={OPP[f]},half=top]")
+                    # stone under a stone wall's window, oak under a plastered one
+                    put(ax, y - 1, az, f"{STAIR if P.name(x, y - 1, z) in STONE_FACE else WOOD_STAIR}[facing={OPP[f]},half=top]")
                     n["sill"] += 1
             above = g.get(x, y + 1, z)
             if "pane" not in above and P.name(x, y + 1, z) in STONE_FACE | PLASTER_FACE and free(ax, y + 1, az):
                 s0 = P.start[ax, az, y + 1] if g.inb(ax, y + 1, az) else -1
                 if s0 >= 0 and (y + 1) - s0 >= 3 and P.is_air(ax, y + 2, az) and lonely(ax, y + 1, az, dx, dz):
-                    put(ax, y + 1, az, "minecraft:stone_brick_slab[type=top]")
+                    put(ax, y + 1, az, "minecraft:stone_brick_slab[type=top]" if P.name(x, y + 1, z) in STONE_FACE else WOOD_SLAB)
                     n["hood"] += 1
     # ---------------- footings under plaster ----------------
     for (x, y, z, dx, dz, f) in _faces(P, PLASTER_FACE):

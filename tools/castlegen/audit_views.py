@@ -253,16 +253,35 @@ def eye_views(g, meta, rs, cells, out, name, size=(1120, 630)):
         cx, cz = gx + ox * far + 0.5, gz + oz * far + 0.5
         cy = _ground_at(g, int(cx), int(cz), GL) + 1.62
         views.append(("The gate from the road", (cx, cy, cz), (gx + 0.5, gy + 6, gz + 0.5), 70))
-        # inside: walk in past the gate passage to open sky, then look on in
-        k, ix, iz = 3, gx, gz
-        while k < 60:
+        # inside: walk in along the road, through the gate passage if there is one, out under the sky again
+        def open_sky(ix, iz, y):
+            return all(walk.passable(g.get(ix, y + h, iz)) or
+                       any(t in g.get(ix, y + h, iz) for t in ("lantern", "chain", "banner", "sign", "wool", "carpet", "leaves", "fence", "torch"))
+                       for h in range(2, 14))
+        k, ix, iz, last, passage, out_again = 1, gx, gz, None, False, None
+        while k < 90:
             ix, iz = gx - ox * k, gz - oz * k
             if not (0 <= ix < g.X and 0 <= iz < g.Z):
                 break
             y = _walk_level(cells, ix, iz, GL)
-            if y is not None and k >= 8 and all(walk.passable(g.get(ix, y + h, iz)) for h in range(2, 14)):
-                break
+            if y is not None:
+                last = (ix, iz)
+                sky = open_sky(ix, iz, y)
+                if not sky:
+                    passage = True
+                elif passage and out_again is None:
+                    out_again = k
+                if out_again is not None and k >= out_again + 5:
+                    break
             k += 1
+        if not passage:
+            # no gatehouse to go through: stand a dozen in from the gate
+            k = 12
+            ix, iz = gx - ox * k, gz - oz * k
+            if _walk_level(cells, ix, iz, GL) is None and last:
+                ix, iz = last
+        elif out_again is None and last:
+            ix, iz = last
         y = _walk_level(cells, ix, iz, GL) or _ground_at(g, ix, iz, GL)
         views.append(("Inside the gate", (ix + 0.5, y + 1.62, iz + 0.5), (ix - ox * 30 + 0.5, y + 4, iz - oz * 30 + 0.5), 70))
     big = sorted([r for r in rs if len(r.cells) >= 20 and any((x, r.y, z) in cells for (x, z) in r.cells)],
@@ -331,7 +350,7 @@ def run(only=None, out=None, pics=True):
     out = out or os.path.join(ROOT, "build", "audit")
     os.makedirs(out, exist_ok=True)
     old = {}
-    if (not pics or only) and os.path.exists(os.path.join(out, "audit.json")):
+    if (not pics or pics == "eyes" or only) and os.path.exists(os.path.join(out, "audit.json")):
         old = json.load(open(os.path.join(out, "audit.json")))
     results = dict(old) if only else {}
     for fn, name, style, seed_shift in build_all.builds():
@@ -352,8 +371,19 @@ def run(only=None, out=None, pics=True):
         s = 7 if g.X <= 70 else 5 if g.X <= 130 else 4
         fs = max(3, min(9, 1100 // g.X))
         pics_ = {"iso": [], "cut": [], "floor": [], "eye": []}
-        if not pics:
+        if not pics or pics == "eyes":
             pics_ = old.get(name, {}).get("pics", pics_)
+        if pics == "eyes":
+            pics_ = dict(old.get(name, {}).get("pics", pics_))
+            if not pics_.get("iso"):
+                # the pictures already drawn for this plan, found on disk
+                import re
+                files_ = os.listdir(out)
+                pics_["iso"] = [f for f in (f"{name}_iso0.jpg",) if f in files_]
+                pics_["cut"] = sorted((int(m.group(1)), f) for f in files_ for m in [re.fullmatch(re.escape(name) + r"_cut(\d+)\.jpg", f)] if m)
+                pics_["floor"] = sorted((int(m.group(1)), f, sum(1 for r in rs if r.y == GL + int(m.group(1)) and len(r.cells) >= 12))
+                                        for f in files_ for m in [re.fullmatch(re.escape(name) + r"_floor(\d+)\.png", f)] if m)
+            pics_["eye"], _ = eye_views(g, meta, rs, cells, out, name)
         if pics is True:
             # at a man's eye, with the game's own textures, and the whole plan from a corner
             pics_["eye"], sc = eye_views(g, meta, rs, cells, out, name)
@@ -367,7 +397,7 @@ def run(only=None, out=None, pics=True):
                 pics_["cut"].append((y - GL, p))
         if pics == "floors":
             pics_["floor"] = []
-        for y in (sorted(set([GL] + levels)) if pics else ()):
+        for y in (sorted(set([GL] + levels)) if pics in (True, "floors") else ()):
             here = [r for r in rs if r.y == y and len(r.cells) >= 12]
             if y != GL and not here:
                 continue
@@ -395,5 +425,6 @@ if __name__ == "__main__":
     ap.add_argument("--out")
     ap.add_argument("--no-pics", action="store_true")
     ap.add_argument("--floors", action="store_true")
+    ap.add_argument("--eyes", action="store_true", help="redraw only the eye-level views")
     a = ap.parse_args()
-    run(a.only, a.out, pics="floors" if a.floors else not a.no_pics)
+    run(a.only, a.out, pics="eyes" if a.eyes else "floors" if a.floors else not a.no_pics)
