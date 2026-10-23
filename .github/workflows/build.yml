@@ -82,9 +82,10 @@ jobs:
           gradle jar --no-daemon -q
           JAR=$(ls build/libs/*.jar | grep -v -- '-sources' | head -1)
           SHA=$(git rev-parse --short HEAD)
-          mkdir -p /tmp/dist && cp "$JAR" /tmp/dist/
-          cp "$JAR" /tmp/dist/stormhold-latest.jar
-          echo "$SHA $(basename $JAR) $(date -u +%FT%TZ)" > /tmp/dist/BUILD.txt
+          # GitHub refuses files over 100 MB and the jar carries every plan revision, so it goes up in parts:
+          # cat stormhold-0.1.0.jar.part* > stormhold-0.1.0.jar puts it back together
+          mkdir -p /tmp/dist && split -b 45000000 -d "$JAR" "/tmp/dist/$(basename $JAR).part"
+          echo "$SHA $(basename $JAR) $(date -u +%FT%TZ) parts=$(ls /tmp/dist | grep -c part) sha1=$(sha1sum "$JAR" | cut -d' ' -f1)" > /tmp/dist/BUILD.txt
           git checkout -q --orphan dist
           git rm -rf -q . || true
           cp /tmp/dist/* .
