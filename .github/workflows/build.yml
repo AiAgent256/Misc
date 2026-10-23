@@ -87,9 +87,10 @@ jobs:
           mkdir -p /tmp/dist && split -b 45000000 -d "$JAR" "/tmp/dist/$(basename $JAR).part"
           echo "$SHA $(basename $JAR) $(date -u +%FT%TZ) parts=$(ls /tmp/dist | grep -c part) sha1=$(sha1sum "$JAR" | cut -d' ' -f1)" > /tmp/dist/BUILD.txt
           git checkout -q --orphan dist
-          git rm -rf -q . || true
+          git rm -rf -q --cached . || true
           cp /tmp/dist/* .
-          git add -A
+          # only the parts and the build note: the working tree's build/ and .gradle/ hold files GitHub refuses
+          git add -f -- BUILD.txt "$(basename $JAR)".part*
           git commit -q -m "build $SHA"
           ok=0
           for i in 1 2 3 4 5 6; do git push --force origin dist && ok=1 && break; sleep $((i * 10)); done
