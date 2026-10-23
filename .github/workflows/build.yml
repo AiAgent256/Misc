@@ -90,4 +90,6 @@ jobs:
           cp /tmp/dist/* .
           git add -A
           git commit -q -m "build $SHA"
-          for i in 1 2 3 4; do git push -q --force origin dist && break; sleep $((i * 5)); done
+          ok=0
+          for i in 1 2 3 4 5 6; do git push --force origin dist && ok=1 && break; sleep $((i * 10)); done
+          if [ "$ok" != 1 ]; then echo "jar not published to dist"; exit 1; fi
