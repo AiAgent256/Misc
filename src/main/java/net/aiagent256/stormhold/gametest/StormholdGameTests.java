@@ -575,6 +575,48 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /**
+     * War parties sent together wait at the walls for the farthest of them. The case from play: twelve parties on
+     * Dawnwall, the nearest about 1,050 blocks off and the farthest about 4,010; at 3 blocks a second the farthest
+     * comes up some 11 minutes after the nearest, and a fixed five-minute wait sent the near ones in alone.
+     */
+    @GameTest(template = "arena")
+    public static void warPartiesWaitForTheFarthest(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        UUID target = UUID.randomUUID();
+        String side = Sides.player(UUID.randomUUID());
+        java.util.function.BiFunction<BlockPos, Double, net.aiagent256.stormhold.holding.Campaign> party = (from, progress) -> {
+            var c = new net.aiagent256.stormhold.holding.Campaign();
+            c.kind = net.aiagent256.stormhold.holding.Campaign.Kind.PARTY;
+            c.side = side;
+            c.target = target;
+            c.from = from;
+            c.to = new BlockPos(1162, 125, -3133);
+            c.progress = progress;
+            return c;
+        };
+        var near = party.apply(new BlockPos(119, 77, -3019), 0.98);          // Goldkeep, at the walls
+        var far = party.apply(new BlockPos(358, 67, 797), 0.375);            // Blackguard Tower, 37.5% of ~4,011 blocks
+        var lost = party.apply(new BlockPos(358, 67, 50797), 0.0);           // fifty thousand blocks off
+        try {
+            mgr.campaigns.add(near);
+            // alone: the floor of five minutes
+            if (net.aiagent256.stormhold.holding.Campaigns.siegeWait(mgr, near) != 6000)
+                throw new IllegalStateException("alone, a party waits " + net.aiagent256.stormhold.holding.Campaigns.siegeWait(mgr, near));
+            mgr.campaigns.add(far);
+            // (0.98 - 0.375) x 4,011 = 2,427 blocks; / 3 = 809 s; + 60 s = 869 s = 17,380 ticks
+            long w = net.aiagent256.stormhold.holding.Campaigns.siegeWait(mgr, near);
+            if (w < 17000 || w > 17800) throw new IllegalStateException("waits " + w + " ticks for a party 2,427 blocks out");
+            mgr.campaigns.add(lost);
+            if (net.aiagent256.stormhold.holding.Campaigns.siegeWait(mgr, near) != 36000)
+                throw new IllegalStateException("a lost party holds the rest " + net.aiagent256.stormhold.holding.Campaigns.siegeWait(mgr, near));
+        } finally {
+            mgr.campaigns.removeIf(x -> target.equals(x.target));
+        }
+        g.succeed();
+    }
+
     @GameTest(template = "arena")
     public static void councilSeatsPayAndHelp(GameTestHelper g) {
         ServerLevel level = g.getLevel();

@@ -220,6 +220,27 @@ public final class Campaigns {
         return false;
     }
 
+    /** The least a party waits at the walls for the others: five minutes. */
+    static final long SIEGE_WAIT_MIN = 6000;
+    /** The most: thirty minutes, so a party lost on the road can't hold the rest there for ever. */
+    static final long SIEGE_WAIT_MAX = 36000;
+
+    /**
+     * How long the first party at the walls waits for the rest, in ticks: until the farthest of ours still on the
+     * road gets there at the unseen pace, and a minute over, never less than five minutes or more than thirty.
+     * Parties from castles thousands of blocks apart arrive many minutes apart; a fixed five minutes sent them in
+     * piecemeal, the near ones alone.
+     */
+    public static long siegeWait(HoldingManager mgr, Campaign c) {
+        double slowest = 0;
+        for (Campaign o : mgr.campaigns) {
+            if (o == c || !together(o, c) || o.stage != Campaign.Stage.MARCH) continue;
+            slowest = Math.max(slowest, Math.max(0, 0.98 - o.progress) * o.length() / MARCH_SPEED);
+        }
+        long wait = (long) Math.ceil(slowest) * 20 + 1200;
+        return Math.max(SIEGE_WAIT_MIN, Math.min(SIEGE_WAIT_MAX, wait));
+    }
+
     /**
      * Every party of ours before these walls, nobody watching, goes in as one army: their strength summed, each in
      * its own kit, against the garrison behind its walls. A win takes the castle (and sends them all home inside
@@ -724,7 +745,7 @@ public final class Campaigns {
         Holding enemy = c.target != null ? mgr.holdings.get(c.target) : null;
         if (c.stage == Campaign.Stage.MARCH && c.progress >= 0.98) {
             c.stage = Campaign.Stage.SIEGE;
-            c.siegeUntil = now + 6000;
+            c.siegeUntil = now + siegeWait(mgr, c);
             // the first of ours at these walls sets the hour: those who come after go in with them
             for (Campaign o : mgr.campaigns)
                 if (o != c && together(o, c) && o.stage == Campaign.Stage.SIEGE) c.siegeUntil = Math.min(c.siegeUntil, o.siegeUntil);
@@ -740,7 +761,7 @@ public final class Campaigns {
                         .withStyle(ChatFormatting.GOLD));
         }
         // fought out while nobody watches: every party of ours at these walls goes in together, once the last
-        // of them is there or the first has waited its five minutes
+        // of them is there or the first has waited out its time (long enough for the farthest to come up)
         if (c.stage == Campaign.Stage.SIEGE && c.live.isEmpty() && enemy != null && (now >= c.siegeUntil || !othersMarching(mgr, c))) {
             if (assault(level, mgr, c, enemy, now)) return;
         }
