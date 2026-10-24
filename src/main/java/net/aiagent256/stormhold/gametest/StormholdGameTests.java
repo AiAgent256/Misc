@@ -652,7 +652,22 @@ public class StormholdGameTests {
             if (blank > 0) throw new IllegalStateException(blank + " pixels of the home sheet left blank");
             if (shades.size() < 3) throw new IllegalStateException("the home sheet is " + shades.size() + " shades: " + shades);
             if (c.state[home] != net.aiagent256.stormhold.holding.Chart.CHARTED) throw new IllegalStateException("home not charted: " + c.state[home]);
-            if (ms > 30000) throw new IllegalStateException("a sheet took " + ms + " ms to draw");
+            if (ms > 12000) throw new IllegalStateException("a sheet took " + ms + " ms to draw");
+            // the map's reckoning of the ground against the exact height the world will have, over the sheet
+            var gen = level.getChunkSource().getGenerator();
+            var rs = level.getChunkSource().randomState();
+            double err = 0;
+            int n = 0, worst = 0;
+            for (int k = 0; k < 64; k++) {
+                int x = data.centerX - 1000 + (k % 8) * 250, z = data.centerZ - 1000 + (k / 8) * 250;
+                int exact = gen.getBaseHeight(x, z, net.minecraft.world.level.levelgen.Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
+                int ours = net.aiagent256.stormhold.holding.Chart.groundAt(level, x, z, gen.getSeaLevel());
+                err += Math.abs(exact - ours);
+                worst = Math.max(worst, Math.abs(exact - ours));
+                n++;
+            }
+            Stormhold.LOGGER.info("Great map: ground within {} blocks on average of the exact height, {} at worst", String.format("%.1f", err / n), worst);
+            if (err / n > 12) throw new IllegalStateException("the map's ground is off by " + err / n + " blocks on average");
         } finally {
             h.chart = null;
             mgr.holdings.remove(h.id);

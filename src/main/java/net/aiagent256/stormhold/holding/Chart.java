@@ -29,7 +29,10 @@ import net.minecraft.world.level.block.entity.SignBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.levelgen.DensityFunction;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
+import net.minecraft.world.level.levelgen.NoiseSettings;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.saveddata.maps.MapDecoration;
@@ -558,16 +561,18 @@ public final class Chart {
         int sea = gen.getSeaLevel();
         int step = 1 << data.scale;
         int x0 = data.centerX - 64 * step, z0 = data.centerZ - 64 * step;
+        Ground ground = Ground.of(level, gen, rs);
         if (j.prev == null) {
             j.prev = new int[128];
-            for (int px = 0; px < 128; px++) j.prev[px] = height(level, gen, rs, x0 + px * step + step / 2, z0 - step / 2);
+            int hint = sea;
+            for (int px = 0; px < 128; px++) hint = j.prev[px] = ground.height(x0 + px * step + step / 2, z0 - step / 2, hint);
         }
         while (j.row < 128) {
             int z = z0 + j.row * step + step / 2;
             int[] row = new int[128];
             for (int px = 0; px < 128; px++) {
                 int x = x0 + px * step + step / 2;
-                int y = height(level, gen, rs, x, z);
+                int y = ground.height(x, z, j.prev[px]);
                 row[px] = y;
                 Holder<Biome> b = gen.getBiomeSource().getNoiseBiome(QuartPos.fromBlock(x), QuartPos.fromBlock(Math.max(y, sea)),
                         QuartPos.fromBlock(z), rs.sampler());
@@ -595,9 +600,64 @@ public final class Chart {
         }
     }
 
-    /** The ground's height at a spot as the world will make it, from the noise: no chunk loaded or made. */
-    static int height(ServerLevel level, ChunkGenerator gen, RandomState rs, int x, int z) {
-        return gen.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
+    /**
+     * The ground's height at a spot as the world will make it, without loading or making a chunk. On a noise world
+     * it's the preliminary surface the game itself works out for its aquifers and surface rules: the first height
+     * from the top where the terrain's density, without the peaks' jaggedness or the caves, is solid. A few points of
+     * one density function a spot, where the exact height runs the whole noise column. Started from a hint (the
+     * height next door), it's a short way down to the ground from just over it.
+     */
+    static final class Ground {
+        /** The density at which the game counts the preliminary surface solid. */
+        static final double SOLID = 0.390625;
+        final ServerLevel level;
+        final ChunkGenerator gen;
+        final RandomState rs;
+        @Nullable final DensityFunction density;
+        final int minY, top;
+
+        private Ground(ServerLevel level, ChunkGenerator gen, RandomState rs, @Nullable DensityFunction density, int minY, int top) {
+            this.level = level;
+            this.gen = gen;
+            this.rs = rs;
+            this.density = density;
+            this.minY = minY;
+            this.top = top;
+        }
+
+        static Ground of(ServerLevel level, ChunkGenerator gen, RandomState rs) {
+            if (gen instanceof NoiseBasedChunkGenerator nb) {
+                NoiseSettings ns = nb.generatorSettings().value().noiseSettings();
+                return new Ground(level, gen, rs, rs.router().initialDensityWithoutJaggedness(), ns.minY(), ns.minY() + ns.height());
+            }
+            return new Ground(level, gen, rs, null, level.getMinBuildHeight(), level.getMaxBuildHeight());
+        }
+
+        boolean solid(int x, int y, int z) {
+            return density.compute(new DensityFunction.SinglePointContext(x, y, z)) > SOLID;
+        }
+
+        int height(int x, int z, int hint) {
+            if (density == null) return gen.getBaseHeight(x, z, Heightmap.Types.OCEAN_FLOOR_WG, level, rs);
+            // down in eights from a little over the hint (from the top if that's already in the ground)
+            int y = Math.min(top, hint + 40);
+            if (solid(x, y, z)) y = top;
+            while (y >= minY && !solid(x, y, z)) y -= 8;
+            if (y < minY) return minY;
+            // the first air within the eight above
+            int lo = y, hi = Math.min(top, y + 8);
+            while (hi - lo > 1) {
+                int mid = (lo + hi) >>> 1;
+                if (solid(x, mid, z)) lo = mid;
+                else hi = mid;
+            }
+            return hi;
+        }
+    }
+
+    /** The ground's height as the great map reckons it (tests). */
+    public static int groundAt(ServerLevel level, int x, int z, int hint) {
+        return Ground.of(level, level.getChunkSource().getGenerator(), level.getChunkSource().randomState()).height(x, z, hint);
     }
 
     /** One pixel: water shaded by its depth, the land by its biome and shaded by the slope from the north, as the game's maps are. */
