@@ -309,7 +309,8 @@ public final class Scouts {
                     for (int dz = -r; dz <= r; dz++) {
                         if (Math.max(Math.abs(dx), Math.abs(dz)) != r) continue;
                         BlockPos p = anchor.offset(dx, dy, dz);
-                        if (!h.box.isInside(p) || !level.isLoaded(p) || !level.getBlockState(p).isAir() || MapRoom.onWall(h, p)) continue;
+                        if (!h.box.isInside(p) || !level.isLoaded(p) || !level.getBlockState(p).isAir() || MapRoom.onWall(h, p)
+                                || Chart.onWall(h, p)) continue;
                         for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
                             BlockPos wall = p.relative(d.getOpposite());
                             var ws = level.getBlockState(wall);

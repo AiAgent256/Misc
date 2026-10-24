@@ -617,6 +617,146 @@ public class StormholdGameTests {
         g.succeed();
     }
 
+    /** The great map: a sheet drawn from the lie of the land, every pixel of it, and how long it takes. */
+    @GameTest(template = "arena", timeoutTicks = 400)
+    public static void greatMapDrawsTheCountry(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        Holding h = sample(g);
+        h.owner = Sides.player(player.getUUID());
+        mgr.holdings.put(h.id, h);
+        try {
+            var c = net.aiagent256.stormhold.holding.Chart.fresh(level, h);
+            h.chart = c;
+            for (int i = 0; i < net.aiagent256.stormhold.holding.Chart.SHEETS; i++)
+                if (net.minecraft.world.item.MapItem.getSavedData(c.maps[i], level) == null) throw new IllegalStateException("sheet " + i + " has no map");
+            int home = net.aiagent256.stormhold.holding.Chart.HOME;
+            var data = net.minecraft.world.item.MapItem.getSavedData(c.maps[home], level);
+            BlockPos at = h.center();
+            if (data.scale != 4 || Math.abs(data.centerX - at.getX()) > 1024 || Math.abs(data.centerZ - at.getZ()) > 1024)
+                throw new IllegalStateException("the home sheet is centred at " + data.centerX + ", " + data.centerZ + " for a castle at " + at);
+            if (c.sheetAt(at.getX(), at.getZ()) != home || c.sheetAt(at.getX() + 2048, at.getZ()) != home + 1
+                    || c.sheetAt(at.getX(), at.getZ() - 2048) != home - net.aiagent256.stormhold.holding.Chart.SIDE || c.sheetAt(at.getX() + 6000, at.getZ()) != -1)
+                throw new IllegalStateException("sheets: east " + c.sheetAt(at.getX() + 2048, at.getZ()) + ", north " + c.sheetAt(at.getX(), at.getZ() - 2048));
+            long t0 = System.nanoTime();
+            net.aiagent256.stormhold.holding.Chart.drawAll(level, mgr, h, home);
+            long ms = (System.nanoTime() - t0) / 1_000_000;
+            Stormhold.LOGGER.info("Great map: a 2,048-block sheet drawn in {} ms", ms);
+            int blank = 0;
+            java.util.Set<Byte> shades = new java.util.HashSet<>();
+            for (byte b : data.colors) {
+                if (b == 0) blank++;
+                shades.add(b);
+            }
+            if (blank > 0) throw new IllegalStateException(blank + " pixels of the home sheet left blank");
+            if (shades.size() < 3) throw new IllegalStateException("the home sheet is " + shades.size() + " shades: " + shades);
+            if (c.state[home] != net.aiagent256.stormhold.holding.Chart.CHARTED) throw new IllegalStateException("home not charted: " + c.state[home]);
+            if (ms > 30000) throw new IllegalStateException("a sheet took " + ms + " ms to draw");
+        } finally {
+            h.chart = null;
+            mgr.holdings.remove(h.id);
+        }
+        g.succeed();
+    }
+
+    /** The great map goes up over a sign that says Map, 5 by 5, each sheet in its frame. */
+    @GameTest(template = "arena")
+    public static void greatMapGoesUpOverTheSign(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        Holding h = sample(g);
+        h.owner = Sides.player(player.getUUID());
+        BlockPos o = g.absolutePos(BlockPos.ZERO);
+        h.box = new BoundingBox(o.getX(), o.getY(), o.getZ(), o.getX() + 15, o.getY() + 12, o.getZ() + 15);
+        for (int x = 2; x <= 12; x++) for (int y = 2; y <= 8; y++) g.setBlock(new BlockPos(x, y, 1), net.minecraft.world.level.block.Blocks.STONE_BRICKS);
+        BlockPos signAt = g.absolutePos(new BlockPos(7, 2, 2));
+        level.setBlock(signAt, net.minecraft.world.level.block.Blocks.OAK_WALL_SIGN.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.WallSignBlock.FACING, net.minecraft.core.Direction.SOUTH), 3);
+        if (!(level.getBlockEntity(signAt) instanceof net.minecraft.world.level.block.entity.SignBlockEntity sign))
+            throw new IllegalStateException("no sign");
+        sign.setText(sign.getFrontText().setMessage(0, net.minecraft.network.chat.Component.literal("[Map]")), true);
+        mgr.holdings.put(h.id, h);
+        try {
+            var c = net.aiagent256.stormhold.holding.Chart.fresh(level, h);
+            h.chart = c;
+            if (!net.aiagent256.stormhold.holding.Chart.ensureWall(level, mgr, h)) throw new IllegalStateException("the map didn't go up over the sign");
+            BlockPos tl = signAt.west(2).above(5);
+            if (!tl.equals(c.wallTopLeft) || c.wallFacing != net.minecraft.core.Direction.SOUTH)
+                throw new IllegalStateException("wall at " + c.wallTopLeft + " facing " + c.wallFacing + ", wanted " + tl);
+            if (!c.frame(2, 4).equals(signAt.above()) || !c.frame(4, 0).equals(tl.east(4)))
+                throw new IllegalStateException("frames: bottom middle " + c.frame(2, 4) + ", top right " + c.frame(4, 0));
+            for (int i = 0; i < net.aiagent256.stormhold.holding.Chart.SHEETS; i++) {
+                BlockPos p = c.frame(i % 5, i / 5);
+                var frames = level.getEntitiesOfClass(net.minecraft.world.entity.decoration.ItemFrame.class, new net.minecraft.world.phys.AABB(p));
+                if (frames.size() != 1) throw new IllegalStateException(frames.size() + " frames at sheet " + i);
+                Integer id = net.minecraft.world.item.MapItem.getMapId(frames.get(0).getItem());
+                if (id == null || id != c.maps[i]) throw new IllegalStateException("sheet " + i + " holds map " + id + ", not " + c.maps[i]);
+            }
+            // taken down: it goes back up
+            var homeFrame = level.getEntitiesOfClass(net.minecraft.world.entity.decoration.ItemFrame.class,
+                    new net.minecraft.world.phys.AABB(c.frame(2, 2))).get(0);
+            homeFrame.setItem(net.minecraft.world.item.ItemStack.EMPTY, false);
+            net.aiagent256.stormhold.holding.Chart.drawAll(level, mgr, h, net.aiagent256.stormhold.holding.Chart.HOME);
+            net.aiagent256.stormhold.holding.Chart.tick(level, mgr, h, 200);
+            if (homeFrame.getItem().isEmpty()) throw new IllegalStateException("the home sheet wasn't put back");
+            if (!net.aiagent256.stormhold.holding.Chart.onWall(h, c.frame(0, 0))) throw new IllegalStateException("onWall");
+        } finally {
+            for (var f : level.getEntitiesOfClass(net.minecraft.world.entity.decoration.ItemFrame.class, net.minecraft.world.phys.AABB.of(h.box).inflate(2))) f.discard();
+            level.removeBlock(signAt, false);
+            h.chart = null;
+            mgr.holdings.remove(h.id);
+        }
+        g.succeed();
+    }
+
+    /** Riders go out in pairs to the nearest sheets, the castle keeps its walls manned, and they come home to draw. */
+    @GameTest(template = "arena")
+    public static void greatMapRidersChartTheNearest(GameTestHelper g) {
+        ServerLevel level = g.getLevel();
+        HoldingManager mgr = HoldingManager.get(level);
+        var player = g.makeMockPlayer();
+        Holding h = sample(g);
+        h.owner = Sides.player(player.getUUID());
+        h.add(Role.KNIGHT, 10);
+        mgr.holdings.put(h.id, h);
+        try {
+            var c = net.aiagent256.stormhold.holding.Chart.fresh(level, h);
+            h.chart = c;
+            int men = h.troops();
+            net.aiagent256.stormhold.holding.Chart.launch(level, mgr, h, c);
+            int pairs = Math.min(net.aiagent256.stormhold.holding.Chart.PAIRS, (men - net.aiagent256.stormhold.holding.Chart.KEEP) / 2);
+            if (c.trips.size() != pairs || h.troops() != men - 2 * pairs)
+                throw new IllegalStateException(c.trips.size() + " pairs out, " + h.troops() + " of " + men + " men home");
+            // the nearest first: the four sheets that share a side with home
+            java.util.Set<Integer> out = new java.util.HashSet<>();
+            for (var t : c.trips) out.add(t.sheet);
+            int home = net.aiagent256.stormhold.holding.Chart.HOME, side = net.aiagent256.stormhold.holding.Chart.SIDE;
+            int near = 0;
+            for (int s : out) if (s == home - 1 || s == home + 1 || s == home - side || s == home + side) near++;
+            if (near < Math.min(pairs, 3)) throw new IllegalStateException("riders sent to sheets " + out);
+            for (var t : c.trips) {
+                if (t.ride <= 0 || c.state[t.sheet] != net.aiagent256.stormhold.holding.Chart.OUT)
+                    throw new IllegalStateException("trip to " + t.sheet + ": ride " + t.ride + ", state " + c.state[t.sheet]);
+                t.stage = 2;
+                t.left = 1;
+            }
+            net.aiagent256.stormhold.holding.Chart.ride(level, mgr, h, c);
+            if (!c.trips.isEmpty() || h.troops() != men) throw new IllegalStateException("home: " + c.trips.size() + " out, " + h.troops() + " of " + men);
+            for (int s : out) if (c.state[s] != net.aiagent256.stormhold.holding.Chart.DRAW)
+                throw new IllegalStateException("sheet " + s + " is " + c.state[s] + " once its riders are home");
+            // saved and loaded, as it was
+            var back = net.aiagent256.stormhold.holding.Chart.load(c.save());
+            if (back.homeX != c.homeX || !java.util.Arrays.equals(back.maps, c.maps) || !java.util.Arrays.equals(back.state, c.state))
+                throw new IllegalStateException("saved and loaded differently");
+        } finally {
+            h.chart = null;
+            mgr.holdings.remove(h.id);
+        }
+        g.succeed();
+    }
+
     @GameTest(template = "arena")
     public static void councilSeatsPayAndHelp(GameTestHelper g) {
         ServerLevel level = g.getLevel();

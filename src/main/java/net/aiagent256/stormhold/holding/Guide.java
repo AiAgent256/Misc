@@ -79,6 +79,13 @@ public final class Guide {
                     + " a War Banner on it and keep their men 12 blocks off for " + net.aiagent256.stormhold.Config.CAPTURE_SECONDS.get() + "s"));
         }
         if (mine && !h.warTablePos.equals(BlockPos.ZERO)) out.add(line("War Table", from, h.warTablePos, "Stores, the garrison, repairs and fortifying"));
+        if (mine && h.chart != null) {
+            if (h.chart.wallTopLeft != null)
+                out.add(line("Great map", from, h.chart.frame(Chart.SIDE / 2, Chart.SIDE - 1), h.chart.progress()));
+            else
+                out.add(Component.literal("  Great map: ").withStyle(ChatFormatting.GOLD).append(Component.literal(h.chart.progress()
+                        + ". No wall for it yet: a sign that says Map on a wall with room for 5 by 5 maps over it").withStyle(ChatFormatting.GRAY)));
+        }
         var barracks = h.extras.get("barracks");
         if (h.isCity() && barracks != null && !barracks.isEmpty())
             out.add(line("Muster Post, at the barracks", from, barracks.get(0), "Right-click with emeralds: 6 a knight, sneak 5 an archer, sneak + empty off-hand 5 a crossbowman"));

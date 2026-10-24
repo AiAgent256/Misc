@@ -185,7 +185,7 @@ public final class MapRoom {
         for (int c = 0; c < across; c++) {
             for (int r = 0; r < down; r++) {
                 BlockPos f = bl.relative(right, c).above(r);
-                if (!h.box.isInside(f) || !level.isLoaded(f) || !level.getBlockState(f).isAir()) return false;
+                if (!h.box.isInside(f) || !level.isLoaded(f) || !level.getBlockState(f).isAir() || Chart.onWall(h, f)) return false;
                 if (!level.getBlockState(f.relative(d)).isAir()) return false;
                 BlockPos wall = f.relative(d.getOpposite());
                 BlockState ws = level.getBlockState(wall);

@@ -6,7 +6,8 @@
   "refmap": "stormhold.refmap.json",
   "mixins": [
     "StructureMixin",
-    "LootTableAccessor"
+    "LootTableAccessor",
+    "MapDataInvoker"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -13,6 +13,7 @@ public final class HoldingTicker {
         HoldingManager mgr = HoldingManager.get(level);
         if (t % 100 == 13) Detector.detect(level, mgr);
         Roads.tick(level, mgr);
+        Chart.drawTick(level, mgr);
         Engines.tickStones(level);
         if (t % 10 == 5) {
             for (Holding h : mgr.holdings.values()) {
@@ -57,6 +58,7 @@ public final class HoldingTicker {
         Warbands.schedule(level, mgr, h, now);
         Columns.tickSupply(level, mgr, h, now);
         City.tickPostings(level, mgr, h, now);
+        Chart.tick(level, mgr, h, now);
         if (h.isPlayerOwned() && h.mode == Holding.Mode.ATTACK && h.attackTarget != null && now >= h.nextCampaign) {
             h.nextCampaign = now + 6000;
             Campaigns.launchParty(level, mgr, h, h.attackTarget);
